@@ -26,6 +26,22 @@ public enum Rules {
     }
     return Content.shared.events[id]!
   }
+  public static func task(_ id: TaskID) -> Task {
+    if let building = Construction.building(for:id) {
+      let definition = Construction.definition(building)
+      return Task(id:id,name:"Build \(definition.title.lowercased())",description:definition.benefit,icon:"hammer",workers:1,moneyCost:definition.cost,foodCost:0,foodGain:0,moneyGain:0,houseGain:0)
+    }
+    return Content.shared.tasks[id.rawValue]!
+  }
+  public static func consumption(_ state: GameState, house: Int) -> Int {
+    let winter = state.season == 3
+    let base = winter && Construction.active(.woodshed,state:state) ? 6 : b.consumption
+    return base + (winter && house < b.coldThreshold ? b.coldFood : 0)
+  }
+  public static func weathering(_ state: GameState) -> Int {
+    state.season == 3 && Construction.active(.woodshed,state:state) ? 6 : b.wear[state.season]
+  }
+  public static func suppliesGain(_ state: GameState) -> Int { Construction.active(.cellar,state:state) ? 10 : b.supplyGain }
   public static func taskOptions(_ s: GameState) -> [Task] {
     let t = Content.shared.tasks
     var tasks: [Task] = []
@@ -36,7 +52,10 @@ public enum Rules {
       harvest.foodGain = b.harvest + s.cropBonus + (s.tended ? b.tendedBonus : 0)
       tasks.append(harvest)
     }
-    return tasks + ["repair", "paid", "help", "supplies", "rest"].map { t[$0]! }
+    let construction = Construction.definitions.filter { Construction.unavailable($0.id,state:s) == nil }.map { task($0.task) }
+    return tasks + [TaskID.repair, .paid, .help, .supplies, .rest].map { id in
+      var value = task(id); if id == .supplies { value.foodGain = suppliesGain(s) }; return value
+    } + construction
   }
   public static func choiceProblem(_ s: GameState, choice c: Choice) -> String? {
     if s.money + (c.effect.money ?? 0) < 0 {
@@ -49,14 +68,14 @@ public enum Rules {
   }
   public static func preview(_ s: GameState) -> Projection {
     var p = Projection()
-    p.consumption = b.consumption
-    p.wear = b.wear[s.season]
+    p.consumption = consumption(s,house:s.house)
+    p.wear = weathering(s)
     let assigned = WorkerID.allCases.compactMap { s.assignments[$0.rawValue] }
     for id in assigned {
-      let task = Content.shared.tasks[id.rawValue]!
+      let task = task(id)
       p.foodCost += task.foodCost
       p.moneyCost += task.moneyCost
-      p.foodGain += task.foodGain
+      p.foodGain += id == .supplies ? suppliesGain(s) : task.foodGain
       p.moneyGain += task.moneyGain
       p.houseGain += task.houseGain
     }
@@ -76,7 +95,7 @@ public enum Rules {
       p.errors.append("Planting needs \(p.foodCost) food for seed; only \(s.food) is available.")
     }
     let repaired = min(100, s.house + p.houseGain)
-    if s.season == 3 && repaired < b.coldThreshold { p.consumption += b.coldFood }
+    p.consumption = consumption(s,house:repaired)
     p.foodAfter = s.food - p.foodCost + p.foodGain - p.consumption
     p.moneyAfter = s.money - p.moneyCost + p.moneyGain
     p.houseAfter = max(0, repaired - p.wear)
@@ -109,7 +128,7 @@ public enum Rules {
     }
     var candidate = s
     candidate.assignments[worker.rawValue] = task
-    for exclusive in [TaskID.plant, .tend] {
+    for exclusive in [TaskID.plant, .tend, .buildWoodshed, .buildCellar] {
       if candidate.assignments.values.filter({ $0 == exclusive }).count > 1 {
         return "Only one adult is needed for that task."
       }
@@ -161,11 +180,10 @@ public enum Rules {
       if s.phase == .opening {
         s.phase = .work
       } else {
-        let consumption =
-          b.consumption + (s.season == 3 && s.house < b.coldThreshold ? b.coldFood : 0)
+        let consumption = consumption(s,house:s.house)
         let deficit = max(0, consumption - s.food)
         s.food = max(0, s.food - consumption)
-        s.house = max(0, s.house - b.wear[s.season])
+        s.house = max(0, s.house - weathering(s))
         if deficit > 0 {
           s.hardship.append(Hardship(season: s.season, kind: "food", amount: deficit))
         }
@@ -194,12 +212,15 @@ public enum Rules {
         foodBefore: s.food, foodAfter: 0, moneyBefore: s.money, moneyAfter: 0, houseBefore: s.house,
         houseAfter: 0, consumption: p.consumption, wear: p.wear, deficit: 0,
         tasks: WorkerID.allCases.map {
-          "\(Content.shared.people[$0.rawValue]!.name): \(Content.shared.tasks[s.assignments[$0.rawValue]!.rawValue]!.name)"
+          "\(Content.shared.people[$0.rawValue]!.name): \(task(s.assignments[$0.rawValue]!).name)"
         })
       s.food = s.food - p.foodCost + p.foodGain
       s.money = s.money - p.moneyCost + p.moneyGain
       s.house = min(100, s.house + p.houseGain)
-      let tasks = s.assignments.values
+      let tasks = Array(s.assignments.values)
+      for definition in Construction.definitions where tasks.contains(definition.task) {
+        s.buildings.append(BuildingRecord(id:definition.id,completedSeason:s.season))
+      }
       if tasks.contains(.plant) {
         s.planted = true
         s.cropBonus = ["borrowed", "paid"].contains(s.ox) ? b.oxBonus : 0

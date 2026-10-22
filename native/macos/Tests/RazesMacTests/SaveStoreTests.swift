@@ -39,3 +39,23 @@ final class SaveStoreTests: XCTestCase {
     XCTAssertEqual(try Data(contentsOf: blocker), bytes)
   }
 }
+
+extension SaveStoreTests {
+  func testMigrationBacksUpOriginalOnceAndFailedPreservationRetainsBytes() throws {
+    let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    try FileManager.default.createDirectory(at:directory,withIntermediateDirectories:true)
+    defer { try? FileManager.default.removeItem(at:directory) }
+    let url = directory.appendingPathComponent("save.json")
+    var object = try JSONSerialization.jsonObject(with:SaveCodec.encode(Rules.newGame())) as! [String:Any]
+    object["version"] = 1; object.removeValue(forKey:"buildings")
+    let original = try JSONSerialization.data(withJSONObject:object); try original.write(to:url)
+    let store = SaveStore(url:url)
+    let migrated = try XCTUnwrap(store.load())
+    XCTAssertEqual(migrated.version,2); XCTAssertEqual(try Data(contentsOf:url),original)
+    let blocked = SaveStore(url:url,preserveOriginal:{ _,_ in throw CocoaError(.fileWriteNoPermission) })
+    XCTAssertThrowsError(try blocked.save(migrated)); XCTAssertEqual(try Data(contentsOf:url),original)
+    try store.save(migrated); try store.save(migrated)
+    let backups = try FileManager.default.contentsOfDirectory(at:directory,includingPropertiesForKeys:nil).filter { $0.lastPathComponent.contains("migration") }
+    XCTAssertEqual(backups.count,1); XCTAssertEqual(try Data(contentsOf:XCTUnwrap(backups.first)),original)
+  }
+}

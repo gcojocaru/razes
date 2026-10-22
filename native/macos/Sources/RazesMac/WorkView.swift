@@ -15,7 +15,7 @@ struct WorkView: View {
           HStack {
             Text(person.name).font(.headline).frame(width: 60, alignment: .leading)
             if let filter {
-              Button("Assign \(Content.shared.tasks[filter.rawValue]!.name)") {
+              Button("Assign \(Rules.task(filter).name)") {
                 session.send(
                   Action(type: "assign", revision: revision, worker: worker, task: filter))
               }
@@ -45,7 +45,7 @@ struct WorkView: View {
           {
             Text(problem).font(.caption).foregroundStyle(.secondary)
           } else if let id = state.assignments[worker.rawValue],
-            let task = Content.shared.tasks[id.rawValue]
+            case let task = Rules.task(id)
           {
             Text(task.description).font(.caption).foregroundStyle(.secondary)
             if task.moneyCost > 0 || task.foodCost > 0 {

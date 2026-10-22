@@ -90,7 +90,7 @@ enum Hotspot: String, CaseIterable { case field, house, visitor, stores }
     for j in 0..<4 {
       if j == 3 && p.visitor == nil { continue }
       let task = j < 3 ? s.assignments[WorkerID.allCases[j].rawValue]! : .rest
-      let pos = j < 3 ? positions[task]! : CGPoint(x: 827, y: 554)
+      let pos = j < 3 ? (positions[task] ?? positions[.rest]!) : CGPoint(x: 827, y: 554)
       let frame = j < 3 ? j : p.visitor == "dumitru" ? 4 : 3
       let x = pos.x + (j == 1 ? 35 : j == 2 ? -29 : 0)
       let y = pos.y + (j < 3 ? CGFloat(j * 8) : 0)

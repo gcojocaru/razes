@@ -5,13 +5,22 @@ public enum SaveCodec {
   public static func decode(_ data: Data) throws -> GameState {
     guard data.count <= 1_000_000 else { throw GameError("This save is too large to read safely.") }
     let s: GameState
-    do { s = try JSONDecoder().decode(GameState.self, from: data) } catch {
-      throw GameError("This save could not be read. You can start a fresh household.")
-    }
-    guard s.version == 1 else {
-      throw GameError(
-        "This save belongs to an unsupported version. You can start a fresh household.")
-    }
+    do {
+      guard var object = try JSONSerialization.jsonObject(with:data) as? [String:Any], let version = object["version"] as? Int else {
+        throw GameError("This save could not be read.")
+      }
+      guard version == 1 || version == 2 else { throw GameError("This save belongs to an unsupported version.") }
+      if version == 1 {
+        guard object["buildings"] == nil,
+          let assignments = object["assignments"] as? [String:String],
+          assignments.values.allSatisfy({ Content.shared.tasks[$0] != nil }) else {
+          throw GameError("This legacy save contains unsupported construction data.")
+        }
+        object["version"] = 2; object["buildings"] = []
+      }
+      s = try JSONDecoder().decode(GameState.self,from:JSONSerialization.data(withJSONObject:object))
+    } catch let error as GameError { throw error }
+    catch { throw GameError("This save could not be read. You can start a fresh household.") }
     func ensure(_ valid: Bool) throws {
       if !valid {
         throw GameError("This save is invalid or incomplete. You can start a fresh household.")
@@ -89,7 +98,7 @@ public enum SaveCodec {
       "spring-ox", "spring-table", "summer-brother", s.tended ? "summer-tended" : "summer-dry",
       opening?.choice == "borrow" ? "autumn-promise" : "autumn-free", "autumn-dispute",
       ox == "broken" ? "winter-isolation" : "winter-friend",
-      s.house + b.wear[3] < b.coldThreshold ? "winter-cold" : "winter-hearth",
+      s.house + Rules.weathering(s) < b.coldThreshold ? "winter-cold" : "winter-hearth",
     ]
     for (i, h) in s.history.enumerated() { try ensure(h.event == events[i] && h.season == i / 2) }
     try ensure(
@@ -113,8 +122,25 @@ public enum SaveCodec {
     try ensure(s.cropBonus == (s.planted && opening?.choice != "decline" ? b.oxBonus : 0))
     if s.phase == .work {
       try ensure(
-        assigned.reduce(0) { $0 + Content.shared.tasks[$1.rawValue]!.moneyCost } <= s.money)
-      try ensure(assigned.reduce(0) { $0 + Content.shared.tasks[$1.rawValue]!.foodCost } <= s.food)
+        assigned.reduce(0) { $0 + Rules.task($1).moneyCost } <= s.money)
+      try ensure(assigned.reduce(0) { $0 + Rules.task($1).foodCost } <= s.food)
+    }
+    try ensure(s.buildings.count <= BuildingID.allCases.count)
+    try ensure(Set(s.buildings.map(\.id)).count == s.buildings.count)
+    for record in s.buildings {
+      try ensure(integer(record.completedSeason,0,2) && record.completedSeason <= s.season)
+      let task = Construction.definition(record.id).task
+      if record.completedSeason == s.season {
+        try ensure(resolved && assigned.contains(task))
+      }
+    }
+    for definition in Construction.definitions {
+      try ensure(n(definition.task) <= 1)
+      if n(definition.task) > 0 {
+        try ensure(s.season < 3)
+        let completion = s.buildings.first { $0.id == definition.id }
+        try ensure(resolved ? completion?.completedSeason == s.season : completion == nil)
+      }
     }
     return s
   }

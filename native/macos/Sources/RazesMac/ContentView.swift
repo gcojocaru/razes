@@ -82,7 +82,7 @@ struct ContentView: View {
             Text(
               "Read the seasonal conversation and choose a response. Assign one task to each adult, review the forecast, then confirm the work. An evening conversation follows before food consumption and weathering. Continue through winter to see your household’s ending.\n\nHarvest needs two adults. Honouring the borrowed ox promise reserves Petru’s autumn assignment. Every accepted choice and draft assignment saves on this Mac.\n\nScene hotspots have matching buttons. Tab moves between controls; Escape closes this window."
             ).lineSpacing(6)
-          } else if let id = selectedTask, let task = Content.shared.tasks[id.rawValue] {
+          } else if let id = selectedTask, case let task = Rules.task(id) {
             Text(task.name).font(.title2)
             Text(task.description)
             Text(

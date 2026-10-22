@@ -30,7 +30,7 @@ final class GameSessionTests: XCTestCase {
     XCTAssertTrue(session.needsRecovery)
     session.send(Action(type: "choose", revision: 0, event: "spring-ox", choice: "borrow"))
     XCTAssertEqual(try Data(contentsOf: url), bad)
-    try store.save(Rules.newGame())
+    try SaveCodec.encode(Rules.newGame()).write(to: url)
     session.retryLoad()
     XCTAssertFalse(session.needsRecovery)
   }
