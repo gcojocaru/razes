@@ -3,3 +3,8 @@ dist/
 test-results/
 playwright-report/
 .superpowers/
+
+# Native macOS generated output
+native/macos/.build/
+native/macos/.swiftpm/
+native/macos/build/
