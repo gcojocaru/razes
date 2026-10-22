@@ -44,6 +44,7 @@
 ### Task 1: Reference fixtures and a matching Swift game core
 
 **Interfaces:**
+
 - Consume the types and functions in `src/game/{types,balance,content,rules}.ts` and `src/scene/presentation.ts`.
 - Produce Codable/Equatable Swift state/action/content types mirroring the reference fields and stable raw identifiers.
 - Produce `Rules.newGame() -> GameState`, `Rules.dispatch(_ state: GameState, action: Action) throws -> GameState`, `Rules.preview(_ state: GameState) -> Projection`, `Rules.currentEvent(_ state: GameState) -> GameEvent`, `Rules.ending(_ state: GameState) -> Ending`, `Rules.taskOptions(_ state: GameState) -> [Task]`, `Rules.choiceProblem(_ state: GameState, choice: Choice) -> String?`, and `Rules.assignmentProblem(_ state: GameState, worker: WorkerID, task: TaskID) -> String?`.
@@ -59,6 +60,7 @@
 ### Task 2: Validated saves and loss-preserving recovery
 
 **Interfaces:**
+
 - Consume `GameState` from Task 1.
 - Produce `SaveCodec.encode(_ state: GameState) throws -> Data` and `SaveCodec.decode(_ data: Data) throws -> GameState` in the core.
 - Produce `SaveStore.init(url: URL)`, `SaveStore.load() throws -> GameState?`, `SaveStore.save(_ state: GameState) throws`, and `SaveStore.startFresh(_ state: GameState) throws` in the app. The default location is resolved with FileManager's user Application Support URL, appending `Razes/household-v1.json`.
@@ -72,6 +74,7 @@
 ### Task 3: A complete playable SwiftUI year
 
 **Interfaces:**
+
 - Consume Task 1 rules and Task 2 persistence.
 - Produce `@MainActor @Observable final class GameSession`, owning `state: GameState`, `error: String?`, `storageWarning: String?`, and recovery status; methods `send(_ action: Action)`, `retryLoad()`, and `startFresh()`.
 - Produce `ContentView(session: GameSession)` and dedicated conversation, work and journal views. Scene and sound integration follow in Task 4.
@@ -86,6 +89,7 @@
 ### Task 4: Painted SpriteKit homestead and optional sound
 
 **Interfaces:**
+
 - Consume `Presentation`, `GameState` and the shared session from earlier tasks.
 - Produce `HomesteadScene.update(state: GameState, reducedMotion: Bool)` and a hotspot callback carrying `field`, `house`, `visitor` or `stores`. Dispatch task-selection UI through the session/view; scene callbacks never mutate rules.
 - Produce main-actor `Ambience.setEnabled(_ enabled: Bool)` and `Ambience.cue()` with failures contained inside the audio implementation.
@@ -100,6 +104,7 @@
 ### Task 5: Package, verify and document the macOS app
 
 **Interfaces:**
+
 - Consume the completed `RazesMac` executable and SwiftPM resource bundles.
 - Produce `native/macos/build/Razes.app` via `native/macos/Scripts/package_app.sh`; executable display name is Răzeș and bundle identifier is `com.razes.game`.
 

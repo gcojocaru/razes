@@ -4,3 +4,9 @@ test-results/
 playwright-report/
 package-lock.json
 .superpowers/
+native/macos/.build/
+native/macos/.swiftpm/
+native/macos/build/
+# Deterministic generated reference data
+native/macos/Tests/RazesCoreTests/Fixtures/parity.json
+native/macos/Sources/RazesCore/Resources/content.json
