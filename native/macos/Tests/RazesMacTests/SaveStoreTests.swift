@@ -62,8 +62,8 @@ extension SaveStoreTests {
     let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
     defer { try? FileManager.default.removeItem(at: directory) }
-    let legacy = directory.appendingPathComponent("household-v1.json")
-    let bytes = Data("original story save".utf8)
+    let legacy = directory.appendingPathComponent("settlement-v9.json")
+    let bytes = Data("original settlement save".utf8)
     try bytes.write(to: legacy)
     XCTAssertEqual(try SaveStore.applicationStore().url.lastPathComponent, SaveStore.filename)
     XCTAssertNotEqual(SaveStore.filename, legacy.lastPathComponent)

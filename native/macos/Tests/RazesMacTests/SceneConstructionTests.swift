@@ -6,6 +6,24 @@ import XCTest
 @testable import RazesMac
 
 final class SceneConstructionTests: XCTestCase {
+  @MainActor func testDeathStopsWorkerAndToolAnimationInEveryMotionMode() throws {
+    var state = Rules.newGame()
+    state.assignments["ion"] = .repair
+    for reduced in [false, true] {
+      let scene = HomesteadScene()
+      scene.update(state: state, reducedMotion: reduced)
+      var dead = state
+      dead.phase = .dead
+      dead.character.health = 0
+      scene.update(state: dead, reducedMotion: reduced)
+      let worker = try XCTUnwrap(scene.childNode(withName: "//worker-ion"))
+      XCTAssertFalse(worker.hasActions())
+      XCTAssertNil(scene.childNode(withName: "//tool-ion"))
+      scene.update(state: dead, reducedMotion: !reduced)
+      XCTAssertFalse(worker.hasActions())
+    }
+  }
+
   @MainActor func testSelectionAndAssignmentPreserveWeatherAndLoadDoesNotReplayCompletion() throws {
     let scene = HomesteadScene()
     let state = Rules.newGame()

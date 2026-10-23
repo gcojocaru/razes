@@ -5,16 +5,18 @@ public enum TaskID: String, Codable, CaseIterable, Sendable {
   case rest, plant, tend, harvest, paid, repair, supplies, buildWoodshed, buildCellar,
     gatherWood, gatherStone
 }
-public enum Phase: String, Codable, Sendable { case work, summary }
+public enum Phase: String, Codable, Sendable { case work, summary, dead }
 public struct SeasonReport: Codable, Equatable, Sendable {
   public var foodBefore, foodAfter, moneyBefore, moneyAfter, houseBefore, houseAfter, consumption,
     wear, deficit: Int
   public var tasks: [String]
   public var seedsBefore = 0, seedsAfter = 0
+  public var character = CharacterWeek()
 }
 public struct GameState: Codable, Equatable, Sendable {
-  public var version = 9, revision = 0, season = 0, year = 0, week = 0
+  public var version = 10, revision = 0, season = 0, year = 0, week = 0
   public var phase: Phase = .work
+  public var character = CharacterState()
   public var food = 18, money = 12, house = 55
   public var seeds = 8, cropWeeks = 0
   public var materials = Materials.starter
@@ -60,9 +62,10 @@ public struct Task: Codable, Equatable, Sendable, Identifiable {
 }
 public struct Projection: Codable, Equatable, Sendable {
   public var foodCost = 0, moneyCost = 0, foodGain = 0, moneyGain = 0, houseGain = 0
-  public var consumption = 3, wear = 0, foodAfter = 0, moneyAfter = 0, houseAfter = 0
+  public var consumption = 1, wear = 0, foodAfter = 0, moneyAfter = 0, houseAfter = 0
   public var seedCost = 0, seedGain = 0, seedsAfter = 0
   public var errors: [String] = [], warnings: [String] = []
+  public var character = CharacterWeek()
 }
 public struct GameError: LocalizedError, Sendable {
   public let message: String

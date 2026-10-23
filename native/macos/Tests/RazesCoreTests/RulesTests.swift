@@ -16,7 +16,7 @@ final class RulesTests: XCTestCase {
         summary,
         action: .init(type: "assign", revision: summary.revision, worker: .ion, task: .paid)))
   }
-  func testSeveralYearsRoundTripAndMatchForecastsIncludingShortages() throws {
+  func testNeglectedSettlementMatchesForecastsAndRoundTripsUntilDeath() throws {
     var s = Rules.newGame()
     for week in 0..<288 {
       let task: TaskID =
@@ -30,12 +30,16 @@ final class RulesTests: XCTestCase {
       XCTAssertEqual(s.house, p.houseAfter)
       XCTAssertEqual(s.report?.deficit, max(0, -p.foodAfter))
       XCTAssertEqual(try SaveCodec.decode(SaveCodec.encode(s)), s)
+      if s.phase == .dead { break }
       s = try Rules.dispatch(s, action: .init(type: "continue", revision: s.revision))
       XCTAssertEqual(s.turn, (week + 1) / 12)
       XCTAssertEqual(s.assignments, ["ion": .rest])
       XCTAssertEqual(try SaveCodec.decode(SaveCodec.encode(s)), s)
     }
-    XCTAssertEqual(s.year, 6)
+    XCTAssertEqual(s.phase, .dead)
+    XCTAssertEqual(s.character.health, 0)
+    XCTAssertThrowsError(
+      try Rules.dispatch(s, action: .init(type: "continue", revision: s.revision)))
   }
   func testHarvestCountsOnceWithAndWithoutTending() throws {
     for tended in [false, true] {

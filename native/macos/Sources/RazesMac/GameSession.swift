@@ -72,9 +72,14 @@ import RazesCore
         "Your run continues, but changes could not be saved: \(error.localizedDescription)"
     }
   }
-  @discardableResult private func editSettlement(_ edit: (inout GameState) throws -> Void) -> Bool {
+  @discardableResult private func editSettlement(
+    viewOnly: Bool = false, _ edit: (inout GameState) throws -> Void
+  ) -> Bool {
     guard !needsRecovery else { return false }
     do {
+      guard state.phase != .dead || viewOnly else {
+        throw GameError("Ion has died. Start a fresh household to play again.")
+      }
       var next = state
       try edit(&next)
       next.revision += 1
@@ -172,7 +177,9 @@ import RazesCore
     }
   }
   func rotateView(_ quarterTurns: Int) {
-    editSettlement { $0.layout.viewRotation = ($0.layout.viewRotation + quarterTurns % 4 + 4) % 4 }
+    editSettlement(viewOnly: true) {
+      $0.layout.viewRotation = ($0.layout.viewRotation + quarterTurns % 4 + 4) % 4
+    }
   }
   func rotateBuilding(_ id: BuildingID) {
     editSettlement { next in

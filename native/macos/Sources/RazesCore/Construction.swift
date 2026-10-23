@@ -46,7 +46,7 @@ public enum Construction {
     .init(
       id: .woodshed, title: "Woodshed", task: .buildWoodshed, cost: 3,
       benefit:
-        "Firewood sales. From next season: winter base food use 2 and shelter wear 6; cold shelter still needs 1 extra food.",
+        "Firewood sales. From next season: save 1 food at winter month end and reduce seasonal shelter wear to 6. Cold shelter still needs 1 extra food at month end.",
       food: 0, coins: 1),
     .init(
       id: .cellar, title: "Root cellar", task: .buildCellar, cost: 4,

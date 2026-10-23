@@ -16,13 +16,14 @@ public struct Content: Sendable {
   public static let shared = Content(
     balance: Balance(
       initial: .init(food: 18, money: 12, house: 55),
-      consumption: 3, repairCost: 3, repairGain: 20, wages: 1, supplyCost: 4,
+      consumption: 1, repairCost: 3, repairGain: 20, wages: 1, supplyCost: 4,
       supplyGain: 7, wear: [6, 5, 8, 14], coldThreshold: 40, coldFood: 1, survivalHouse: 20,
       harvest: 20, tendedBonus: 8),
     tasks: [
       "rest": Task(
-        id: .rest, name: "Unassigned",
-        description: "Leave Ion free. Unused work does not carry over.", icon: "sun", workers: 1,
+        id: .rest, name: "Rest",
+        description: "Recover 35 energy (25 in winter exposure). Safe rest also heals 10 health.",
+        icon: "sun", workers: 1,
         moneyCost: 0, foodCost: 0, foodGain: 0, moneyGain: 0, houseGain: 0),
       "plant": Task(
         id: .plant, name: "Sow the field",

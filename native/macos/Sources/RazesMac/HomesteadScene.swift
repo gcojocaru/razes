@@ -291,7 +291,7 @@ import SpriteKit
         person.zRotation = 0
         person.yScale = 1
       }
-      if !reduced && !person.hasActions() {
+      if s.phase != .dead && !reduced && !person.hasActions() {
         person.run(
           .repeatForever(
             .sequence([.scaleY(to: 1.012, duration: 1.4), .scaleY(to: 1, duration: 1.4)])))
@@ -342,6 +342,7 @@ import SpriteKit
     let dustName = "dust-\(worker.rawValue)"
     world.childNode(withName: name)?.removeFromParent()
     world.childNode(withName: dustName)?.removeFromParent()
+    guard phase != .dead else { return }
     guard [.plant, .tend, .harvest, .repair, .buildWoodshed, .buildCellar].contains(task) else {
       return
     }

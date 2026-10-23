@@ -105,8 +105,14 @@ struct MaterialsPanel: View {
                 Text(Rules.task(current).name).tag(current)
               }
               Text("Rest").tag(TaskID.rest)
-              Text("Gather timber · up to 2 wood").tag(TaskID.gatherWood)
-              Text("Gather stone · up to 1 stone").tag(TaskID.gatherStone)
+              Text(
+                "Gather timber · up to \(Materials.gatheringYield(.gatherWood, state: state)) wood"
+              ).tag(TaskID.gatherWood)
+                .disabled(Rules.assignmentProblem(state, worker: worker, task: .gatherWood) != nil)
+              Text(
+                "Gather stone · up to \(Materials.gatheringYield(.gatherStone, state: state)) stone"
+              ).tag(TaskID.gatherStone)
+                .disabled(Rules.assignmentProblem(state, worker: worker, task: .gatherStone) != nil)
             }.labelsHidden()
           }
         }
@@ -133,7 +139,7 @@ struct MaterialsPanel: View {
       .font(.caption).foregroundStyle(GamePalette.muted)
       if let error = session.error { Text(error).foregroundStyle(.orange) }
       if let warning = session.storageWarning { Text(warning).foregroundStyle(.orange) }
-    }.buttonStyle(.bordered)
+    }.buttonStyle(.bordered).disabled(state.phase == .dead)
   }
 }
 
@@ -191,7 +197,7 @@ struct HouseStockOverview: View {
         Text("Storage is over capacity. Existing stocks are safe; free space before buying more.")
           .font(.caption).foregroundStyle(.orange)
       }
-      Text("Food use this week (month-end only): \(Rules.consumption(state, house: state.house))")
+      Text("Food use this week: \(Rules.consumption(state, house: state.house))")
         .font(.caption).foregroundStyle(GamePalette.muted)
     }
   }

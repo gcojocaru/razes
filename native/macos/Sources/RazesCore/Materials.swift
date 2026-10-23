@@ -82,14 +82,17 @@ public enum Materials {
       icon: "hammer", workers: 1, moneyCost: 0, foodCost: 0, foodGain: 0, moneyGain: 0, houseGain: 0
     )
   }
+  public static func gatheringYield(_ id: TaskID, state: GameState) -> Int {
+    (id == .gatherWood ? 2 : 1) + state.character.level(.gathering) - 1
+  }
   public static func forecast(_ s: GameState) -> MaterialHaul {
     var haul = MaterialHaul()
     var room = max(0, capacity(s) - (s.materials - reserved(s)).total)
     for worker in WorkerID.allCases {
-      let task = assignments(s)[worker.rawValue]
-      guard task == .gatherWood || task == .gatherStone else { continue }
+      guard let task = assignments(s)[worker.rawValue], task == .gatherWood || task == .gatherStone
+      else { continue }
       let id: MaterialID = task == .gatherWood ? .wood : .stone
-      let expected = id == .wood ? 2 : 1
+      let expected = gatheringYield(task, state: s)
       let received = min(expected, room)
       haul.expected[id] += expected
       haul.gained[id] += received

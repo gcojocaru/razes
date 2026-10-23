@@ -5,6 +5,7 @@ struct PhaseOverlay: View {
   @Bindable var session: GameSession
   let state: GameState
   let close: () -> Void
+  var restart: () -> Void = {}
   @AccessibilityFocusState private var headingFocused: Bool
   var body: some View {
     VStack(alignment: .leading, spacing: 14) {
@@ -40,10 +41,12 @@ struct PhaseOverlay: View {
               Text("Building supplies: \(Materials.reserved(state).text)").font(.caption)
             }
             ForEach(Materials.forecast(state).lines, id: \.self) { Text($0).font(.caption) }
+            Divider()
+            CharacterWeekView(week: forecast.character)
           }.frame(maxWidth: .infinity, alignment: .leading)
           VStack(alignment: .leading, spacing: 8) {
             Text(
-              "Food use: \(forecast.consumption) at month end · Wear: \(forecast.wear) at season end"
+              "This week’s meal: \(forecast.consumption) food · Seasonal wear: \(forecast.wear)"
             )
             .font(.caption).foregroundStyle(GamePalette.muted)
             Text("AFTER WORK & CONSUMPTION").font(.system(size: 10, weight: .semibold)).tracking(1)
@@ -56,18 +59,24 @@ struct PhaseOverlay: View {
             ForEach(forecast.warnings, id: \.self) {
               Text($0).font(.caption).foregroundStyle(GamePalette.gold)
             }
-            Button("Confirm week’s work") {
+            Button(forecast.character.fatal ? "Confirm fatal week" : "Confirm week’s work") {
               session.send(Action(type: "resolve", revision: state.revision))
             }.buttonStyle(.borderedProminent).disabled(!forecast.errors.isEmpty)
           }.frame(maxWidth: .infinity, alignment: .leading)
         }
-      case .summary:
+      case .summary, .dead:
+        if state.phase == .dead {
+          Text("Ion has died").font(.system(size: 27, design: .serif))
+          Text("\(state.report?.character.deathCause ?? "Death") · \(state.calendarLabel)")
+            .foregroundStyle(.orange)
+        }
         Text("Month \(state.month) · Week \(state.weekOfMonth) report").font(
           .system(size: 27, design: .serif))
         if let report = state.report {
           HStack(alignment: .top, spacing: 24) {
             VStack(alignment: .leading, spacing: 6) {
               ForEach(report.tasks, id: \.self) { Text($0).font(.callout) }
+              CharacterWeekView(week: report.character)
             }.frame(maxWidth: .infinity, alignment: .leading)
             VStack(alignment: .leading, spacing: 6) {
               Text(
@@ -88,9 +97,13 @@ struct PhaseOverlay: View {
             }.frame(maxWidth: .infinity, alignment: .leading)
           }
         }
-        Button("Continue to \(state.nextWeekLabel)") {
-          session.send(Action(type: "continue", revision: state.revision))
-        }.buttonStyle(.borderedProminent)
+        if state.phase == .dead {
+          Button("Start a fresh household", action: restart).buttonStyle(.borderedProminent)
+        } else {
+          Button("Continue to \(state.nextWeekLabel)") {
+            session.send(Action(type: "continue", revision: state.revision))
+          }.buttonStyle(.borderedProminent)
+        }
       }
     }.onAppear { headingFocused = true }
   }
@@ -98,6 +111,7 @@ struct PhaseOverlay: View {
     switch state.phase {
     case .work: "REVIEW & CONFIRM"
     case .summary: "WEEK REPORT"
+    case .dead: "FINAL REPORT"
     }
   }
 }

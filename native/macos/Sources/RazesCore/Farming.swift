@@ -42,6 +42,7 @@ public enum Farming {
   }
   public static func foodYield(_ s: GameState) -> Int {
     Content.shared.balance.harvest + (s.tended ? Content.shared.balance.tendedBonus : 0)
+      + 2 * (s.character.level(.farming) - 1)
   }
   public static func seedYield(_ s: GameState) -> Int { s.tended ? 6 : 4 }
   public static func buySeeds(quantity: Int, state: inout GameState) throws {

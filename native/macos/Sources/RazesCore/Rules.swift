@@ -21,10 +21,30 @@ public enum Rules {
     return Content.shared.tasks[id.rawValue]!
   }
   public static func consumption(_ state: GameState, house: Int) -> Int {
-    guard state.isMonthEnd else { return 0 }
-    let winter = state.season == 3
-    let base = winter && Construction.active(.woodshed, state: state) ? 2 : b.consumption
-    return base + (winter && house < b.coldThreshold ? b.coldFood : 0)
+    guard state.season == 3 && state.isMonthEnd else { return b.consumption }
+    return b.consumption + (house < b.coldThreshold ? b.coldFood : 0)
+      - (Construction.active(.woodshed, state: state) ? 1 : 0)
+  }
+  public static func task(_ id: TaskID, in state: GameState) -> Task {
+    var value = task(id)
+    switch id {
+    case .harvest:
+      value.foodGain = Farming.foodYield(state)
+      value.description =
+        "Gather ripe grain before winter: \(value.foodGain) food and \(Farming.seedYield(state)) seeds."
+    case .repair:
+      value.houseGain = b.repairGain + 5 * (state.character.level(.building) - 1)
+      value.description = "Restore up to \(value.houseGain) shelter for \(value.moneyCost) coins."
+    case .supplies:
+      value.foodGain = suppliesGain(state)
+      value.description = "Bring home \(value.foodGain) food before this week’s meal."
+    case .gatherWood, .gatherStone:
+      let material = id == .gatherWood ? "wood" : "stone"
+      value.description =
+        "Bring home up to \(Materials.gatheringYield(id, state: state)) \(material), limited by shared storage."
+    default: break
+    }
+    return value
   }
   public static func weathering(_ state: GameState) -> Int {
     guard state.isSeasonEnd else { return 0 }
@@ -35,25 +55,19 @@ public enum Rules {
     Construction.active(.cellar, state: state) ? 10 : b.supplyGain
   }
   public static func taskOptions(_ s: GameState) -> [Task] {
-    let t = Content.shared.tasks
-    var tasks: [Task] = []
+    guard s.phase == .work else { return [] }
+    var tasks: [TaskID] = []
     // shortcut: all farmland shares one crop cycle and yield; split crops when area affects production.
-    if s.season == 0 && !s.planted && !s.layout.farmland.isEmpty { tasks.append(t["plant"]!) }
-    if Farming.canTend(s) { tasks.append(t["tend"]!) }
-    if Farming.canHarvest(s) {
-      var harvest = t["harvest"]!
-      harvest.foodGain = Farming.foodYield(s)
-      tasks.append(harvest)
-    }
+    if s.season == 0 && !s.planted && !s.layout.farmland.isEmpty { tasks.append(.plant) }
+    if Farming.canTend(s) { tasks.append(.tend) }
+    if Farming.canHarvest(s) { tasks.append(.harvest) }
     let construction = Construction.definitions.filter {
       Construction.unavailable($0.id, state: s) == nil
-    }.compactMap { $0.task.map(task) }
-    return tasks
-      + [TaskID.repair, .paid, .supplies, .gatherWood, .gatherStone, .rest].map { id in
-        var value = task(id)
-        if id == .supplies { value.foodGain = suppliesGain(s) }
-        return value
-      } + construction
+    }.compactMap { $0.task }
+    return
+      (tasks
+      + [TaskID.repair, .paid, .supplies, .gatherWood, .gatherStone, .rest]
+      + construction).map { task($0, in: s) }
   }
   public static func preview(_ s: GameState) -> Projection {
     var p = Projection()
@@ -61,10 +75,10 @@ public enum Rules {
     p.wear = weathering(s)
     let assigned = WorkerID.allCases.compactMap { s.assignments[$0.rawValue] }
     for id in assigned {
-      let task = task(id)
+      let task = task(id, in: s)
       p.foodCost += task.foodCost
       p.moneyCost += task.moneyCost
-      p.foodGain += id == .supplies ? suppliesGain(s) : task.foodGain
+      p.foodGain += task.foodGain
       p.moneyGain += task.moneyGain
       p.houseGain += task.houseGain
     }
@@ -76,7 +90,6 @@ public enum Rules {
     let harvesters = assigned.filter { $0 == .harvest }.count
     if assigned.contains(.plant) { p.seedCost = Farming.seedCost }
     if harvesters == 1 {
-      p.foodGain += Farming.foodYield(s)
       p.seedGain = Farming.seedYield(s)
     }
     p.seedsAfter = min(100000, s.seeds - p.seedCost + p.seedGain)
@@ -101,6 +114,29 @@ public enum Rules {
     p.foodAfter = min(100000, s.food - p.foodCost + p.foodGain) - p.consumption
     p.moneyAfter = min(100000, s.money - p.moneyCost + p.moneyGain)
     p.houseAfter = max(0, repaired - p.wear)
+    let work = s.assignments["ion"] ?? .rest
+    p.character = CharacterSimulation.week(
+      s, task: work, deficit: max(0, -p.foodAfter), shelter: repaired, haul: haul.gained)
+    if p.character.energyCost > s.character.energy {
+      p.errors.append(
+        "Ion needs \(p.character.energyCost) energy; he has \(s.character.energy). Assign Rest first."
+      )
+    }
+    if p.character.starvationDamage > 0 {
+      p.warnings.append(
+        "Starvation: Ion will lose \(p.character.starvationDamage) health. Buy provisions or harvest food."
+      )
+    }
+    if p.character.exposureDamage > 0 {
+      p.warnings.append(
+        "Winter exposure: Ion will lose \(p.character.exposureDamage) health. Mend the house to reach 40 shelter."
+      )
+    }
+    if p.character.fatal {
+      p.warnings.append(
+        "This week will kill Ion: \(p.character.deathCause!). Review his needs and supplies before confirming."
+      )
+    }
     if p.foodAfter < 0 {
       p.warnings.append(
         "Expected food shortfall: \(-p.foodAfter). Food will fall to zero; the shortfall appears in the week’s report."
@@ -121,6 +157,7 @@ public enum Rules {
     return p
   }
   public static func assignmentProblem(_ s: GameState, worker: WorkerID, task: TaskID) -> String? {
+    if s.phase == .dead { return "Ion has died. Start a fresh household to play again." }
     if task == .plant, let reason = Farming.plantingProblem(s) { return reason }
     if s.phase != .work { return "Continue to the next week before assigning work." }
     if !taskOptions(s).contains(where: { $0.id == task }) {
@@ -131,6 +168,9 @@ public enum Rules {
     return preview(candidate).errors.first
   }
   public static func dispatch(_ state: GameState, action a: Action) throws -> GameState {
+    guard state.phase != .dead else {
+      throw GameError("Ion has died. Start a fresh household to play again.")
+    }
     guard a.revision == state.revision else {
       throw GameError("This choice has already changed. Please use the current controls.")
     }
@@ -164,7 +204,7 @@ public enum Rules {
         houseAfter: 0, consumption: p.consumption, wear: p.wear, deficit: 0,
         tasks: WorkerID.allCases.map {
           "\(Content.shared.people[$0.rawValue]!.name): \(task(s.assignments[$0.rawValue]!).name)"
-        }, seedsBefore: s.seeds, seedsAfter: p.seedsAfter)
+        }, seedsBefore: s.seeds, seedsAfter: p.seedsAfter, character: p.character)
       s.food = min(100000, s.food - p.foodCost + p.foodGain)
       s.money = min(100000, s.money - p.moneyCost + p.moneyGain)
       s.house = min(100, s.house + p.houseGain)
@@ -188,7 +228,8 @@ public enum Rules {
       s.report?.houseAfter = s.house
       s.report?.deficit = deficit
       if s.isSeasonEnd { Construction.resolveSeason(state: &s, produce: false) }
-      s.phase = .summary
+      s.character = p.character.after
+      s.phase = p.character.fatal ? .dead : .summary
     case "continue":
       guard s.phase == .summary else { throw GameError("Finish this week before continuing.") }
       guard s.turn < 400003 || !s.isSeasonEnd else {
