@@ -12,9 +12,9 @@ struct MaterialsPanel: View {
     VStack(alignment: .leading, spacing: 16) {
       Text("Food: \(state.food) · Coins: \(state.money)").font(.headline)
       Text("FOOD PROVISIONS").font(.headline)
-      Text("\(Rules.suppliesGain(state)) food · 4 coins · arrives at season end")
+      Text("\(Rules.suppliesGain(state)) food · 4 coins · arrives at week end")
       Text(
-        "Ion buys provisions instead of another seasonal job. Food does not use material storage slots."
+        "Ion buys provisions instead of another weekly job. Food does not use material storage slots."
       )
       .font(.caption).foregroundStyle(GamePalette.muted)
       if state.phase == .work {
@@ -26,13 +26,15 @@ struct MaterialsPanel: View {
         }.disabled(reason != nil)
         if let reason { Text(reason).font(.caption).foregroundStyle(GamePalette.muted) }
       } else {
-        Text("Continue to seasonal planning to buy food.").font(.caption)
+        Text("Continue to weekly planning to buy food.").font(.caption)
       }
       Divider()
       Text("Shared storage: \(state.materials.total) / \(Materials.capacity(state))")
         .font(.title3).accessibilityAddTraits(.isHeader)
-      Text("Wood, stone and planks each take one slot. Food and coins are stored separately.")
-        .font(.caption).foregroundStyle(GamePalette.muted)
+      Text(
+        "Wood, stone and planks each take one slot. Food, seeds and coins are stored separately."
+      )
+      .font(.caption).foregroundStyle(GamePalette.muted)
       if state.materials.total > Materials.capacity(state) {
         Text(
           "Over capacity after storage damage. Your supplies are safe; spend or discard some to make room."
@@ -40,10 +42,20 @@ struct MaterialsPanel: View {
         .foregroundStyle(.orange)
       }
       if Materials.reserved(state).total > 0 {
-        Text("Reserved for seasonal building work: \(Materials.reserved(state).text)")
+        Text("Reserved for weekly building work: \(Materials.reserved(state).text)")
           .font(.caption).foregroundStyle(GamePalette.gold)
       }
       Stepper("Quantity: \(quantity)", value: $quantity, in: 1...100)
+      HStack {
+        Text("Grain seeds: \(state.seeds)").frame(maxWidth: .infinity, alignment: .leading)
+        Button("Buy \(quantity) grain seeds · \(quantity) coins") {
+          session.buySeeds(quantity: quantity)
+        }.disabled(freeCoins < quantity || state.seeds > 100000 - quantity)
+      }
+      Text(
+        "Planting window: Spring only — all 12 weeks, once per year. Plant 4 seeds through Places → Field. Grain ripens after 24 weeks."
+      )
+      .font(.caption).foregroundStyle(GamePalette.muted)
       ForEach(MaterialID.allCases, id: \.self) { id in
         HStack {
           Text("\(id.title): \(state.materials[id])").frame(
@@ -72,7 +84,7 @@ struct MaterialsPanel: View {
       )
       .font(.caption).foregroundStyle(GamePalette.muted)
       Divider()
-      Text("SEASONAL GATHERING").font(.headline)
+      Text("WEEKLY GATHERING").font(.headline)
       if state.phase == .work {
         ForEach(WorkerID.allCases, id: \.self) { worker in
           HStack {
@@ -93,20 +105,20 @@ struct MaterialsPanel: View {
                 Text(Rules.task(current).name).tag(current)
               }
               Text("Rest").tag(TaskID.rest)
-              Text("Gather timber · up to 6 wood").tag(TaskID.gatherWood)
-              Text("Gather stone · up to 4 stone").tag(TaskID.gatherStone)
+              Text("Gather timber · up to 2 wood").tag(TaskID.gatherWood)
+              Text("Gather stone · up to 1 stone").tag(TaskID.gatherStone)
             }.labelsHidden()
           }
         }
         let haul = Materials.forecast(state)
         ForEach(haul.lines, id: \.self) { Text($0).font(.caption) }
         Text(
-          "Arrives when seasonal work resolves. Free storage limits Ion’s haul."
+          "Arrives when weekly work resolves. Free storage limits Ion’s haul."
         )
         .font(.caption).foregroundStyle(GamePalette.muted)
       } else {
         Text(
-          "Assign gathering during seasonal planning. Ion can gather instead of another job."
+          "Assign gathering during weekly planning. Ion can gather instead of another job."
         )
         .font(.caption)
       }
@@ -155,6 +167,9 @@ struct HouseStockOverview: View {
       LabeledContent("Coins", value: "\(state.money)")
         .accessibilityElement(children: .ignore).accessibilityLabel("Coins").accessibilityValue(
           "\(state.money)")
+      LabeledContent("Grain seeds", value: "\(state.seeds)")
+        .accessibilityElement(children: .ignore).accessibilityLabel("Grain seeds")
+        .accessibilityValue("\(state.seeds)")
       ForEach(MaterialID.allCases, id: \.self) { material in
         LabeledContent(material.title, value: "\(state.materials[material])")
           .accessibilityElement(children: .ignore).accessibilityLabel(material.title)
@@ -176,7 +191,7 @@ struct HouseStockOverview: View {
         Text("Storage is over capacity. Existing stocks are safe; free space before buying more.")
           .font(.caption).foregroundStyle(.orange)
       }
-      Text("Seasonal food use: \(Rules.consumption(state, house: state.house))")
+      Text("Food use this week (month-end only): \(Rules.consumption(state, house: state.house))")
         .font(.caption).foregroundStyle(GamePalette.muted)
     }
   }

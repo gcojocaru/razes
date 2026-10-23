@@ -166,7 +166,8 @@ extension HomesteadScene {
       for column in 0..<4 {
         let p = local(CGFloat(column) * 0.22 - 0.33, y)
         crop.move(to: p)
-        let height: CGFloat = field == "sown" ? 3 : field == "ripe" ? 13 : 9
+        let height: CGFloat =
+          field == "sown" ? 3 : field == "sprouting" ? 6 : field == "ripe" ? 13 : 9
         crop.addLine(to: CGPoint(x: p.x, y: p.y + height))
         if field != "sown" {
           crop.move(to: CGPoint(x: p.x - 3, y: p.y + height - 3))
@@ -181,14 +182,14 @@ extension HomesteadScene {
       ? .init(white: 0.78, alpha: 1) : .init(red: 0.48, green: 0.32, blue: 0.16, alpha: 1)
     rows.lineWidth = 2
     node.addChild(rows)
-    if ["sown", "growing", "ripe"].contains(field) {
+    if ["sown", "sprouting", "growing", "ripe"].contains(field) {
       let stalks = SKShapeNode(path: crop)
       stalks.name = "crop"
       stalks.strokeColor =
         field == "ripe"
         ? .init(red: 0.91, green: 0.73, blue: 0.28, alpha: 1)
         : .init(red: 0.43, green: 0.65, blue: 0.23, alpha: 1)
-      stalks.lineWidth = field == "sown" ? 2 : 2.5
+      stalks.lineWidth = ["sown", "sprouting"].contains(field) ? 2 : 2.5
       node.addChild(stalks)
     }
   }

@@ -11,7 +11,7 @@ final class MaterialsTests: XCTestCase {
     s = try Rules.dispatch(s, action: .init(type: "resolve", revision: s.revision))
     let after = try JSONSerialization.jsonObject(with: SaveCodec.encode(s)) as! [String: Any]
     XCTAssertEqual((before["materials"] as? [String: Int])?["wood"], 6)
-    XCTAssertEqual((after["materials"] as? [String: Int])?["wood"], 12)
+    XCTAssertEqual((after["materials"] as? [String: Int])?["wood"], 8)
   }
 
   func testStorehouseIsARealBuilding() {
@@ -20,11 +20,11 @@ final class MaterialsTests: XCTestCase {
 
   func testIonHaulUsesSharedRoomAndForecastMatchesResolution() throws {
     var s = try ConstructionTests().work()
-    s.materials = .init(wood: 9, stone: 6)
+    s.materials = .init(wood: 13, stone: 6)
     s = try ConstructionTests().assign(s, .ion, .gatherWood)
     let haul = Materials.forecast(s)
-    XCTAssertEqual(haul.gained, .init(wood: 5))
-    XCTAssertEqual(haul.expected, .init(wood: 6))
+    XCTAssertEqual(haul.gained, .init(wood: 1))
+    XCTAssertEqual(haul.expected, .init(wood: 2))
     XCTAssertFalse(Rules.preview(s).warnings.filter { $0.contains("Limited storage") }.isEmpty)
     s = try Rules.dispatch(s, action: .init(type: "resolve", revision: s.revision))
     XCTAssertEqual(s.materials, .init(wood: 14, stone: 6))

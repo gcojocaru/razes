@@ -134,6 +134,9 @@ import RazesCore
   func buyMaterials(_ id: MaterialID, quantity: Int) {
     editSettlement { try Materials.buy(id, quantity: quantity, state: &$0) }
   }
+  func buySeeds(quantity: Int) {
+    editSettlement { try Farming.buySeeds(quantity: quantity, state: &$0) }
+  }
   func craftPlanks(quantity: Int) {
     editSettlement { try Materials.craftPlanks(quantity: quantity, state: &$0) }
   }

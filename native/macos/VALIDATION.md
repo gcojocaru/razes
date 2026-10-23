@@ -1,5 +1,23 @@
 # Native macOS validation — 2026-10-23
 
+## Planting clarity follow-up — 2026-10-23
+
+- Native suite: **95 tests passed** (47 core, 48 macOS). Four new tests cover closed-season reasons, already-planted fields, the last Spring report, and every eligible Spring week plus missing requirements. Before implementation, three tests reproduced generic or misleading availability messages.
+- The field and Ion inspector share persistent planting controls; unavailable actions remain visible with reasons. The seed market repeats the Spring-only window; stale seasonal food-purchase wording now describes weekly resolution.
+
+
+## Weekly calendar, seeds and painted-field harvest — 2026-10-23
+
+- Integrated on main `85b740a`, preserving the house supplies panel and painted farmland. All tiles share one crop cycle and fixed seed costs/yields; this is the existing area limitation, now documented alongside the weekly rules.
+- Native suite: **91 tests passed** (43 core, 48 macOS). Covers 48-week years, month/season/year boundaries, monthly food use, seasonal building production/wear/foundations, crop stages, late spring sowing, tended and untended yields, winter loss, seed purchasing/reservations/invalid quantities, malformed saves, multi-year forecast/save consistency, relocated painted crops and editing protection until harvest.
+- The new calendar tests failed against the old seasonal rules before implementation. The painted-scene test then reproduced missing sprouting stalks; all painted growth stages now render through the existing farmland infrastructure.
+- Browser regression suite: **66 tests passed**; TypeScript and production build passed. Browser runtime is unchanged; browser E2E was not repeated.
+- Debug packaging passed before the main integration. The final integrated Release app built, packaged and passed strict local ad-hoc signature/resource checks. Release dSYM generation needed sandbox escalation. No public signing/notarization was attempted.
+- Native UI confirmed immediate seed buying (4 coins → 4 seeds), sowing spending four seeds without using food, a weekly report, Week 1 → Week 2, labelled growth progress and expected harvest. After the main integration, visually confirmed the release app renders the crop on the painted farmland rather than the removed fixed field sprite. Screenshot: `build/painted-harvest-validation/painted-crop-week-2.png` (local, ignored).
+- Independent read-only review of the implementation and main integration found no actionable issues. Gameplay balance, full VoiceOver navigation, minimum-window layout and Intel/macOS14 hardware behavior were not playtested in this pass. Sprouting uses shorter procedural stalks on main's painted tiles; no new art assets or dependencies.
+- Schema 9 starts a new `settlement-v9.json`. Per the user’s unreleased-app rule in `AGENTS.md`, progress preservation and save migrations are not required.
+
+
 ## Materials and shared storage — 2026-10-23
 
 - Native suite: 84 tests passed (39 core, 45 macOS), including 11 material rules tests and 2 material session/save tests. Existing forty reference years and legacy construction paths pass with schema-7 normalization.

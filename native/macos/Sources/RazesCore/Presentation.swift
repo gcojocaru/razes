@@ -8,10 +8,7 @@ public struct Presentation: Codable, Equatable, Sendable {
     field =
       s.displaySeason == 3
       ? "snow"
-      : s.harvested
-        ? "harvested"
-        : !s.planted
-          ? "bare" : s.displaySeason == 0 ? "sown" : s.displaySeason == 1 ? "growing" : "ripe"
+      : Farming.stage(s) == .snow ? "bare" : Farming.stage(s).rawValue
     house = s.house >= 65 ? "intact" : "damaged"
     stores = s.food < 9 ? 0 : s.food < 25 ? 1 : 2
     weather =

@@ -20,8 +20,13 @@ struct SelectionInspector: View {
           }
         }
         Text(person.line).font(.callout).italic()
+        PlantingControls(session: session, state: state)
         if state.phase == .work {
-          ForEach(Rules.taskOptions(state).filter { Construction.building(for: $0.id) == nil }) {
+          ForEach(
+            Rules.taskOptions(state).filter {
+              $0.id != .plant && Construction.building(for: $0.id) == nil
+            }
+          ) {
             task in
             let reason = Rules.assignmentProblem(state, worker: worker, task: task.id)
             Button {
@@ -41,10 +46,12 @@ struct SelectionInspector: View {
           }
           let task = Rules.task(Materials.assignments(state)[worker.rawValue]!)
           Text(task.description).font(.caption).foregroundStyle(GamePalette.muted)
-          Text("Current work cost: \(task.moneyCost) money · \(task.foodCost) food").font(
+          Text(
+            "Current work cost: \(task.moneyCost) money · \(task.foodCost) food · \(task.id == .plant ? Farming.seedCost : 0) seeds"
+          ).font(
             .caption)
         } else {
-          Text("Continue to the next season to assign work.").font(.caption)
+          Text("Continue to the next week to assign work.").font(.caption)
         }
       case .building(let id):
         BuildingInspector(session: session, state: state, id: id, beginPlacement: beginPlacement)
@@ -78,21 +85,37 @@ struct SelectionInspector: View {
         case .field:
           Text("\(state.layout.farmland.count) farmland tiles").font(.headline)
           Text(Rules.fieldLabel(state)).font(.callout)
-          if state.layout.farmland.isEmpty {
-            Text("Paint farmland in Construction before sowing.").font(.caption)
-          }
+          PlantingControls(session: session, state: state)
           Button("Paint farmland") { beginPlacement(.infrastructure(.farmland)) }
             .disabled(Settlement.farmlandEditingProblem(state) != nil)
           if let reason = Settlement.farmlandEditingProblem(state) {
             Text(reason).font(.caption).foregroundStyle(GamePalette.muted)
           }
+          Text("Grain seeds: \(state.seeds) · sowing needs \(Farming.seedCost)").font(.caption)
+          Button("Buy 4 grain seeds · 4 coins") { session.buySeeds(quantity: 4) }
+            .disabled(
+              state.money - (state.phase == .work ? Rules.preview(state).moneyCost : 0) < 4
+                || state.seeds > 99996)
+          if state.planted && state.season != 3 && !state.harvested {
+            ProgressView(value: Double(state.cropWeeks), total: Double(Farming.growingWeeks))
+              .accessibilityLabel("Grain growth")
+              .accessibilityValue("\(state.cropWeeks) of 24 growing weeks")
+            Text(
+              "Expected harvest: \(Farming.foodYield(state)) food + \(Farming.seedYield(state)) seeds"
+            )
+            .font(.caption).foregroundStyle(GamePalette.gold)
+            Text(
+              state.tended
+                ? "Tended · bonus secured"
+                : "Tend once after week 4 of growth, before ripening, for +8 food and +2 seeds."
+            )
+            .font(.caption)
+          }
           if let task = Rules.taskOptions(state).first(where: {
-            [TaskID.plant, .tend, .harvest].contains($0.id)
+            [TaskID.tend, .harvest].contains($0.id)
           }) {
             Text(task.description).font(.caption)
             assignmentButtons(task.id)
-          } else {
-            Text("No field work is available this season.").font(.caption)
           }
         }
       }
@@ -116,6 +139,38 @@ struct SelectionInspector: View {
     } else {
       Text("Work commands are available during planning.").font(.caption).foregroundStyle(
         GamePalette.muted)
+    }
+  }
+}
+
+private struct PlantingControls: View {
+  @Bindable var session: GameSession
+  let state: GameState
+
+  var body: some View {
+    let assigned = state.phase == .work && state.assignments["ion"] == .plant
+    let reason = Rules.assignmentProblem(state, worker: .ion, task: .plant)
+    VStack(alignment: .leading, spacing: 7) {
+      Label("Planting: Spring only", systemImage: "calendar")
+        .font(.headline).foregroundStyle(GamePalette.gold)
+      Text("All 12 spring weeks · once per year · 4 grain seeds")
+        .font(.caption).foregroundStyle(GamePalette.muted)
+      Text(
+        assigned
+          ? "Sowing assigned. Choose End week, then Confirm week’s work to plant."
+          : reason
+            ?? (state.isSeasonEnd
+              ? "Ready to plant — this is the last week of Spring."
+              : "Ready to plant — \(12 - state.week) spring weeks left.")
+      )
+      .font(.caption)
+      .foregroundStyle(reason == nil || assigned ? GamePalette.gold : GamePalette.muted)
+      Button(assigned ? "Cancel sowing" : "Plant seeds · assign Ion") {
+        session.send(
+          .init(
+            type: "assign", revision: state.revision, worker: .ion,
+            task: assigned ? .rest : .plant))
+      }.disabled(!assigned && reason != nil)
     }
   }
 }
