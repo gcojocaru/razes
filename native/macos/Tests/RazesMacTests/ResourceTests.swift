@@ -11,9 +11,19 @@ final class ResourceTests: XCTestCase {
     scene.update(state: Rules.newGame(), reducedMotion: true)
     XCTAssertNil(scene.resourceWarning)
     XCTAssertGreaterThan(scene.children.count, 5)
-    XCTAssertFalse(scene.children.contains { $0.hasActions() })
+    scene.enumerateChildNodes(withName: "//*") { node, _ in
+      XCTAssertFalse(node.hasActions(), node.name ?? "unnamed node")
+    }
     scene.update(state: Rules.newGame(), reducedMotion: false)
-    XCTAssertTrue(scene.children.contains { $0.hasActions() })
+    var animating = false
+    scene.enumerateChildNodes(withName: "//*") { node, _ in
+      if node.hasActions() { animating = true }
+    }
+    XCTAssertTrue(animating)
+    scene.update(state: Rules.newGame(), reducedMotion: true)
+    scene.enumerateChildNodes(withName: "//*") { node, _ in
+      XCTAssertFalse(node.hasActions(), node.name ?? "unnamed node")
+    }
   }
   @MainActor func testMissingArtReportsWarningWithoutBlockingRules() {
     let scene = HomesteadScene(artDirectory: URL(fileURLWithPath: "/missing-razes-test-art"))

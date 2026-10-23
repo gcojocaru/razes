@@ -25,7 +25,6 @@ final class GameSessionTests: XCTestCase {
     let url = dir.appendingPathComponent("save.json")
     let bad = Data("invalid".utf8)
     try bad.write(to: url)
-    let store = SaveStore(url: url)
     let session = GameSession(store: SaveStore(url: url))
     XCTAssertTrue(session.needsRecovery)
     session.send(Action(type: "choose", revision: 0, event: "spring-ox", choice: "borrow"))
@@ -54,3 +53,19 @@ final class GameSessionTests: XCTestCase {
     XCTAssertEqual(try Data(contentsOf: dir), Data("blocker".utf8))
   }
 }
+
+#if DEBUG
+  extension GameSessionTests {
+    @MainActor func testValidationLaunchUsesOnlyItsExplicitSaveFile() throws {
+      let directory = FileManager.default.temporaryDirectory.appendingPathComponent(
+        UUID().uuidString)
+      defer { try? FileManager.default.removeItem(at: directory) }
+      let url = directory.appendingPathComponent("validation.json")
+      let session = GameSession.applicationSession(arguments: [
+        "RazesValidation", "--validation-save", url.path,
+      ])
+      session.send(Action(type: "choose", revision: 0, event: "spring-ox", choice: "borrow"))
+      XCTAssertEqual(try SaveStore(url: url).load()?.phase, .work)
+    }
+  }
+#endif

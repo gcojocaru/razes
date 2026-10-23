@@ -2,349 +2,242 @@ import RazesCore
 import SpriteKit
 import SwiftUI
 
-private let ink = Color(red: 0.18, green: 0.24, blue: 0.17)
-private let parchment = Color(red: 0.97, green: 0.95, blue: 0.90)
 struct ContentView: View {
   @Bindable var session: GameSession
   @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
   @Environment(\.scenePhase) private var scenePhase
   @State private var scene = HomesteadScene()
+  @State private var ui = GameUIState()
   @State private var resourceWarning: String?
   @State private var sheet: String?
   @State private var restart = false
-  @State private var confirmWork = false
-  @State private var selectedTask: TaskID?
-  @AccessibilityFocusState private var panelFocused: Bool
+  @State private var keyMonitor: Any?
   private var state: GameState { session.state }
   private var reduced: Bool { systemReduceMotion || session.reduceMotion }
+  private var mandatory: Bool { state.phase == .opening || state.phase == .consequence }
   var body: some View {
-    VStack(spacing: 0) {
-      topbar
-      Divider()
-      if session.needsRecovery {
-        recovery.padding(40)
-        Spacer()
-      } else {
-        ScrollView {
-          VStack(alignment: .leading, spacing: 22) {
-            heading
-            if let warning = session.storageWarning {
-              banner(warning, symbol: "externaldrive.badge.exclamationmark")
-            }
-            if let error = session.error { banner(error, symbol: "exclamationmark.triangle") }
-            resources
-            HStack(alignment: .top, spacing: 24) {
-              VStack(alignment: .leading, spacing: 16) {
-                SpriteView(scene: scene, preferredFramesPerSecond: 30)
-                  .aspectRatio(1200 / 760, contentMode: .fit)
-                  .clipShape(RoundedRectangle(cornerRadius: 14))
-                  .accessibilityHidden(true)
-                if let warning = resourceWarning { banner(warning, symbol: "photo") }
-                HStack {
-                  ForEach(Hotspot.allCases, id: \.rawValue) { spot in
-                    Button(spot.rawValue.capitalized) { hotspot(spot) }.buttonStyle(.bordered)
+    GeometryReader { geometry in
+      ZStack {
+        GamePalette.ink.ignoresSafeArea()
+        if session.needsRecovery {
+          recovery.padding(40)
+        } else {
+          SpriteView(scene: scene, preferredFramesPerSecond: 30).accessibilityHidden(true)
+          VStack(spacing: 0) {
+            topStrip
+            warnings
+            Spacer(minLength: 0)
+            HStack(alignment: .bottom, spacing: 16) {
+              if mandatory || ui.review {
+                GamePanel {
+                  GameScroll(maximumHeight: min(380, geometry.size.height * 0.46)) {
+                    PhaseOverlay(
+                      session: session, state: state, close: { ui.review = false },
+                      restart: { restart = true }, journal: { sheet = "journal" })
                   }
-                  Spacer()
-                  Text(Rules.fieldLabel(state)).font(.caption).foregroundStyle(.secondary)
-                }
-                commitment
-                household
-              }.frame(maxWidth: .infinity)
-              phasePanel.frame(width: 340, alignment: .leading)
-            }
-            HStack {
-              Text("A small life. A lasting story.")
-              Spacer()
-              Text("Northern Moldavia · 1495 · A fictional household")
-            }
-            .font(.caption).foregroundStyle(.secondary)
-          }.padding(28)
+                }.frame(maxWidth: 760)
+              }
+              Spacer(minLength: 0)
+              if !mandatory, ui.selection != nil || ui.buildMode {
+                GamePanel {
+                  VStack(alignment: .leading, spacing: 12) {
+                    HStack {
+                      Text(ui.buildMode ? "CONSTRUCTION" : "SELECTED").font(
+                        .system(size: 10, weight: .semibold)
+                      ).tracking(2).foregroundStyle(GamePalette.gold)
+                      Spacer()
+                      Button("Close", systemImage: "xmark") { ui.dismissOptional() }.labelStyle(
+                        .iconOnly
+                      )
+                    }
+                    GameScroll(maximumHeight: min(420, geometry.size.height - 260)) {
+                      if let selection = ui.selection {
+                        SelectionInspector(session: session, state: state, selection: selection)
+                      } else {
+                        BuildPanel(state: state, select: { choose(.building($0)) })
+                      }
+                    }
+                  }
+                }.frame(width: 300)
+              }
+            }.padding(.horizontal, 18).padding(.bottom, 12)
+            GameHUD(
+              state: state, selection: ui.selection, buildMode: ui.buildMode, choose: choose,
+              build: {
+                ui.review = false
+                ui.buildMode.toggle()
+                ui.selection = nil
+              },
+              primary: {
+                ui.review = true
+                ui.selection = nil
+                ui.buildMode = false
+              })
+          }
         }
       }
     }
-    .font(.custom("DMSans9pt-Regular", size: 14, relativeTo: .body))
-    .foregroundStyle(ink).background(parchment).tint(ink)
+    .font(.custom("DMSans9pt-Regular", size: 13, relativeTo: .body))
+    .foregroundStyle(GamePalette.paper).tint(GamePalette.gold).preferredColorScheme(.dark)
     .frame(minWidth: 1000, minHeight: 700)
-    .sheet(item: Binding(get: { sheet.map(SheetID.init) }, set: { sheet = $0?.id })) { value in
+    .sheet(item: Binding(get: { sheet.map(SheetID.init) }, set: { sheet = $0?.id })) { item in
       VStack(alignment: .leading, spacing: 18) {
         HStack {
-          Text(
-            value.id == "journal"
-              ? "The promise journal" : value.id == "help" ? "How to play" : "Household work"
-          ).font(.system(size: 30, design: .serif))
+          Text(item.id == "journal" ? "The promise journal" : "How to play").font(
+            .system(size: 28, design: .serif))
           Spacer()
           Button("Done") { sheet = nil }.keyboardShortcut(.cancelAction)
         }
         ScrollView {
-          if value.id == "journal" {
+          if item.id == "journal" {
             JournalView(state: state)
-          } else if value.id == "help" {
+          } else {
             Text(
-              "Read the seasonal conversation and choose a response. Assign one task to each adult, review the forecast, then confirm the work. An evening conversation follows before food consumption and weathering. Continue through winter to see your household’s ending.\n\nHarvest needs two adults. Honouring the borrowed ox promise reserves Petru’s autumn assignment. Every accepted choice and draft assignment saves on this Mac.\n\nScene hotspots have matching buttons. Tab moves between controls; Escape closes this window."
-            ).lineSpacing(6)
-          } else if let id = selectedTask, case let task = Rules.task(id) {
-            Text(task.name).font(.title2)
-            Text(task.description)
-            Text(
-              "Cost: \(task.moneyCost) money · \(task.foodCost) food. Needs \(task.workers) adult\(task.workers == 1 ? "" : "s")."
-            ).padding(.vertical)
-            if state.phase == .work { WorkView(session: session, filter: id) }
+              "Read the seasonal conversation, then select a household portrait or a place in the homestead to assign work. Each adult has one assignment. End season opens a forecast; confirm to resolve work, then answer the evening conversation.\n\nBuild reveals two fixed plots. A woodshed costs 3 money and reduces winter consumption and wear; a root cellar costs 4 money and improves provisions purchases. Both require one adult’s assignment, finish when work resolves and help from the following season. Construction is unavailable in winter. Select the plot to change or cancel its builder.\n\nHarvest needs two adults. Honouring the ox promise reserves Petru in autumn. All choices and draft assignments save on this Mac.\n\nCommand-J opens the journal. The Places menu provides keyboard alternatives to scene targets. Escape closes optional commands; conversations remain until answered."
+            ).lineSpacing(5)
           }
         }
-      }.padding(26).frame(width: 580, height: 480).background(parchment)
+      }.padding(26).frame(width: 620, height: 480).background(GamePalette.panel)
     }
     .alert("Begin a fresh household?", isPresented: $restart) {
       Button("Cancel", role: .cancel) {}
-      Button("Start fresh", role: .destructive) { session.startFresh() }
+      Button("Start fresh", role: .destructive) {
+        session.startFresh()
+        ui.changedPhase()
+      }
     } message: {
-      Text("Your existing save will be kept as a recovery copy before the new year begins.")
+      Text("Your existing save will be preserved as a recovery copy before a new year begins.")
     }
-    .alert("Confirm this season’s work?", isPresented: $confirmWork) {
-      Button("Keep planning", role: .cancel) {}
-      Button("Complete work") { session.send(Action(type: "resolve", revision: state.revision)) }
-    } message: {
-      Text(
-        "Assignments become final. The evening conversation follows before consumption and weathering."
-      )
-    }
+    .onExitCommand { ui.dismissOptional() }
     .onAppear {
-      scene.onHotspot = hotspot
+      if keyMonitor == nil {
+        // SpriteKit consumes Escape before SwiftUI's exit command sees it.
+        keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+          guard event.keyCode == 53, event.window === scene.view?.window,
+            event.window?.attachedSheet == nil, sheet == nil, !restart, !mandatory
+          else { return event }
+          ui.dismissOptional()
+          return nil
+        }
+      }
+      scene.onSelection = choose
+      if state.phase == .work { ui.review = false }
       refreshScene()
+    }
+    .onDisappear {
+      if let keyMonitor { NSEvent.removeMonitor(keyMonitor) }
+      keyMonitor = nil
     }
     .onChange(of: state) { old, new in
+      if old.phase != new.phase {
+        ui.changedPhase()
+        if new.phase == .work { ui.review = false }
+      }
       refreshScene()
-      if old.phase != new.phase { panelFocused = true }
     }
+    .onChange(of: ui.selection) { scene.select(ui.selection, buildMode: ui.buildMode) }
+    .onChange(of: ui.buildMode) { scene.select(ui.selection, buildMode: ui.buildMode) }
     .onChange(of: reduced) { refreshScene() }
     .onChange(of: scenePhase) { session.active = scenePhase == .active }
-  }
-  private var topbar: some View {
-    HStack(spacing: 20) {
-      Image(systemName: "leaf.fill").font(.title2)
-      VStack(alignment: .leading, spacing: 0) {
-        Text("Răzeș").font(.system(size: 28, design: .serif))
-        Text("A HOME WORTH KEEPING").font(.system(size: 8, weight: .semibold)).tracking(2)
-      }
-      Spacer()
-      Button("Journal", systemImage: "book") { sheet = "journal" }.keyboardShortcut(
-        "j", modifiers: .command)
-      Button("How to play", systemImage: "questionmark.circle") { sheet = "help" }
-      Text(
-        session.storageWarning != nil || session.needsRecovery
-          ? "Saving unavailable" : session.hasSaved ? "Saved on this Mac" : "A new household"
-      ).font(.caption).foregroundStyle(.secondary)
-      Toggle(isOn: $session.soundEnabled) {
-        Image(systemName: session.soundEnabled ? "speaker.wave.2" : "speaker.slash")
-      }.toggleStyle(.button).accessibilityLabel("Ambient sound").help("Enable ambient sound")
-      Toggle(isOn: $session.reduceMotion) { Image(systemName: "sparkles") }.toggleStyle(.button)
-        .accessibilityLabel("Reduce motion").help("Reduce optional animation")
-      Button("Restart", systemImage: "arrow.counterclockwise") { restart = true }.labelStyle(
-        .iconOnly
-      ).help("Start a fresh household")
-    }.buttonStyle(.borderless).padding(.horizontal, 28).padding(.vertical, 16)
-  }
-  private var heading: some View {
-    HStack(alignment: .center) {
-      VStack(alignment: .leading, spacing: 5) {
-        Text("\(Content.seasons[state.season].uppercased()) · YEAR ONE").font(
-          .caption.weight(.semibold)
-        ).tracking(2)
-        Text(
-          state.phase == .ending
-            ? "What a year can hold."
-            : [
-              "A new beginning.", "Under the summer sun.", "The season of keeping.",
-              "A light in the window.",
-            ][state.season]
-        ).font(.custom("CormorantGaramondLight-Medium", size: 42, relativeTo: .largeTitle))
-        Text(Rules.seasonSubtitle(state)).foregroundStyle(.secondary)
-      }
-      Spacer()
-      HStack(spacing: 18) {
-        ForEach(0..<4) { i in
-          VStack(spacing: 5) {
-            Image(
-              systemName: i < state.season
-                ? "checkmark.circle.fill" : ["leaf", "sun.max", "leaf.fill", "snowflake"][i])
-            Text(Content.seasons[i]).font(.caption)
-          }.foregroundStyle(i == state.season ? ink : ink.opacity(0.45)).accessibilityLabel(
-            "\(Content.seasons[i])\(i == state.season ? ", current season" : "")")
-        }
-      }
+    .background {
+      Button("Open journal") { sheet = "journal" }.keyboardShortcut("j", modifiers: .command)
+        .hidden()
     }
   }
-  private var resources: some View {
-    HStack(spacing: 16) {
-      resource("Food", value: "\(state.food)", detail: "4 needed for spring seed", symbol: "leaf")
-      resource("Money", value: "\(state.money)", detail: "Coins to your name", symbol: "circle")
+  private var topStrip: some View {
+    HStack(spacing: 18) {
+      Text("Răzeș").font(.system(size: 20, design: .serif)).foregroundStyle(GamePalette.gold)
+      Text("\(Content.seasons[state.season].uppercased()) · 1495").font(
+        .system(size: 10, weight: .semibold)
+      ).tracking(1)
+      Divider().frame(height: 18).overlay(GamePalette.gold.opacity(0.4))
+      resource("Food", value: "\(state.food)", icon: "leaf")
+      resource("Money", value: "\(state.money)", icon: "circle")
+      resource("Shelter", value: "\(state.house)", icon: "house")
       resource(
-        "Shelter", value: "\(state.house)/100",
-        detail: state.house >= 65 ? "A roof that holds" : "The house needs care", symbol: "house")
-      resource(
-        "Free hands", value: "\(state.assignments.values.filter { $0 == .rest }.count)/3",
-        detail: "Three adults, one household", symbol: "person.2")
-    }
-  }
-  private func resource(_ title: String, value: String, detail: String, symbol: String) -> some View
-  {
-    HStack(alignment: .top, spacing: 12) {
-      Image(systemName: symbol).font(.title3).padding(10).background(
-        ink.opacity(0.06), in: RoundedRectangle(cornerRadius: 8))
-      VStack(alignment: .leading, spacing: 3) {
-        Text(title).font(.caption).foregroundStyle(.secondary)
-        Text(value).font(.system(size: 25, weight: .medium, design: .serif))
-        Text(detail).font(.caption).foregroundStyle(.secondary)
-      }
+        "Free", value: "\(state.assignments.values.filter{$0 == .rest}.count)/3", icon: "person.2")
       Spacer(minLength: 0)
-    }.padding(16).frame(maxWidth: .infinity, alignment: .leading).background(
-      .white.opacity(0.55), in: RoundedRectangle(cornerRadius: 12))
+      Menu("Places") {
+        ForEach(Hotspot.allCases, id: \.rawValue) { spot in
+          Button(spot.rawValue.capitalized) { choose(.hotspot(spot)) }
+        }
+        Divider()
+        ForEach(BuildingID.allCases, id: \.self) { id in
+          Button(Construction.definition(id).title) { choose(.building(id)) }
+        }
+      }.menuStyle(.borderlessButton).fixedSize()
+      Menu {
+        Button("Promise journal") { sheet = "journal" }
+        Button("How to play") { sheet = "help" }
+        Divider()
+        Toggle("Ambient sound", isOn: $session.soundEnabled)
+        Toggle("Reduce motion", isOn: $session.reduceMotion)
+        Divider()
+        Text(session.hasSaved ? "Saved on this Mac" : "A new household")
+        Button("Start a fresh household") { restart = true }
+      } label: {
+        Image(systemName: "gearshape").accessibilityLabel("Game menu")
+      }.menuStyle(.borderlessButton).frame(width: 24)
+    }.padding(.horizontal, 18).frame(height: 48).background(GamePalette.panel.opacity(0.96))
+      .overlay(alignment: .bottom) {
+        Rectangle().fill(GamePalette.gold.opacity(0.7)).frame(height: 1)
+      }
   }
-  @ViewBuilder private var commitment: some View {
-    if state.ox == "borrowed" || state.reservedWorker != nil {
-      Label(
-        state.reservedWorker != nil
-          ? "A promise kept · Petru is helping Vasile this autumn."
-          : "A promise to remember · One adult owes Vasile help in autumn.", systemImage: "heart"
-      ).font(.callout).padding(14).frame(maxWidth: .infinity, alignment: .leading).background(
-        ink.opacity(0.06), in: RoundedRectangle(cornerRadius: 10))
+  private func resource(_ label: String, value: String, icon: String) -> some View {
+    HStack(spacing: 5) {
+      Image(systemName: icon).foregroundStyle(GamePalette.gold)
+      Text(label).foregroundStyle(GamePalette.muted)
+      Text(value).monospacedDigit().fontWeight(.semibold)
+    }.font(.system(size: 12)).accessibilityElement(children: .combine)
+  }
+  private var warnings: some View {
+    VStack(spacing: 3) {
+      if let warning = session.storageWarning { notice(warning) }
+      if let warning = resourceWarning { notice(warning) }
+      if let error = session.error {
+        HStack {
+          notice(error)
+          Button("Dismiss") { session.error = nil }.font(.caption)
+        }.background(GamePalette.panel)
+      }
     }
   }
-  private var household: some View {
-    VStack(alignment: .leading, spacing: 14) {
-      Text("The household").font(.system(size: 24, design: .serif))
-      if state.phase == .work {
-        WorkView(session: session)
-      } else {
-        HStack(alignment: .top) {
-          ForEach(WorkerID.allCases, id: \.self) { worker in
-            let person = Content.shared.people[worker.rawValue]!
-            VStack(alignment: .leading, spacing: 4) {
-              Text(person.name).font(.headline)
-              Text(person.role).font(.caption).foregroundStyle(.secondary)
-              Text(person.line).font(.caption).italic().fixedSize(horizontal: false, vertical: true)
-            }.frame(maxWidth: .infinity, alignment: .leading)
-          }
-        }
-      }
-    }.padding(18).background(.white.opacity(0.55), in: RoundedRectangle(cornerRadius: 12))
-  }
-  private var phasePanel: some View {
-    VStack(alignment: .leading, spacing: 18) {
-      Text(
-        [
-          Phase.opening: "A conversation", .work: "Plan your work",
-          .consequence: "As evening falls", .summary: "Season remembered",
-          .ending: "Your first year",
-        ][state.phase]!
-      ).font(.caption.weight(.semibold)).tracking(1).accessibilityAddTraits(.isHeader)
-        .accessibilityFocused($panelFocused)
-      switch state.phase {
-      case .opening, .consequence: ConversationView(session: session, state: state)
-      case .work:
-        Text("A season’s work").font(.system(size: 30, design: .serif))
-        Text(
-          "Give each adult one task. Work costs must be affordable before wages or harvest come home."
-        ).foregroundStyle(.secondary)
-        let p = Rules.preview(state)
-        Divider()
-        Text("After work and consumption").font(.headline)
-        Text("Food: \(p.foodAfter)\nMoney: \(p.moneyAfter)\nShelter: \(p.houseAfter)/100")
-          .lineSpacing(8)
-        Text("The evening conversation may change these numbers.").font(.caption).foregroundStyle(
-          .secondary)
-        ForEach(p.errors, id: \.self) { Text($0).foregroundStyle(.red) }
-        ForEach(p.warnings, id: \.self) {
-          Text($0).font(.callout).foregroundStyle(Color(red: 0.48, green: 0.28, blue: 0.12))
-        }
-        Button("Review and complete work") { confirmWork = true }.buttonStyle(.borderedProminent)
-          .disabled(!p.errors.isEmpty)
-      case .summary:
-        Text("\(Content.seasons[state.season]), remembered").font(.system(size: 30, design: .serif))
-        if let r = state.report {
-          ForEach(r.tasks, id: \.self) { Text($0).font(.callout) }
-          Divider()
-          Text(
-            "Food \(r.foodBefore) → \(r.foodAfter)\nMoney \(r.moneyBefore) → \(r.moneyAfter)\nShelter \(r.houseBefore) → \(r.houseAfter)"
-          ).lineSpacing(8)
-          Text("Consumed \(r.consumption) food · Weathering \(r.wear)").font(.caption)
-            .foregroundStyle(.secondary)
-          if r.deficit > 0 {
-            Text("Food shortfall: \(r.deficit). Recorded as hardship.").foregroundStyle(.red)
-          }
-        }
-        Button(
-          state.season == 3
-            ? "See what the year has meant"
-            : "Continue to \(Content.seasons[min(3,state.season+1)])"
-        ) { session.send(Action(type: "continue", revision: state.revision)) }.buttonStyle(
-          .borderedProminent)
-      case .ending:
-        let end = Rules.ending(state)
-        Text(end.title).font(.system(size: 30, design: .serif))
-        Text(end.text).lineSpacing(5)
-        ForEach(end.decisions, id: \.event) { h in
-          VStack(alignment: .leading, spacing: 4) {
-            Text(h.title).font(.headline)
-            Text(h.detail).font(.callout).foregroundStyle(.secondary)
-          }
-        }
-        Button("Open the promise journal") { sheet = "journal" }.buttonStyle(.bordered)
-        Button("Begin another household") { restart = true }.buttonStyle(.borderedProminent)
-      }
-    }.padding(22).frame(maxWidth: .infinity, alignment: .leading).background(
-      .white.opacity(0.7), in: RoundedRectangle(cornerRadius: 14))
+  private func notice(_ text: String) -> some View {
+    Label(text, systemImage: "exclamationmark.triangle").font(.caption).foregroundStyle(
+      GamePalette.gold
+    ).padding(8).frame(maxWidth: .infinity, alignment: .leading).background(
+      GamePalette.panel.opacity(0.97))
   }
   private var recovery: some View {
-    VStack(alignment: .leading, spacing: 18) {
-      Text("Your household needs attention").font(.largeTitle)
-      Text(session.error ?? "The saved household could not be opened.")
-      Text(
-        "Your existing save has been left untouched. Retry opening it, or keep a recovery copy and begin a fresh household."
-      )
-      HStack {
-        Button("Retry opening save") { session.retryLoad() }
-        Button("Start a fresh household") { restart = true }
-      }
-    }.frame(maxWidth: 650, alignment: .leading)
+    GamePanel {
+      VStack(alignment: .leading, spacing: 18) {
+        Text("Your household needs attention").font(.largeTitle)
+        Text(session.error ?? "This save could not be opened.")
+        Text(
+          "Your saved household has been left untouched. Retry, or preserve a recovery copy and start fresh."
+        )
+        HStack {
+          Button("Retry opening save") { session.retryLoad() }
+          Button("Start a fresh household") { restart = true }
+        }
+      }.frame(maxWidth: 620, alignment: .leading)
+    }
   }
-  private func banner(_ text: String, symbol: String) -> some View {
-    Label(text, systemImage: symbol).font(.callout).padding(12).frame(
-      maxWidth: .infinity, alignment: .leading
-    ).background(Color.orange.opacity(0.12), in: RoundedRectangle(cornerRadius: 8))
-      .accessibilityAddTraits(.updatesFrequently)
+  private func choose(_ selection: SceneSelection) {
+    guard !session.needsRecovery else { return }
+    if mandatory {
+      ui.review = true
+      return
+    }
+    ui.selection = selection
+    ui.review = false
   }
   private func refreshScene() {
-    scene.update(state: state, reducedMotion: reduced)
+    scene.update(
+      state: state, reducedMotion: reduced,
+      animateChanges: session.acceptedRevision == state.revision)
+    scene.select(ui.selection, buildMode: ui.buildMode)
     resourceWarning = scene.resourceWarning
-  }
-  private func hotspot(_ spot: Hotspot) {
-    guard !session.needsRecovery else { return }
-    if spot == .visitor {
-      panelFocused = true
-      return
-    }
-    guard state.phase == .work else {
-      panelFocused = true
-      session.error = "Finish the current conversation before assigning work."
-      return
-    }
-    let task: TaskID? =
-      spot == .house
-      ? .repair
-      : spot == .stores
-        ? .supplies
-        : state.season == 0
-          ? .plant : state.season == 1 ? .tend : state.season == 2 ? .harvest : nil
-    guard let task else {
-      session.error = "The field is resting beneath the snow."
-      return
-    }
-    guard Rules.taskOptions(state).contains(where: { $0.id == task }) else {
-      session.error = "The field was not planted in spring. Choose another household task."
-      return
-    }
-    selectedTask = task
-    sheet = "task"
   }
 }
 private struct SheetID: Identifiable {

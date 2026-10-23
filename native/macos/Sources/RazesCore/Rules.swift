@@ -27,21 +27,26 @@ public enum Rules {
     return Content.shared.events[id]!
   }
   public static func task(_ id: TaskID) -> Task {
-    if let building = Construction.building(for:id) {
+    if let building = Construction.building(for: id) {
       let definition = Construction.definition(building)
-      return Task(id:id,name:"Build \(definition.title.lowercased())",description:definition.benefit,icon:"hammer",workers:1,moneyCost:definition.cost,foodCost:0,foodGain:0,moneyGain:0,houseGain:0)
+      return Task(
+        id: id, name: "Build \(definition.title.lowercased())", description: definition.benefit,
+        icon: "hammer", workers: 1, moneyCost: definition.cost, foodCost: 0, foodGain: 0,
+        moneyGain: 0, houseGain: 0)
     }
     return Content.shared.tasks[id.rawValue]!
   }
   public static func consumption(_ state: GameState, house: Int) -> Int {
     let winter = state.season == 3
-    let base = winter && Construction.active(.woodshed,state:state) ? 6 : b.consumption
+    let base = winter && Construction.active(.woodshed, state: state) ? 6 : b.consumption
     return base + (winter && house < b.coldThreshold ? b.coldFood : 0)
   }
   public static func weathering(_ state: GameState) -> Int {
-    state.season == 3 && Construction.active(.woodshed,state:state) ? 6 : b.wear[state.season]
+    state.season == 3 && Construction.active(.woodshed, state: state) ? 6 : b.wear[state.season]
   }
-  public static func suppliesGain(_ state: GameState) -> Int { Construction.active(.cellar,state:state) ? 10 : b.supplyGain }
+  public static func suppliesGain(_ state: GameState) -> Int {
+    Construction.active(.cellar, state: state) ? 10 : b.supplyGain
+  }
   public static func taskOptions(_ s: GameState) -> [Task] {
     let t = Content.shared.tasks
     var tasks: [Task] = []
@@ -52,10 +57,15 @@ public enum Rules {
       harvest.foodGain = b.harvest + s.cropBonus + (s.tended ? b.tendedBonus : 0)
       tasks.append(harvest)
     }
-    let construction = Construction.definitions.filter { Construction.unavailable($0.id,state:s) == nil }.map { task($0.task) }
-    return tasks + [TaskID.repair, .paid, .help, .supplies, .rest].map { id in
-      var value = task(id); if id == .supplies { value.foodGain = suppliesGain(s) }; return value
-    } + construction
+    let construction = Construction.definitions.filter {
+      Construction.unavailable($0.id, state: s) == nil
+    }.map { task($0.task) }
+    return tasks
+      + [TaskID.repair, .paid, .help, .supplies, .rest].map { id in
+        var value = task(id)
+        if id == .supplies { value.foodGain = suppliesGain(s) }
+        return value
+      } + construction
   }
   public static func choiceProblem(_ s: GameState, choice c: Choice) -> String? {
     if s.money + (c.effect.money ?? 0) < 0 {
@@ -68,7 +78,7 @@ public enum Rules {
   }
   public static func preview(_ s: GameState) -> Projection {
     var p = Projection()
-    p.consumption = consumption(s,house:s.house)
+    p.consumption = consumption(s, house: s.house)
     p.wear = weathering(s)
     let assigned = WorkerID.allCases.compactMap { s.assignments[$0.rawValue] }
     for id in assigned {
@@ -95,7 +105,7 @@ public enum Rules {
       p.errors.append("Planting needs \(p.foodCost) food for seed; only \(s.food) is available.")
     }
     let repaired = min(100, s.house + p.houseGain)
-    p.consumption = consumption(s,house:repaired)
+    p.consumption = consumption(s, house: repaired)
     p.foodAfter = s.food - p.foodCost + p.foodGain - p.consumption
     p.moneyAfter = s.money - p.moneyCost + p.moneyGain
     p.houseAfter = max(0, repaired - p.wear)
@@ -180,7 +190,7 @@ public enum Rules {
       if s.phase == .opening {
         s.phase = .work
       } else {
-        let consumption = consumption(s,house:s.house)
+        let consumption = consumption(s, house: s.house)
         let deficit = max(0, consumption - s.food)
         s.food = max(0, s.food - consumption)
         s.house = max(0, s.house - weathering(s))
@@ -219,7 +229,7 @@ public enum Rules {
       s.house = min(100, s.house + p.houseGain)
       let tasks = Array(s.assignments.values)
       for definition in Construction.definitions where tasks.contains(definition.task) {
-        s.buildings.append(BuildingRecord(id:definition.id,completedSeason:s.season))
+        s.buildings.append(BuildingRecord(id: definition.id, completedSeason: s.season))
       }
       if tasks.contains(.plant) {
         s.planted = true

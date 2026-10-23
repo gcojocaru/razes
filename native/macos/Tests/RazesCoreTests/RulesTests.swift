@@ -24,20 +24,27 @@ struct Reference: Decodable {
   var runs: [Run]
   static func normalized(_ data: Data) throws -> Data {
     func visit(_ value: Any) -> Any {
-      if var object = value as? [String:Any] {
+      if var object = value as? [String: Any] {
         object = object.mapValues(visit)
-        if object["assignments"] != nil && object["phase"] != nil { object["buildings"] = []; object["version"] = 2 }
+        if object["assignments"] != nil && object["phase"] != nil {
+          object["buildings"] = []
+          object["version"] = 2
+        }
         return object
       }
       if let array = value as? [Any] { return array.map(visit) }
       return value
     }
-    return try JSONSerialization.data(withJSONObject:visit(JSONSerialization.jsonObject(with:data)))
+    return try JSONSerialization.data(
+      withJSONObject: visit(JSONSerialization.jsonObject(with: data)))
   }
   static func load() throws -> Reference {
     try JSONDecoder().decode(
       Self.self,
-      from: normalized(Data(contentsOf: Bundle.module.url(forResource:"parity",withExtension:"json",subdirectory:"Fixtures")!)))
+      from: normalized(
+        Data(
+          contentsOf: Bundle.module.url(
+            forResource: "parity", withExtension: "json", subdirectory: "Fixtures")!)))
   }
 }
 extension RulesTests {

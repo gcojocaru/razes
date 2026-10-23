@@ -6,21 +6,29 @@ public enum SaveCodec {
     guard data.count <= 1_000_000 else { throw GameError("This save is too large to read safely.") }
     let s: GameState
     do {
-      guard var object = try JSONSerialization.jsonObject(with:data) as? [String:Any], let version = object["version"] as? Int else {
+      struct Header: Decodable { let version: Int }
+      let version = try JSONDecoder().decode(Header.self, from: data).version
+      guard var object = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
         throw GameError("This save could not be read.")
       }
-      guard version == 1 || version == 2 else { throw GameError("This save belongs to an unsupported version.") }
+      guard version == 1 || version == 2 else {
+        throw GameError("This save belongs to an unsupported version.")
+      }
       if version == 1 {
         guard object["buildings"] == nil,
-          let assignments = object["assignments"] as? [String:String],
-          assignments.values.allSatisfy({ Content.shared.tasks[$0] != nil }) else {
+          let assignments = object["assignments"] as? [String: String],
+          assignments.values.allSatisfy({ Content.shared.tasks[$0] != nil })
+        else {
           throw GameError("This legacy save contains unsupported construction data.")
         }
-        object["version"] = 2; object["buildings"] = []
+        object["version"] = 2
+        object["buildings"] = []
       }
-      s = try JSONDecoder().decode(GameState.self,from:JSONSerialization.data(withJSONObject:object))
-    } catch let error as GameError { throw error }
-    catch { throw GameError("This save could not be read. You can start a fresh household.") }
+      s = try JSONDecoder().decode(
+        GameState.self, from: JSONSerialization.data(withJSONObject: object))
+    } catch let error as GameError { throw error } catch {
+      throw GameError("This save could not be read. You can start a fresh household.")
+    }
     func ensure(_ valid: Bool) throws {
       if !valid {
         throw GameError("This save is invalid or incomplete. You can start a fresh household.")
@@ -128,7 +136,7 @@ public enum SaveCodec {
     try ensure(s.buildings.count <= BuildingID.allCases.count)
     try ensure(Set(s.buildings.map(\.id)).count == s.buildings.count)
     for record in s.buildings {
-      try ensure(integer(record.completedSeason,0,2) && record.completedSeason <= s.season)
+      try ensure(integer(record.completedSeason, 0, 2) && record.completedSeason <= s.season)
       let task = Construction.definition(record.id).task
       if record.completedSeason == s.season {
         try ensure(resolved && assigned.contains(task))

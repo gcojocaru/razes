@@ -6,6 +6,7 @@ import RazesCore
   private(set) var state = Rules.newGame()
   private(set) var needsRecovery = false
   private(set) var hasSaved = false
+  private(set) var acceptedRevision: Int?
   var error: String?
   var storageWarning: String?
   private let store: SaveStore?
@@ -17,13 +18,19 @@ import RazesCore
     self.store = store
     if let startupError { storageWarning = startupError } else { retryLoad() }
   }
-  static func applicationSession() -> GameSession {
+  static func applicationSession(arguments: [String] = CommandLine.arguments) -> GameSession {
+    #if DEBUG
+      if let index = arguments.firstIndex(of: "--validation-save"), index + 1 < arguments.count {
+        return GameSession(store: SaveStore(url: URL(fileURLWithPath: arguments[index + 1])))
+      }
+    #endif
     do { return GameSession(store: try SaveStore.applicationStore()) } catch {
       return GameSession(
         store: nil, startupError: "Saving is unavailable: \(error.localizedDescription)")
     }
   }
   func retryLoad() {
+    acceptedRevision = nil
     guard let store else { return }
     do {
       if let loaded = try store.load() {
@@ -45,6 +52,7 @@ import RazesCore
     guard !needsRecovery else { return }
     do {
       state = try Rules.dispatch(state, action: action)
+      acceptedRevision = state.revision
       error = nil
       do {
         guard let store else { throw GameError("The save location is unavailable.") }
@@ -63,6 +71,7 @@ import RazesCore
     do {
       guard let store else { throw GameError("The save location is unavailable.") }
       try store.startFresh(fresh)
+      acceptedRevision = nil
       state = fresh
       needsRecovery = false
       error = nil

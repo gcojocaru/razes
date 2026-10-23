@@ -24,13 +24,14 @@ struct SaveStore {
     { return nil }
   }
   func save(_ state: GameState) throws {
-    if FileManager.default.fileExists(atPath:url.path) {
-      let original = try Data(contentsOf:url)
+    if FileManager.default.fileExists(atPath: url.path) {
+      let original = try Data(contentsOf: url)
       _ = try SaveCodec.decode(original)
-      let object = try JSONSerialization.jsonObject(with:original) as? [String:Any]
+      let object = try JSONSerialization.jsonObject(with: original) as? [String: Any]
       if object?["version"] as? Int == 1 {
-        let backup = url.deletingLastPathComponent().appendingPathComponent("household-migration-\(UUID().uuidString).json")
-        try preserveOriginal(url,backup)
+        let backup = url.deletingLastPathComponent().appendingPathComponent(
+          "household-migration-\(UUID().uuidString).json")
+        try preserveOriginal(url, backup)
       }
     }
     try write(state)

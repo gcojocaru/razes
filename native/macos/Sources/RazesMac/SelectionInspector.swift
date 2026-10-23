@@ -1,0 +1,124 @@
+import RazesCore
+import SwiftUI
+
+struct SelectionInspector: View {
+  @Bindable var session: GameSession
+  let state: GameState
+  let selection: SceneSelection
+  var body: some View {
+    VStack(alignment: .leading, spacing: 14) {
+      switch selection {
+      case .worker(let worker):
+        let person = Content.shared.people[worker.rawValue]!
+        HStack {
+          PortraitView(person: worker.rawValue).frame(width: 48, height: 60)
+          VStack(alignment: .leading, spacing: 4) {
+            Text(person.name).font(.system(size: 25, design: .serif))
+            Text(person.role).font(.caption).foregroundStyle(GamePalette.muted)
+          }
+        }
+        Text(person.line).font(.callout).italic()
+        if state.phase == .work {
+          if state.reservedWorker == worker.rawValue {
+            Text("Reserved for your promise to Vasile.").foregroundStyle(GamePalette.gold)
+          } else {
+            ForEach(Rules.taskOptions(state)) { task in
+              let reason = Rules.assignmentProblem(state, worker: worker, task: task.id)
+              Button {
+                session.send(
+                  Action(type: "assign", revision: state.revision, worker: worker, task: task.id))
+              } label: {
+                HStack {
+                  Text(task.name)
+                  Spacer()
+                  if task.id == state.assignments[worker.rawValue] {
+                    Image(systemName: "checkmark")
+                  }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+              }.disabled(reason != nil).help(reason ?? task.description)
+              if let reason { Text(reason).font(.caption).foregroundStyle(GamePalette.muted) }
+            }
+            let task = Rules.task(state.assignments[worker.rawValue]!)
+            Text(task.description).font(.caption).foregroundStyle(GamePalette.muted)
+            Text("Current work cost: \(task.moneyCost) money · \(task.foodCost) food").font(
+              .caption)
+          }
+        } else {
+          Text("Assign work after the opening conversation.").font(.caption)
+        }
+      case .building(let id):
+        let definition = Construction.definition(id)
+        Text(definition.title).font(.system(size: 25, design: .serif))
+        Text(definition.benefit).lineSpacing(3)
+        if let record = state.buildings.first(where: { $0.id == id }) {
+          Label(
+            "Completed in \(Content.seasons[record.completedSeason])", systemImage: "checkmark.seal"
+          )
+          Text(
+            Construction.active(id, state: state)
+              ? "Benefits are available this season\(id == .woodshed && state.season != 3 ? " when winter arrives":"")."
+              : "Benefits begin next season."
+          ).font(.caption).foregroundStyle(GamePalette.gold)
+        } else {
+          Text("\(definition.cost) money · one adult’s seasonal assignment").font(.headline)
+            .foregroundStyle(GamePalette.gold)
+          Text("Completes when work is confirmed. Benefits begin the following season.").font(
+            .caption)
+          if let reason = Construction.unavailable(id, state: state) {
+            Text(reason).foregroundStyle(GamePalette.muted)
+          } else {
+            assignmentButtons(definition.task)
+          }
+        }
+      case .hotspot(let spot):
+        Text(spot.rawValue.capitalized).font(.system(size: 25, design: .serif))
+        switch spot {
+        case .house:
+          Text("Shelter: \(state.house)/100")
+          Text(
+            "Winter wear: \(state.buildings.contains(where:{$0.id == .woodshed}) ? 6:14). Keep the roof ready for the cold."
+          ).font(.caption)
+          assignmentButtons(.repair)
+        case .stores:
+          Text("\(state.food) food · \(state.money) money")
+          Text("A provisions purchase brings \(Rules.suppliesGain(state)) food for 4 money.").font(
+            .caption)
+          assignmentButtons(.supplies)
+        case .field:
+          Text(Rules.fieldLabel(state)).font(.callout)
+          if let task = Rules.taskOptions(state).first(where: {
+            [TaskID.plant, .tend, .harvest].contains($0.id)
+          }) {
+            Text(task.description).font(.caption)
+            assignmentButtons(task.id)
+          } else {
+            Text("No field work is available this season.").font(.caption)
+          }
+        case .visitor:
+          Text("Your neighbours remember the work and the promises you share.").font(.callout)
+        }
+      }
+    }.buttonStyle(.bordered).controlSize(.regular)
+  }
+  @ViewBuilder private func assignmentButtons(_ task: TaskID) -> some View {
+    if state.phase == .work {
+      ForEach(WorkerID.allCases, id: \.self) { worker in
+        let assigned = state.assignments[worker.rawValue] == task
+        let target: TaskID = assigned ? .rest : task
+        let reason = Rules.assignmentProblem(state, worker: worker, task: target)
+        VStack(alignment: .leading, spacing: 4) {
+          Button("\(assigned ? "Cancel":"Assign") \(Content.shared.people[worker.rawValue]!.name)")
+          {
+            session.send(
+              Action(type: "assign", revision: state.revision, worker: worker, task: target))
+          }.disabled(reason != nil)
+          if let reason { Text(reason).font(.caption).foregroundStyle(GamePalette.muted) }
+        }
+      }
+    } else {
+      Text("Work commands are available during planning.").font(.caption).foregroundStyle(
+        GamePalette.muted)
+    }
+  }
+}

@@ -2,14 +2,30 @@ import AppKit
 import RazesCore
 import SpriteKit
 
-enum Hotspot: String, CaseIterable { case field, house, visitor, stores }
 @MainActor final class HomesteadScene: SKScene {
-  var onHotspot: ((Hotspot) -> Void)?
+  var onSelection: ((SceneSelection) -> Void)?
   private(set) var resourceWarning: String?
-  private var lastState: GameState?
-  private var lastReduced = false
-  private var textures: [String: SKTexture] = [:]
+  private(set) var completionEffectCount = 0
+  private var previous: GameState?
+  private var reduced = false
+  private var selection: SceneSelection?
+  private var buildMode = false
   private let artDirectory: URL?
+  private var textures: [String: SKTexture] = [:]
+  private var sprites: [String: SKSpriteNode] = [:]
+  private let backdrop = SKNode(), terrain = SKNode(), world = SKNode()
+  private let ground = TerrainLayer()
+  private let weather = SKNode(), smoke = SKNode(), markers = SKNode(), feedback = SKNode()
+  private var weatherSignature = ""
+  private var workerPositions: [WorkerID: CGPoint] = [:]
+  static let plotPositions: [BuildingID: CGPoint] = Dictionary(
+    uniqueKeysWithValues: BuildingID.allCases.map { id in
+      let point = IsometricLayout.plot(id)
+      return (id, CGPoint(x: point.x, y: 760 - point.y))
+    })
+  static let plotSizes: [BuildingID: CGSize] = [
+    .woodshed: CGSize(width: 185, height: 150), .cellar: CGSize(width: 180, height: 120),
+  ]
   override convenience init() {
     self.init(
       artDirectory: Bundle.module.url(
@@ -19,7 +35,28 @@ enum Hotspot: String, CaseIterable { case field, house, visitor, stores }
     self.artDirectory = artDirectory
     super.init(size: CGSize(width: 1200, height: 760))
     scaleMode = .aspectFit
-    backgroundColor = NSColor(red: 0.85, green: 0.89, blue: 0.82, alpha: 1)
+    backgroundColor = NSColor(red: 0.13, green: 0.17, blue: 0.13, alpha: 1)
+    backdrop.name = "backdrop"
+    addChild(backdrop)
+    terrain.name = "terrain"
+    terrain.zPosition = 5
+    addChild(terrain)
+    terrain.addChild(ground)
+    world.name = "world"
+    world.zPosition = 100
+    addChild(world)
+    weather.name = "weather"
+    weather.zPosition = 2000
+    addChild(weather)
+    smoke.name = "smoke"
+    smoke.zPosition = 1900
+    addChild(smoke)
+    markers.name = "selection"
+    markers.zPosition = 2050
+    addChild(markers)
+    feedback.name = "feedback"
+    feedback.zPosition = 2100
+    addChild(feedback)
   }
   required init?(coder: NSCoder) { fatalError("Not used") }
   private func texture(_ name: String, rect: CGRect? = nil) -> SKTexture? {
@@ -27,148 +64,380 @@ enum Hotspot: String, CaseIterable { case field, house, visitor, stores }
       guard let url = artDirectory?.appendingPathComponent(name + ".png"),
         let image = NSImage(contentsOf: url)
       else {
-        resourceWarning =
-          "Some artwork could not load. You can still play using the household controls."
+        resourceWarning = "Some artwork could not load. The command controls remain available."
         return nil
       }
       textures[name] = SKTexture(image: image)
     }
     let base = textures[name]!
-    guard let r = rect else { return base }
+    let frames: [String: CGRect] = [
+      "woodshed-complete": CGRect(x: 32, y: 194, width: 1209, height: 903),
+      "woodshed-construction": CGRect(x: 54, y: 192, width: 1163, height: 871),
+      "woodshed-winter": CGRect(x: 12, y: 230, width: 1229, height: 873),
+      "cellar-complete": CGRect(x: 10, y: 282, width: 1237, height: 744),
+      "cellar-construction": CGRect(x: 17, y: 313, width: 1226, height: 646),
+      "cellar-winter": CGRect(x: 6, y: 253, width: 1242, height: 845),
+    ]
+    guard let rect = rect ?? frames[name] else { return base }
     let size = base.size()
     return SKTexture(
       rect: CGRect(
-        x: r.minX / size.width, y: 1 - r.maxY / size.height, width: r.width / size.width,
-        height: r.height / size.height), in: base)
+        x: rect.minX / size.width, y: 1 - rect.maxY / size.height, width: rect.width / size.width,
+        height: rect.height / size.height), in: base)
   }
   @discardableResult private func sprite(
-    _ name: String, rect: CGRect? = nil, x: CGFloat, y: CGFloat, width: CGFloat, height: CGFloat,
-    bottom: Bool = true
+    _ id: String, art: String, crop: CGRect? = nil, x: CGFloat, y: CGFloat, w: CGFloat, h: CGFloat,
+    z: CGFloat
   ) -> SKSpriteNode {
-    let node = SKSpriteNode(texture: texture(name, rect: rect))
-    node.size = CGSize(width: width, height: height)
-    node.anchorPoint = CGPoint(x: 0.5, y: bottom ? 0 : 0.5)
+    let node: SKSpriteNode
+    if let existing = sprites[id] {
+      node = existing
+    } else {
+      node = SKSpriteNode()
+      node.name = id
+      node.anchorPoint = CGPoint(x: 0.5, y: 0)
+      sprites[id] = node
+      (id == "land" ? backdrop : world).addChild(node)
+    }
+    node.texture = texture(art, rect: crop)
+    node.color = .clear
+    let height =
+      art.hasPrefix("woodshed-") || art.hasPrefix("cellar-")
+      ? w * (node.texture?.size().height ?? h) / max(1, node.texture?.size().width ?? w) : h
+    node.size = CGSize(width: w, height: height)
     node.position = CGPoint(x: x, y: 760 - y)
-    addChild(node)
+    node.zPosition = z
+    node.isHidden = false
     return node
   }
-  func update(state s: GameState, reducedMotion: Bool) {
-    guard s != lastState || reducedMotion != lastReduced else { return }
-    lastState = s
-    lastReduced = reducedMotion
-    removeAllChildren()
+  @discardableResult private func isoSprite(
+    _ id: String, art: String, crop: CGRect? = nil, point: CGPoint, width: CGFloat, height: CGFloat
+  ) -> SKSpriteNode {
+    sprite(
+      id, art: art, crop: crop, x: point.x, y: 760 - point.y, w: width, h: height, z: 1000 - point.y
+    )
+  }
+  func update(state s: GameState, reducedMotion: Bool, animateChanges: Bool = true) {
+    guard previous != s || reduced != reducedMotion else { return }
+    let old = previous
+    let motionChanged = reduced != reducedMotion
+    previous = s
+    reduced = reducedMotion
     let p = Presentation(state: s)
-    sprite(Content.seasons[s.season].lowercased(), x: 600, y: 760, width: 1200, height: 760)
-    let crops = ["bare", "sown", "growing", "ripe", "harvested", "snow"]
-    let i = crops.firstIndex(of: p.field)!
-    sprite(
-      "fields", rect: CGRect(x: (i % 3) * 525, y: (i / 3) * 499, width: 525, height: 499), x: 285,
-      y: 640, width: 390, height: 295)
     let atlas = s.season == 3 ? "props-winter" : "props"
-    sprite(
-      atlas, rect: CGRect(x: 1107, y: 0, width: 429, height: 503), x: 370, y: 452, width: 215,
-      height: 235)
-    sprite(
-      atlas,
-      rect: p.house == "intact"
+    let land = sprite(
+      "land", art: Content.seasons[s.season].lowercased(), x: 600, y: 760, w: 1200, h: 760, z: 0)
+    land.color = NSColor(red: 0.10, green: 0.18, blue: 0.13, alpha: 1)
+    land.colorBlendFactor = 0.68
+    ground.update(state: s) { texture($0) }
+    let fields = ["bare", "sown", "growing", "ripe", "harvested", "snow"]
+    let i = fields.firstIndex(of: p.field)!
+    isoSprite(
+      "field", art: "fields",
+      crop: CGRect(x: (i % 3) * 525, y: (i / 3) * 499, width: 525, height: 499),
+      point: IsometricLayout.field, width: 290, height: 185)
+    isoSprite(
+      "barn", art: atlas, crop: CGRect(x: 1107, y: 0, width: 429, height: 503),
+      point: IsometricLayout.barn, width: 160, height: 170)
+    isoSprite(
+      "house", art: atlas,
+      crop: p.house == "intact"
         ? CGRect(x: 0, y: 0, width: 557, height: 503)
-        : CGRect(x: 557, y: 0, width: 550, height: 503), x: 700, y: 493, width: 355, height: 320)
-    sprite(
-      atlas, rect: CGRect(x: 0, y: 503, width: 426, height: 521), x: 956, y: 552, width: 125,
-      height: 153)
-    for j in 0..<p.stores {
-      sprite(
-        atlas, rect: CGRect(x: 426, y: 503, width: 634, height: 521), x: j == 0 ? 408 : 482,
-        y: j == 0 ? 524 : 545, width: j == 0 ? 116 : 107, height: j == 0 ? 96 : 88)
+        : CGRect(x: 557, y: 0, width: 550, height: 503), point: IsometricLayout.house, width: 240,
+      height: 216)
+    isoSprite(
+      "well", art: atlas, crop: CGRect(x: 0, y: 503, width: 426, height: 521),
+      point: IsometricLayout.well, width: 80, height: 98)
+    for j in 0..<2 {
+      let point = CGPoint(
+        x: IsometricLayout.stores.x + CGFloat(j * 42), y: IsometricLayout.stores.y - CGFloat(j * 12)
+      )
+      let node = isoSprite(
+        "store-\(j)", art: atlas, crop: CGRect(x: 426, y: 503, width: 634, height: 521),
+        point: point, width: 85, height: 70)
+      node.isHidden = j >= p.stores
     }
-    let positions: [TaskID: CGPoint] = [
-      .plant: CGPoint(x: 245, y: 569), .tend: CGPoint(x: 245, y: 569),
-      .harvest: CGPoint(x: 245, y: 569), .repair: CGPoint(x: 720, y: 510),
-      .paid: CGPoint(x: 903, y: 643), .help: CGPoint(x: 824, y: 582),
-      .supplies: CGPoint(x: 430, y: 547), .rest: CGPoint(x: 645, y: 552),
-    ]
-    for j in 0..<4 {
-      if j == 3 && p.visitor == nil { continue }
-      let task = j < 3 ? s.assignments[WorkerID.allCases[j].rawValue]! : .rest
-      let pos = j < 3 ? (positions[task] ?? positions[.rest]!) : CGPoint(x: 827, y: 554)
-      let frame = j < 3 ? j : p.visitor == "dumitru" ? 4 : 3
-      let x = pos.x + (j == 1 ? 35 : j == 2 ? -29 : 0)
-      let y = pos.y + (j < 3 ? CGFloat(j * 8) : 0)
+    for id in BuildingID.allCases {
+      let stage = Construction.stage(id, state: s)
+      let pos = Self.plotPositions[id]!
+      let size = Self.plotSizes[id]!
+      let prefix = id == .woodshed ? "woodshed" : "cellar"
+      let suffix = stage == .planned ? "construction" : s.season == 3 ? "winter" : "complete"
+      let node = sprite(
+        "plot-\(id.rawValue)", art: "\(prefix)-\(suffix)", x: pos.x, y: pos.y, w: size.width,
+        h: size.height, z: 1000 - (760 - pos.y))
+      node.isHidden = stage == .empty && !buildMode
+      node.alpha = stage == .empty ? 0.38 : 1
+      if stage == .complete && old != nil && !old!.buildings.contains(where: { $0.id == id })
+        && !reduced && animateChanges
+      {
+        completionEffectCount += 1
+        let flash = SKShapeNode(ellipseOf: CGSize(width: size.width, height: 35))
+        flash.strokeColor = .init(red: 0.96, green: 0.83, blue: 0.51, alpha: 1)
+        flash.lineWidth = 3
+        flash.position = node.position
+        feedback.addChild(flash)
+        flash.run(
+          .sequence([
+            .group([.scale(to: 1.25, duration: 0.7), .fadeOut(withDuration: 0.7)]),
+            .removeFromParent(),
+          ]))
+      }
+    }
+    for (j, worker) in WorkerID.allCases.enumerated() {
+      let task = s.assignments[worker.rawValue]!
+      let pos = IsometricLayout.worker(task)
+      let x = pos.x + (j == 1 ? 26 : j == 2 ? -22 : 0)
+      let y = 760 - pos.y + CGFloat(j * 5)
+      workerPositions[worker] = CGPoint(x: x, y: 760 - y)
       let person = sprite(
-        "people", rect: CGRect(x: frame * 307, y: 0, width: 307, height: 590), x: x, y: y,
-        width: 48, height: 92)
-      if !reducedMotion {
+        "worker-\(worker.rawValue)", art: "people",
+        crop: CGRect(x: j * 307, y: 0, width: 307, height: 590), x: x, y: y, w: 34, h: 65,
+        z: 1000 - (760 - y) + 10)
+      if old?.assignments[worker.rawValue] != task || old?.phase != s.phase || old == nil
+        || motionChanged || reduced
+      {
+        person.removeAllActions()
+        person.zRotation = 0
+        person.yScale = 1
+      }
+      if !reduced && !person.hasActions() {
         person.run(
           .repeatForever(
             .sequence([.scaleY(to: 1.012, duration: 1.4), .scaleY(to: 1, duration: 1.4)])))
       }
-      if [.plant, .tend, .harvest, .repair].contains(task) && j < 3 {
-        let path = CGMutablePath()
-        path.move(to: .zero)
-        path.addLine(to: CGPoint(x: 2, y: 27))
-        path.move(to: CGPoint(x: -7, y: 27))
-        path.addLine(to: CGPoint(x: 10, y: 27))
-        let tool = SKShapeNode(path: path)
-        tool.strokeColor = .brown
-        tool.lineWidth = 3
-        tool.position = CGPoint(x: x + 15, y: 760 - y + 28)
-        addChild(tool)
-        if !reducedMotion && s.phase == .consequence {
-          tool.run(
-            .repeatForever(
-              .sequence([
-                .rotate(toAngle: 0.35, duration: 0.35), .rotate(toAngle: -0.35, duration: 0.35),
-              ])))
-        }
+      if old?.assignments[worker.rawValue] != task || old?.phase != s.phase || old == nil
+        || motionChanged
+      {
+        updateTool(
+          worker: worker, task: task, point: CGPoint(x: x + 15, y: 760 - y + 28), phase: s.phase,
+          depth: person.zPosition + 1)
       }
     }
-    sprite(
-      atlas, rect: CGRect(x: 1066, y: 503, width: 470, height: 521), x: 1040, y: 712, width: 275,
-      height: 235)
-    if !reducedMotion {
-      let snow = p.weather == "snow"
-      let rain = p.weather == "rain"
-      for j in 0..<(snow || rain ? 48 : 20) {
-        let particle = SKShapeNode(ellipseOf: CGSize(width: rain ? 1.5 : 4, height: rain ? 17 : 4))
-        particle.fillColor =
-          snow
-          ? .white
-          : rain ? NSColor.lightGray : NSColor(red: 0.91, green: 0.78, blue: 0.49, alpha: 1)
+    let visitor = sprite(
+      "visitor", art: "people",
+      crop: CGRect(x: (p.visitor == "dumitru" ? 4 : 3) * 307, y: 0, width: 307, height: 590),
+      x: IsometricLayout.visitor.x, y: 760 - IsometricLayout.visitor.y, w: 34, h: 65,
+      z: 1010 - IsometricLayout.visitor.y)
+    visitor.isHidden = p.visitor == nil
+    isoSprite(
+      "fence", art: atlas, crop: CGRect(x: 1066, y: 503, width: 470, height: 521),
+      point: IsometricLayout.fence, width: 160, height: 110)
+    updateWeather(p.weather)
+    if let old, animateChanges && !reduced && old.revision != s.revision {
+      let changes = [
+        ("Food", s.food - old.food), ("Money", s.money - old.money),
+        ("Shelter", s.house - old.house),
+      ].filter { $0.1 != 0 }
+      for (index, change) in changes.enumerated() {
+        let text = SKLabelNode(fontNamed: "DMSans9pt-Regular")
+        text.fontSize = 18
+        text.fontColor = .white
+        text.text = "\(change.0) \(change.1 > 0 ? "+":"")\(change.1)"
+        text.position = CGPoint(
+          x: ["Food": 280.0, "Money": 400.0, "Shelter": 520.0][change.0]!,
+          y: 690 - CGFloat(index * 4))
+        feedback.addChild(text)
+        text.run(
+          .sequence([
+            .group([.moveBy(x: 0, y: 18, duration: 1.6), .fadeOut(withDuration: 1.6)]),
+            .removeFromParent(),
+          ]))
+      }
+    }
+    if reduced { feedback.removeAllChildren() }
+    drawSelection()
+  }
+  private func updateTool(
+    worker: WorkerID, task: TaskID, point: CGPoint, phase: Phase, depth: CGFloat
+  ) {
+    let name = "tool-\(worker.rawValue)"
+    let dustName = "dust-\(worker.rawValue)"
+    world.childNode(withName: name)?.removeFromParent()
+    world.childNode(withName: dustName)?.removeFromParent()
+    guard [.plant, .tend, .harvest, .repair, .buildWoodshed, .buildCellar].contains(task) else {
+      return
+    }
+    let path = CGMutablePath()
+    path.move(to: .zero)
+    path.addLine(to: CGPoint(x: 2, y: 27))
+    path.move(to: CGPoint(x: -7, y: 27))
+    path.addLine(to: CGPoint(x: 10, y: 27))
+    let tool = SKShapeNode(path: path)
+    tool.name = name
+    tool.strokeColor = .brown
+    tool.lineWidth = 3
+    tool.position = point
+    tool.zPosition = depth
+    world.addChild(tool)
+    guard !reduced && (phase == .work || phase == .consequence) else { return }
+    tool.run(
+      .repeatForever(
+        .sequence([.rotate(toAngle: 0.3, duration: 0.4), .rotate(toAngle: -0.3, duration: 0.4)])))
+    if Construction.building(for: task) != nil {
+      let dust = SKNode()
+      dust.name = dustName
+      dust.position = CGPoint(x: point.x, y: point.y - 25)
+      dust.zPosition = depth + 1
+      world.addChild(dust)
+      for index in 0..<5 {
+        let particle = SKShapeNode(ellipseOf: CGSize(width: 5 + index, height: 3 + index))
+        particle.fillColor = NSColor(red: 0.72, green: 0.59, blue: 0.40, alpha: 1)
         particle.strokeColor = .clear
-        particle.alpha = 0.65
-        particle.position = CGPoint(x: (j * 137) % 1200, y: (j * 83) % 760)
-        addChild(particle)
-        let duration: TimeInterval = rain ? 2.6 : snow ? 25 : 38
+        particle.alpha = 0
+        dust.addChild(particle)
         particle.run(
           .repeatForever(
             .sequence([
-              .moveBy(x: 80, y: -800, duration: duration), .moveBy(x: -80, y: 800, duration: 0),
-            ])))
-      }
-      for j in 0..<5 {
-        let smoke = SKShapeNode(ellipseOf: CGSize(width: 15 + j * 6, height: 9 + j * 4))
-        smoke.fillColor = .white
-        smoke.strokeColor = .clear
-        smoke.alpha = 0.17
-        smoke.position = CGPoint(x: 733 + j * 4, y: 524 + j * 11)
-        addChild(smoke)
-        smoke.run(
-          .repeatForever(
-            .sequence([
-              .group([.moveBy(x: 30, y: 65, duration: 5.5), .fadeOut(withDuration: 5.5)]),
-              .moveBy(x: -30, y: -65, duration: 0), .fadeAlpha(to: 0.17, duration: 0),
+              .wait(forDuration: Double(index) * 0.13), .fadeAlpha(to: 0.3, duration: 0.12),
+              .group([
+                .moveBy(x: CGFloat(index * 3 - 6), y: 12, duration: 0.7),
+                .fadeOut(withDuration: 0.7),
+              ]), .move(to: .zero, duration: 0), .wait(forDuration: 0.8),
             ])))
       }
     }
   }
+  private func updateWeather(_ kind: String) {
+    let signature = "\(kind)-\(reduced)"
+    guard signature != weatherSignature else { return }
+    weatherSignature = signature
+    weather.removeAllChildren()
+    smoke.removeAllChildren()
+    guard !reduced else { return }
+    let rain = kind == "rain"
+    let snow = kind == "snow"
+    for j in 0..<(rain || snow ? 48 : 20) {
+      let particle = SKShapeNode(ellipseOf: CGSize(width: rain ? 1.5 : 4, height: rain ? 17 : 4))
+      particle.fillColor =
+        snow ? .white : rain ? .lightGray : NSColor(red: 0.95, green: 0.84, blue: 0.58, alpha: 1)
+      particle.strokeColor = .clear
+      particle.alpha = 0.6
+      particle.position = CGPoint(x: (j * 137) % 1200, y: (j * 83) % 760)
+      weather.addChild(particle)
+      let duration: TimeInterval = rain ? 2.6 : snow ? 25 : 38
+      particle.run(
+        .repeatForever(
+          .sequence([
+            .moveBy(x: 80, y: -800, duration: duration), .moveBy(x: -80, y: 800, duration: 0),
+          ])))
+    }
+    for j in 0..<5 {
+      let node = SKShapeNode(ellipseOf: CGSize(width: 15 + j * 6, height: 9 + j * 4))
+      node.fillColor = .white
+      node.strokeColor = .clear
+      node.alpha = 0.17
+      node.position = CGPoint(
+        x: IsometricLayout.house.x + 64 + CGFloat(j * 4),
+        y: IsometricLayout.house.y + 197 + CGFloat(j * 11))
+      smoke.addChild(node)
+      node.run(
+        .repeatForever(
+          .sequence([
+            .group([.moveBy(x: 30, y: 65, duration: 5.5), .fadeOut(withDuration: 5.5)]),
+            .moveBy(x: -30, y: -65, duration: 0), .fadeAlpha(to: 0.17, duration: 0),
+          ])))
+    }
+  }
+  func select(_ selection: SceneSelection?, buildMode: Bool) {
+    self.selection = selection
+    self.buildMode = buildMode
+    if let s = previous {
+      for id in BuildingID.allCases where Construction.stage(id, state: s) == .empty {
+        sprites["plot-\(id.rawValue)"]?.isHidden = !buildMode
+        sprites["plot-\(id.rawValue)"]?.alpha = 0.38
+      }
+    }
+    drawSelection()
+  }
+  private func marker(at point: CGPoint, width: CGFloat, label: String) {
+    let path = CGMutablePath()
+    path.move(to: CGPoint(x: 0, y: width / 4))
+    path.addLine(to: CGPoint(x: width / 2, y: 0))
+    path.addLine(to: CGPoint(x: 0, y: -width / 4))
+    path.addLine(to: CGPoint(x: -width / 2, y: 0))
+    path.closeSubpath()
+    let outline = SKShapeNode(path: path)
+    outline.position = point
+    outline.strokeColor = .init(red: 0.95, green: 0.82, blue: 0.46, alpha: 1)
+    outline.lineWidth = 2
+    outline.fillColor = .clear
+    markers.addChild(outline)
+    let text = SKLabelNode(fontNamed: "DMSans9pt-Regular")
+    text.text = label
+    text.fontSize = 14
+    text.fontColor = .white
+    text.position = CGPoint(x: point.x, y: point.y - width / 4 - 20)
+    markers.addChild(text)
+  }
+  private func drawSelection() {
+    markers.removeAllChildren()
+    if buildMode {
+      for column in 0..<8 {
+        for row in 0..<8 {
+          let center = IsometricLayout.point(column: CGFloat(column), row: CGFloat(row))
+          let path = CGMutablePath()
+          path.move(to: CGPoint(x: 0, y: 33))
+          path.addLine(to: CGPoint(x: 66, y: 0))
+          path.addLine(to: CGPoint(x: 0, y: -33))
+          path.addLine(to: CGPoint(x: -66, y: 0))
+          path.closeSubpath()
+          let tile = SKShapeNode(path: path)
+          tile.position = center
+          tile.strokeColor = NSColor(red: 0.93, green: 0.84, blue: 0.60, alpha: 0.18)
+          tile.lineWidth = 0.7
+          tile.fillColor = .clear
+          markers.addChild(tile)
+        }
+      }
+    }
+    if buildMode {
+      for id in BuildingID.allCases {
+        let p = Self.plotPositions[id]!
+        marker(
+          at: CGPoint(x: p.x, y: 760 - p.y), width: Self.plotSizes[id]!.width,
+          label: Construction.definition(id).title)
+      }
+    }
+    switch selection {
+    case .worker(let id):
+      if let p = workerPositions[id] {
+        marker(at: p, width: 70, label: Content.shared.people[id.rawValue]!.name)
+      }
+    case .building(let id):
+      if !buildMode {
+        let p = Self.plotPositions[id]!
+        marker(
+          at: CGPoint(x: p.x, y: 760 - p.y), width: Self.plotSizes[id]!.width,
+          label: Construction.definition(id).title)
+      }
+    case .hotspot(let spot):
+      let points: [Hotspot: CGPoint] = [
+        .field: IsometricLayout.field, .house: IsometricLayout.house,
+        .stores: IsometricLayout.stores, .visitor: IsometricLayout.visitor,
+      ]
+      marker(at: points[spot]!, width: spot == .field ? 200 : 100, label: spot.rawValue.capitalized)
+    case nil: break
+    }
+  }
+  func selection(at point: CGPoint) -> SceneSelection? {
+    var targets: [(SKSpriteNode, SceneSelection)] = []
+    for worker in WorkerID.allCases {
+      if let node = sprites["worker-\(worker.rawValue)"] { targets.append((node, .worker(worker))) }
+    }
+    for id in BuildingID.allCases {
+      if let node = sprites["plot-\(id.rawValue)"] { targets.append((node, .building(id))) }
+    }
+    for (spot, id) in [
+      (Hotspot.visitor, "visitor"), (.stores, "store-0"), (.stores, "store-1"), (.house, "house"),
+      (.field, "field"),
+    ] {
+      if let node = sprites[id] { targets.append((node, .hotspot(spot))) }
+    }
+    return targets.filter { !$0.0.isHidden && $0.0.frame.contains(point) }
+      .max { $0.0.zPosition < $1.0.zPosition }?.1
+  }
   override func mouseDown(with event: NSEvent) {
-    let point = event.location(in: self)
-    let zones: [(Hotspot, CGRect)] = [
-      (.field, CGRect(x: 110, y: 125, width: 350, height: 180)),
-      (.house, CGRect(x: 535, y: 270, width: 330, height: 250)),
-      (.visitor, CGRect(x: 787, y: 156, width: 80, height: 100)),
-      (.stores, CGRect(x: 365, y: 212, width: 140, height: 100)),
-    ]
-    if let spot = zones.first(where: { $0.1.contains(point) })?.0 { onHotspot?(spot) }
+    if let target = selection(at: event.location(in: self)) { onSelection?(target) }
   }
 }
