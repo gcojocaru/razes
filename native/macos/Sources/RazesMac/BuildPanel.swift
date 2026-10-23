@@ -8,7 +8,7 @@ struct BuildPanel: View {
   var body: some View {
     VStack(alignment: .leading, spacing: 14) {
       Text("Grow the settlement").font(.system(size: 23, design: .serif))
-      Text("10 buildings · 5 levels each").font(.caption).foregroundStyle(GamePalette.gold)
+      Text("\(Construction.definitions.count) buildings · 5 levels each").font(.caption).foregroundStyle(GamePalette.gold)
       Text(
         "Choose a building, then place it on free ground. Foundations finish at season end; household workers keep their assignments."
       ).font(.caption).foregroundStyle(GamePalette.muted)
@@ -36,6 +36,7 @@ struct BuildPanel: View {
               Text("\(definition.cost) coins").foregroundStyle(GamePalette.gold)
             }
             Text(definition.benefit).font(.caption).fixedSize(horizontal: false, vertical: true)
+            Text(Construction.materialCost(definition.id).text).font(.caption).foregroundStyle(GamePalette.gold)
             Text(definition.yieldText(level: 1)).font(.caption).foregroundStyle(GamePalette.gold)
             Text(status(definition)).font(.caption).foregroundStyle(GamePalette.muted)
           }.multilineTextAlignment(.leading).frame(maxWidth: .infinity, alignment: .leading)

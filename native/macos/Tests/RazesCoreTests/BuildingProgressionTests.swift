@@ -16,9 +16,10 @@ final class BuildingProgressionTests: XCTestCase {
     return object
   }
   func testCatalogAndAllFiveInstantLevelsRoundTrip() throws {
-    XCTAssertEqual(BuildingID.allCases.count, 10)
+    XCTAssertEqual(BuildingID.allCases.count, 11)
     var s = Rules.newGame()
-    s.money = 1000
+    s.money = 10000
+    s.materials = .init(wood: 1000, stone: 1000, planks: 1000)
     for id in BuildingID.allCases {
       s.layout.buildings.append(
         .init(id: id, position: try XCTUnwrap(Settlement.firstAvailable(id, in: s.layout))))

@@ -12,7 +12,10 @@ extension Construction {
     guard stage(id, state: state) == .empty else {
       throw GameError("This building already exists or has a seasonal builder.")
     }
-    try spend(definition(id).cost, state: &state)
+    var next = state
+    try Materials.spend(materialCost(id), state: &next)
+    try spend(definition(id).cost, state: &next)
+    state = next
     state.buildings.append(
       .init(id: id, completedSeason: state.turn, legacyAssignment: false, level: 0))
   }
@@ -20,7 +23,10 @@ extension Construction {
     guard let index = state.buildings.firstIndex(where: { $0.id == id }),
       (1...4).contains(state.buildings[index].level)
     else { throw GameError("An upgrade needs a completed building below level 5.") }
-    try spend(upgradeCost(state.buildings[index]), state: &state)
+    var next = state
+    try Materials.spend(materialCost(id).scaled(state.buildings[index].level + 1), state: &next)
+    try spend(upgradeCost(state.buildings[index]), state: &next)
+    state = next
     state.buildings[index].level += 1
     state.buildings[index].condition = 100
   }
@@ -29,7 +35,10 @@ extension Construction {
       state.buildings[index].level > 0,
       state.buildings[index].condition < 100
     else { throw GameError("Repairs need a completed, worn building.") }
-    try spend(repairCost(id), state: &state)
+    var next = state
+    try Materials.spend(repairMaterials(id), state: &next)
+    try spend(repairCost(id), state: &next)
+    state = next
     state.buildings[index].condition = 100
   }
   public static func seasonalYield(_ state: GameState) -> (food: Int, money: Int) {

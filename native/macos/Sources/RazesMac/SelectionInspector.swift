@@ -19,8 +19,8 @@ struct SelectionInspector: View {
           }
         }
         Text(person.line).font(.callout).italic()
-        if state.phase == .work {
-          if state.reservedWorker == worker.rawValue {
+        if state.phase == .work || state.phase == .ending {
+          if state.phase == .work && state.reservedWorker == worker.rawValue {
             Text("Reserved for your promise to Vasile.").foregroundStyle(GamePalette.gold)
           } else {
             ForEach(Rules.taskOptions(state).filter { Construction.building(for: $0.id) == nil }) {
@@ -39,7 +39,7 @@ struct SelectionInspector: View {
                 HStack {
                   Text(task.name)
                   Spacer()
-                  if task.id == state.assignments[worker.rawValue] {
+                  if task.id == Materials.assignments(state)[worker.rawValue] {
                     Image(systemName: "checkmark")
                   }
                 }
@@ -47,7 +47,7 @@ struct SelectionInspector: View {
               }.disabled(reason != nil).help(reason ?? task.description)
               if let reason { Text(reason).font(.caption).foregroundStyle(GamePalette.muted) }
             }
-            let task = Rules.task(state.assignments[worker.rawValue]!)
+            let task = Rules.task(Materials.assignments(state)[worker.rawValue]!)
             Text(task.description).font(.caption).foregroundStyle(GamePalette.muted)
             Text("Current work cost: \(task.moneyCost) money · \(task.foodCost) food").font(
               .caption)
@@ -71,6 +71,7 @@ struct SelectionInspector: View {
         switch spot {
         case .house:
           Text("Shelter: \(state.house)/100")
+          HouseStorageControls(session: session, state: state)
           Text(
             "Winter wear: \(Construction.active(.woodshed, state: state) ? 6:14). Keep the roof ready for the cold."
           ).font(.caption)

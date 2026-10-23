@@ -41,6 +41,9 @@ extension HomesteadScene {
   func buildingTexture(_ id: BuildingID, level: Int, planned: Bool, winter: Bool, facing: Int = 0)
     -> SKTexture?
   {
+    if id == .storehouse {
+      return buildingTexture(.granary, level: level, planned: planned, winter: winter, facing: facing)
+    }
     if facing >= 2 && !planned {
       let index: [BuildingID: Int] = [
         .woodshed: 1, .cellar: 2, .barn: 3, .well: 4, .granary: 5, .workshop: 6, .bakery: 7,

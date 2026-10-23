@@ -27,6 +27,7 @@ public enum Rules {
     return Content.shared.events[id]!
   }
   public static func task(_ id: TaskID) -> Task {
+    if let gathering = Materials.gatheringTask(id) { return gathering }
     if let building = Construction.building(for: id) {
       let definition = Construction.definition(building)
       return Task(
@@ -48,6 +49,7 @@ public enum Rules {
     Construction.active(.cellar, state: state) ? 10 : b.supplyGain
   }
   public static func taskOptions(_ s: GameState) -> [Task] {
+    if s.phase == .ending { return [TaskID.gatherWood, .gatherStone, .rest].map(task) }
     let t = Content.shared.tasks
     var tasks: [Task] = []
     if s.season == 0 && !s.planted { tasks.append(t["plant"]!) }
@@ -61,7 +63,7 @@ public enum Rules {
       Construction.unavailable($0.id, state: s) == nil
     }.compactMap { $0.task.map(task) }
     return tasks
-      + [TaskID.repair, .paid, .help, .supplies, .rest].map { id in
+      + [TaskID.repair, .paid, .help, .supplies, .gatherWood, .gatherStone, .rest].map { id in
         var value = task(id)
         if id == .supplies { value.foodGain = suppliesGain(s) }
         return value
@@ -107,6 +109,14 @@ public enum Rules {
     if p.foodCost > s.food {
       p.errors.append("Planting needs \(p.foodCost) food for seed; only \(s.food) is available.")
     }
+    let materialCost = Materials.reserved(s)
+    if !s.materials.contains(materialCost) {
+      p.errors.append("Seasonal building work needs \(materialCost.text) already in storage.")
+    }
+    let haul = Materials.forecast(s)
+    if haul.gained != haul.expected {
+      p.warnings.append("Limited storage: bring home \(haul.gained.text). Gathering fills space in Ion, Ana, Petru order.")
+    }
     let repaired = min(100, s.house + p.houseGain)
     p.consumption = consumption(s, house: repaired)
     p.foodAfter = min(100000, s.food - p.foodCost + p.foodGain) - p.consumption
@@ -132,6 +142,10 @@ public enum Rules {
     return p
   }
   public static func assignmentProblem(_ s: GameState, worker: WorkerID, task: TaskID) -> String? {
+    if s.phase == .ending {
+      return [TaskID.gatherWood, .gatherStone, .rest].contains(task)
+        ? nil : "Only gathering or rest is available after the first year."
+    }
     if s.phase != .work { return "Choose the seasonal event before assigning work." }
     if s.reservedWorker == worker.rawValue {
       return "This adult is reserved for your promise to Vasile."
@@ -152,7 +166,7 @@ public enum Rules {
     guard a.revision == state.revision else {
       throw GameError("This choice has already changed. Please use the current controls.")
     }
-    guard state.phase != .ending || a.type == "settlement" else {
+    guard state.phase != .ending || a.type == "settlement" || a.type == "assign" else {
       throw GameError("This year is complete. Begin a new household to play again.")
     }
     var s = state
@@ -219,6 +233,10 @@ public enum Rules {
         throw GameError("Unknown work assignment.")
       }
       if let problem = assignmentProblem(s, worker: worker, task: task) { throw GameError(problem) }
+      if s.phase == .ending {
+        s.gatheringAssignments[worker.rawValue] = task
+        break
+      }
       if let id = Construction.building(for: task),
         Settlement.position(for: id, in: s.layout) == nil
       {
@@ -241,6 +259,7 @@ public enum Rules {
       s.food = min(100000, s.food - p.foodCost + p.foodGain)
       s.money = min(100000, s.money - p.moneyCost + p.moneyGain)
       s.house = min(100, s.house + p.houseGain)
+      Materials.collect(state: &s)
       let tasks = Array(s.assignments.values)
       for definition in Construction.definitions where definition.task.map(tasks.contains) == true {
         s.buildings.append(BuildingRecord(id: definition.id, completedSeason: s.season))
@@ -266,6 +285,7 @@ public enum Rules {
       guard s.phase == .ending, s.settlementSeasons < 100000 else {
         throw GameError("Complete the first year before advancing settlement seasons.")
       }
+      Materials.collect(state: &s)
       s.settlementSeasons += 1
       Construction.resolveSeason(state: &s)
     case "continue":

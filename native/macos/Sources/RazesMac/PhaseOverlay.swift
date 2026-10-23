@@ -37,6 +37,10 @@ struct PhaseOverlay: View {
             Text("Work costs: \(forecast.moneyCost) money · \(forecast.foodCost) food").font(
               .caption
             ).foregroundStyle(GamePalette.gold)
+            if Materials.reserved(state).total > 0 {
+              Text("Building supplies: \(Materials.reserved(state).text)").font(.caption)
+            }
+            ForEach(Materials.forecast(state).lines, id: \.self) { Text($0).font(.caption) }
           }.frame(maxWidth: .infinity, alignment: .leading)
           VStack(alignment: .leading, spacing: 8) {
             Text("AFTER WORK & CONSUMPTION").font(.system(size: 10, weight: .semibold)).tracking(1)
@@ -68,6 +72,9 @@ struct PhaseOverlay: View {
                 "Food \(report.foodBefore) → \(report.foodAfter) · Money \(report.moneyBefore) → \(report.moneyAfter)"
               )
               Text("Shelter \(report.houseBefore) → \(report.houseAfter)")
+              if let haul = state.lastMaterialHaul {
+                Text("Gathered: \(haul.text)").font(.caption)
+              }
               Text("Consumed \(report.consumption) food · Weathering \(report.wear)").font(.caption)
                 .foregroundStyle(GamePalette.muted)
               if report.deficit > 0 {
@@ -103,6 +110,9 @@ struct PhaseOverlay: View {
           Button("Promise journal", action: journal)
           Button("Begin another household", action: restart).buttonStyle(.borderedProminent)
         }
+        ForEach(Materials.forecast(state).lines, id: \.self) { Text($0).font(.caption) }
+        if let haul = state.lastMaterialHaul { Text("Last haul: \(haul.text)").font(.caption) }
+        Text("Use Materials or a portrait to assign gathering for the next settlement season.").font(.caption)
       }
     }.onAppear { headingFocused = true }
   }

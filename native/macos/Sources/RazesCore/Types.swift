@@ -2,7 +2,8 @@ import Foundation
 
 public enum WorkerID: String, Codable, CaseIterable, Sendable { case ion, ana, petru }
 public enum TaskID: String, Codable, CaseIterable, Sendable {
-  case rest, plant, tend, harvest, paid, repair, help, supplies, buildWoodshed, buildCellar
+  case rest, plant, tend, harvest, paid, repair, help, supplies, buildWoodshed, buildCellar,
+    gatherWood, gatherStone
 }
 public enum Phase: String, Codable, Sendable { case opening, work, consequence, summary, ending }
 public struct Memory: Codable, Equatable, Sendable {
@@ -25,9 +26,13 @@ public struct SeasonReport: Codable, Equatable, Sendable {
   public var tasks: [String]
 }
 public struct GameState: Codable, Equatable, Sendable {
-  public var version = 6, revision = 0, season = 0
+  public var version = 7, revision = 0, season = 0
   public var phase: Phase = .opening
   public var food = 18, money = 12, house = 55
+  public var materials = Materials.starter
+  public var houseLevel = 1
+  public var gatheringAssignments: [String: TaskID] = ["ion": .rest, "ana": .rest, "petru": .rest]
+  public var lastMaterialHaul: MaterialStock? = nil
   public var assignments: [String: TaskID] = ["ion": .rest, "ana": .rest, "petru": .rest]
   public var reservedWorker: String? = nil
   public var planted = false, tended = false, harvested = false

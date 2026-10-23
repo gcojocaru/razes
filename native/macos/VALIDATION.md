@@ -1,5 +1,14 @@
 # Native macOS validation — 2026-10-23
 
+## Materials and shared storage — 2026-10-23
+
+- Native suite: 84 tests passed (39 core, 45 macOS), including 11 material rules tests and 2 material session/save tests. Existing forty reference years and legacy construction paths pass with schema-7 normalization.
+- Covered mixed gathering truncation/forecast equality, gathering only at resolution, immediate purchases/crafting, reserved coins and building supplies, atomic failure, invalid quantities, house expansion, storehouse completion/downgrade overflow, explicit discard, post-story gathering without replaying story work, v6 migration and original-byte backup failure protection.
+- Independent static review reported no actionable findings.
+- DEBUG and Release packaging, bundled-resource checks and strict ad-hoc signature verification passed. Release required a sandbox escalation for Apple’s debug-symbol generator. Packaged and ad-hoc signed DEBUG app. Launched a separate `com.razes.materialsvalidation` bundle with `build/materials-validation/household.json`; did not use the live player's household. Materials sheet and main HUD were visually inspected. UI actions bought 1 wood (6 → 7, coins 12 → 11), crafted 1 plank (wood 7 → 5, plank 0 → 1), upgraded house storage (20 → 30, coins 11 → 3), assigned Ion to timber and confirmed the 6/6 forecast. Work resolution increased wood 3 → 9 and occupied storage 5 → 11, matching the forecast.
+- Initial market prices, gathering yields and storage progression have not been playtested for balance. No end-to-end VoiceOver, Intel/macOS14 hardware or browser test run in this increment. Storehouse artwork reuses the granary; roads/fences retain coin-only prices.
+
+
 ## Fence styles, dirt paths and directional snow
 
 - Full native suite: **71 tests passed** (28 core, 43 macOS). New coverage checks dirt/wattle placement costs, overlapping surfaces, mixed-style duplicate edges, protected ground, erasing, save round trips, schema-5 migration backup, malformed styles/extreme coordinates, all four fence edges in all four map views, preview/commit agreement, seasonal texture selection and rotated foundations. Existing reference years, recovery, camera, construction, reduced-motion and progression checks also pass.

@@ -131,6 +131,18 @@ import RazesCore
   func repairBuilding(_ id: BuildingID) {
     editSettlement { try Construction.repair(id, state: &$0) }
   }
+  func buyMaterials(_ id: MaterialID, quantity: Int) {
+    editSettlement { try Materials.buy(id, quantity: quantity, state: &$0) }
+  }
+  func craftPlanks(quantity: Int) {
+    editSettlement { try Materials.craftPlanks(quantity: quantity, state: &$0) }
+  }
+  func discardMaterials(_ id: MaterialID, quantity: Int) {
+    editSettlement { try Materials.discard(id, quantity: quantity, state: &$0) }
+  }
+  func upgradeHouseStorage() {
+    editSettlement { try Materials.upgradeHouse(state: &$0) }
+  }
   func finishConstruction(_ id: BuildingID) {
     if let record = state.buildings.first(where: { $0.id == id }) {
       debugSetBuilding(

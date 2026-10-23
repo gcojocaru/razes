@@ -6,6 +6,7 @@ final class SeasonalSettlementTests: XCTestCase {
   func testConstructionProductionAndWearFollowSeasons() throws {
     var s = Rules.newGame()
     s.money = 100
+    s.materials = .init(wood: 20)
     try Construction.start(.woodshed, state: &s)
     XCTAssertEqual(s.buildings[0].level, 0)
     Construction.resolveSeason(state: &s)
