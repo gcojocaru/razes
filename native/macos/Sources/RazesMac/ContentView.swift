@@ -98,7 +98,7 @@ struct ContentView: View {
     .sheet(item: Binding(get: { sheet.map(SheetID.init) }, set: { sheet = $0?.id })) { item in
       VStack(alignment: .leading, spacing: 18) {
         HStack {
-          Text(item.id == "journal" ? "The promise journal" : "How to play").font(
+          Text(item.id == "journal" ? "The promise journal" : item.id == "materials" ? "Materials & storage" : "How to play").font(
             .system(size: 28, design: .serif))
           Spacer()
           Button("Done") { sheet = nil }.keyboardShortcut(.cancelAction)
@@ -106,13 +106,15 @@ struct ContentView: View {
         ScrollView {
           if item.id == "journal" {
             JournalView(state: state)
+          } else if item.id == "materials" {
+            MaterialsPanel(session: session, state: state)
           } else {
             Text(
-              "Read the seasonal conversation, then select a household portrait or a place in the homestead to assign work. Each adult has one assignment. End season opens a forecast; confirm to resolve work, then answer the evening conversation.\n\nBuild lets you choose free locations on the isometric map. Drag or scroll to pan, and pinch or Option-scroll to zoom. The map controls also provide pan, zoom and a Home reset. Green placement footprints are free; red footprints are occupied, outside the map or reserved for the house and farmland. Click to place; Escape cancels. Construction completes at season end. Completed buildings produce their level-scaled food/coins once per season and lose 20 condition afterwards. Upgrades and repairs are immediate. At zero condition a building loses a level and returns to 60 condition; level 1 becomes inactive until repaired. No building timers or offline decay run. The year ending offers Next settlement season for ongoing building progress.\n\nRotate the map with the arrow controls; the HUD stays upright. Rotate a building from its inspector or press R while placing. Build offers stone pavement, dirt paths, rail fences and woven wattle fences (1 coin per tile/edge). Click or drag to paint; the tool stays active. Press R or Rotate fence edge to choose the north, east, south or west edge. Erase removes placed pavement/fences without a refund. Debug season preview changes the scene only; choose Actual season to restore the story view.\n\nHarvest needs two adults. Honouring the ox promise reserves Petru in autumn. All choices and draft assignments save on this Mac.\n\nCommand-J opens the journal. The Places menu provides keyboard alternatives to scene targets. Escape closes optional commands; conversations remain until answered."
+              "Read the seasonal conversation, then select a household portrait or a place in the homestead to assign work. Each adult has one assignment. End season opens a forecast; confirm to resolve work, then answer the evening conversation.\n\nBuild lets you choose free locations on the isometric map. Drag or scroll to pan, and pinch or Option-scroll to zoom. The map controls also provide pan, zoom and a Home reset. Green placement footprints are free; red footprints are occupied, outside the map or reserved for the house and farmland. Click to place; Escape cancels. Construction completes at season end. Completed buildings produce their level-scaled food/coins once per season and lose 20 condition afterwards. Upgrades and repairs are immediate. At zero condition a building loses a level and returns to 60 condition; level 1 becomes inactive until repaired. No building timers or offline decay run. The year ending offers Next settlement season for ongoing building progress.\n\nRotate the map with the arrow controls; the HUD stays upright. Rotate a building from its inspector or press R while placing. Build offers stone pavement, dirt paths, rail fences and woven wattle fences (1 coin per tile/edge). Click or drag to paint; the tool stays active. Press R or Rotate fence edge to choose the north, east, south or west edge. Erase removes placed pavement/fences without a refund. Debug season preview changes the scene only; choose Actual season to restore the story view.\n\nMaterials opens shared wood/stone/plank storage, immediate purchases and crafting (2 wood → 1 plank). Gathering uses a seasonal worker; the forecast shows what fits. House storage upgrades add 10 slots, and completed storehouses add 40 per level. Material costs are shown before construction. Discard unwanted supplies explicitly to free room.\n\nHarvest needs two adults. Honouring the ox promise reserves Petru in autumn. All choices and draft assignments save on this Mac.\n\nCommand-J opens the journal. The Places menu provides keyboard alternatives to scene targets. Escape closes optional commands; conversations remain until answered."
             ).lineSpacing(5)
           }
         }
-      }.padding(26).frame(width: 620, height: 480).background(GamePalette.panel)
+      }.padding(26).frame(width: 720, height: 620).background(GamePalette.panel)
     }
     .alert("Begin a fresh household?", isPresented: $restart) {
       Button("Cancel", role: .cancel) {}
@@ -188,8 +190,10 @@ struct ContentView: View {
       resource("Food", value: "\(state.food)", icon: "leaf")
       resource("Money", value: "\(state.money)", icon: "circle")
       resource("Shelter", value: "\(state.house)", icon: "house")
+      Button("Materials \(state.materials.total)/\(Materials.capacity(state))") { sheet = "materials" }
+        .help("\(state.materials.text). Buy, craft, gather and expand shared storage.")
       resource(
-        "Free", value: "\(state.assignments.values.filter{$0 == .rest}.count)/3", icon: "person.2")
+        "Free", value: "\(Materials.assignments(state).values.filter{$0 == .rest}.count)/3", icon: "person.2")
       Spacer(minLength: 0)
       Button("Debug", systemImage: "wrench.and.screwdriver") {
         ui.dismissOptional()

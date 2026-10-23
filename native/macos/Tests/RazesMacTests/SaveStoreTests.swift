@@ -79,7 +79,7 @@ extension SaveStoreTests {
     try original.write(to: url)
     let store = SaveStore(url: url)
     let migrated = try XCTUnwrap(store.load())
-    XCTAssertEqual(migrated.version, 6)
+    XCTAssertEqual(migrated.version, 7)
     XCTAssertEqual(try Data(contentsOf: url), original)
     let blocked = SaveStore(
       url: url, preserveOriginal: { _, _ in throw CocoaError(.fileWriteNoPermission) })
@@ -116,7 +116,7 @@ extension SaveStoreTests {
     try bytes.write(to: url)
     let store = SaveStore(url: url)
     let loaded = try XCTUnwrap(store.load())
-    XCTAssertEqual(loaded.version, 6)
+    XCTAssertEqual(loaded.version, 7)
     XCTAssertEqual(loaded.layout, state.layout)
     try store.save(loaded)
     let backups = try FileManager.default.contentsOfDirectory(
@@ -154,7 +154,7 @@ extension SaveStoreTests {
     try original.write(to: url)
     let store = SaveStore(url: url)
     let loaded = try XCTUnwrap(store.load())
-    XCTAssertEqual(loaded.version, 6)
+    XCTAssertEqual(loaded.version, 7)
     try store.save(loaded)
     try store.save(loaded)
     let backups = try FileManager.default.contentsOfDirectory(

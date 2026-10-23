@@ -12,7 +12,7 @@ struct GameHUD: View {
     HStack(spacing: 10) {
       ForEach(WorkerID.allCases, id: \.self) { worker in
         let person = Content.shared.people[worker.rawValue]!
-        let task = Rules.task(state.assignments[worker.rawValue]!)
+        let task = Rules.task(Materials.assignments(state)[worker.rawValue]!)
         Button {
           choose(.worker(worker))
         } label: {
@@ -21,7 +21,7 @@ struct GameHUD: View {
               .overlay(Rectangle().stroke(GamePalette.gold.opacity(0.6)))
             VStack(alignment: .leading, spacing: 4) {
               Text(person.name).font(.system(size: 15, weight: .semibold, design: .serif))
-              Text(state.reservedWorker == worker.rawValue ? "Promised to Vasile" : task.name)
+              Text(state.phase == .work && state.reservedWorker == worker.rawValue ? "Promised to Vasile" : task.name)
                 .font(.system(size: 11)).lineLimit(2).multilineTextAlignment(.leading)
             }.frame(maxWidth: .infinity, alignment: .leading)
           }.frame(width: 160).padding(5)
@@ -31,7 +31,7 @@ struct GameHUD: View {
       }
       Divider().overlay(GamePalette.gold.opacity(0.5)).frame(height: 52)
       Button(action: build) { Label("Build", systemImage: "hammer").padding(.vertical, 8) }
-        .help("Build and manage ten structure types, each with five levels")
+        .help("Build and manage eleven structure types, each with five levels")
       Spacer(minLength: 8)
       VStack(alignment: .trailing, spacing: 7) {
         Text(phaseLabel).font(.system(size: 10, weight: .semibold)).tracking(1).foregroundStyle(

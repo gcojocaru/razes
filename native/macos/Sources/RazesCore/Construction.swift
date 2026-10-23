@@ -1,7 +1,7 @@
 import Foundation
 
 public enum BuildingID: String, Codable, CaseIterable, Sendable {
-  case woodshed, cellar, barn, well, granary, workshop, bakery, smithy, stable, apiary
+  case woodshed, cellar, barn, well, granary, workshop, bakery, smithy, stable, apiary, storehouse
 }
 public struct BuildingRecord: Codable, Equatable, Sendable {
   public var id: BuildingID
@@ -30,13 +30,17 @@ public struct BuildingDefinition: Sendable, Identifiable {
   public let benefit: String
   public let food, coins: Int
   public func yieldText(level: Int) -> String {
-    [food > 0 ? "\(food * level) food" : nil, coins > 0 ? "\(coins * level) coins" : nil]
+    if id == .storehouse { return "+\(40 * level) shared storage" }
+    return [food > 0 ? "\(food * level) food" : nil, coins > 0 ? "\(coins * level) coins" : nil]
       .compactMap { $0 }.joined(separator: " + ") + " / season"
   }
 }
 public enum BuildingStage: String, Sendable { case empty, planned, complete }
 public enum Construction {
   public static let definitions: [BuildingDefinition] = [
+    .init(id: .storehouse, title: "Storehouse", cost: 4,
+      benefit: "Shared room for wood, stone and crafted supplies. Adds 40 storage per completed level.",
+      food: 0, coins: 0),
     .init(
       id: .woodshed, title: "Woodshed", task: .buildWoodshed, cost: 3,
       benefit:
@@ -106,4 +110,27 @@ public enum Construction {
     definition(record.id).cost * (record.level + 1)
   }
   public static func repairCost(_ id: BuildingID) -> Int { (definition(id).cost + 1) / 2 }
+  public static func materialCost(_ id: BuildingID) -> MaterialStock {
+    switch id {
+    case .woodshed: .init(wood: 4)
+    case .cellar: .init(wood: 2, stone: 4)
+    case .barn: .init(wood: 6, stone: 2)
+    case .well: .init(wood: 1, stone: 5)
+    case .granary, .workshop: .init(wood: 4, stone: 2, planks: 2)
+    case .bakery: .init(wood: 2, stone: 4, planks: 2)
+    case .smithy: .init(wood: 2, stone: 6, planks: 2)
+    case .stable: .init(wood: 4, stone: 2, planks: 4)
+    case .apiary: .init(wood: 3, planks: 1)
+    case .storehouse: .init(wood: 6, stone: 2, planks: 2)
+    }
+  }
+  public static func repairMaterials(_ id: BuildingID) -> MaterialStock {
+    switch id {
+    case .cellar, .well, .bakery, .smithy: .init(stone: 1)
+    default: .init(wood: 1)
+    }
+  }
+  public static func priceText(_ id: BuildingID, level: Int = 1) -> String {
+    "\(definition(id).cost * level) coins · \(materialCost(id).scaled(level).text)"
+  }
 }

@@ -29,6 +29,7 @@ struct BuildingInspector: View {
             r.condition > 0 ? d.yieldText(level: r.level) : "Inactive · repair to resume production"
           ).foregroundStyle(GamePalette.gold)
           if r.level < 5 {
+            Text(Construction.materialCost(id).scaled(r.level + 1).text).font(.caption)
             Button("Upgrade to level \(r.level + 1) · \(Construction.upgradeCost(r)) coins") {
               session.upgradeBuilding(id)
             }
@@ -38,6 +39,7 @@ struct BuildingInspector: View {
           } else {
             Label("Maximum level reached", systemImage: "checkmark.seal").font(.caption)
           }
+          Text("Repair supplies: \(Construction.repairMaterials(id).text)").font(.caption)
           Button("Repair · \(Construction.repairCost(id)) coins · immediate") {
             session.repairBuilding(id)
           }.disabled(r.condition >= 100)
@@ -49,7 +51,8 @@ struct BuildingInspector: View {
         Text("Legacy seasonal plan · completes when its worker's season resolves.").font(.caption)
         Button("Remove seasonal plan") { session.removePlan(id) }
       } else {
-        Text("\(d.cost) coins · completes at season end").foregroundStyle(GamePalette.gold)
+        Text(Construction.priceText(id)).foregroundStyle(GamePalette.gold)
+        Text("Completes at season end").font(.caption)
         Text(d.yieldText(level: 1)).font(.caption)
         Button("Choose building location") {
           beginPlacement(.building(id, worker: nil, instant: false))

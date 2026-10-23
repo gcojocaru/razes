@@ -11,7 +11,7 @@ public enum SaveCodec {
       guard var object = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
         throw GameError("This save could not be read.")
       }
-      guard (1...6).contains(version) else {
+      guard (1...7).contains(version) else {
         throw GameError("This save belongs to an unsupported version.")
       }
       if version == 1 {
@@ -63,6 +63,13 @@ public enum SaveCodec {
         object["layout"] = layout
         object["version"] = 6
       }
+      if version < 7 {
+        object["materials"] = ["wood": 6, "stone": 4, "planks": 0]
+        object["houseLevel"] = 1
+        object["gatheringAssignments"] = ["ion": "rest", "ana": "rest", "petru": "rest"]
+        object.removeValue(forKey: "lastMaterialHaul")
+        object["version"] = 7
+      }
       s = try JSONDecoder().decode(
         GameState.self, from: JSONSerialization.data(withJSONObject: object))
       if version < 3 { s.layout = Settlement.legacyLayout(for: s) }
@@ -83,6 +90,14 @@ public enum SaveCodec {
       integer(s.revision) && integer(s.season, 0, 3) && integer(s.food) && integer(s.money)
         && integer(s.house, 0, 100) && integer(s.trust, -5, 5))
     try ensure(integer(s.settlementSeasons) && (s.settlementSeasons == 0 || s.phase == .ending))
+    try ensure(integer(s.houseLevel, 1, 5))
+    try ensure(MaterialID.allCases.allSatisfy { integer(s.materials[$0]) })
+    if let haul = s.lastMaterialHaul {
+      try ensure(MaterialID.allCases.allSatisfy { integer(haul[$0], 0, 18) } && haul.total <= 18)
+    }
+    try ensure(Set(s.gatheringAssignments.keys) == Set(WorkerID.allCases.map(\.rawValue)))
+    try ensure(s.gatheringAssignments.values.allSatisfy { [.rest, .gatherWood, .gatherStone].contains($0) })
+    try ensure(s.phase == .ending || s.gatheringAssignments.values.allSatisfy { $0 == .rest })
     if let season = s.debugSeason { try ensure(integer(season, 0, 3)) }
     try ensure(["none", "borrowed", "paid", "declined", "honoured", "broken"].contains(s.ox))
     try ensure(s.cropBonus == 0 || s.cropBonus == b.oxBonus)
@@ -172,6 +187,7 @@ public enum SaveCodec {
     if s.season <= 2 { try ensure(s.harvested == (s.season == 2 && resolved && n(.harvest) == 2)) }
     try ensure(s.cropBonus == (s.planted && opening?.choice != "decline" ? b.oxBonus : 0))
     if s.phase == .work {
+      try ensure(s.materials.contains(Materials.reserved(s)))
       try ensure(
         assigned.reduce(0) { $0 + Rules.task($1).moneyCost } <= s.money)
       try ensure(assigned.reduce(0) { $0 + Rules.task($1).foodCost } <= s.food)

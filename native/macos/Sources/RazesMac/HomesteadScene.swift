@@ -279,7 +279,7 @@ import SpriteKit
       }
     }
     for (j, worker) in WorkerID.allCases.enumerated() {
-      let task = s.assignments[worker.rawValue]!
+      let task = Materials.assignments(s)[worker.rawValue]!
       let pos = IsometricLayout.worker(task, state: s)
       let x = pos.x + (j == 1 ? 26 : j == 2 ? -22 : 0)
       let y = 760 - pos.y + CGFloat(j * 5)
@@ -290,7 +290,7 @@ import SpriteKit
         "worker-\(worker.rawValue)", art: "people",
         crop: CGRect(x: j * 307, y: 0, width: 307, height: 590), x: x, y: y, w: 34, h: 65,
         z: 1000 - (760 - y) + 10)
-      if old?.assignments[worker.rawValue] != task || old?.phase != s.phase || old == nil
+      if old.map({ Materials.assignments($0)[worker.rawValue] }) != task || old?.phase != s.phase || old == nil
         || motionChanged || moved || reduced
       {
         person.removeAllActions()
@@ -302,7 +302,7 @@ import SpriteKit
           .repeatForever(
             .sequence([.scaleY(to: 1.012, duration: 1.4), .scaleY(to: 1, duration: 1.4)])))
       }
-      if old?.assignments[worker.rawValue] != task || old?.phase != s.phase || old == nil
+      if old.map({ Materials.assignments($0)[worker.rawValue] }) != task || old?.phase != s.phase || old == nil
         || motionChanged || moved
       {
         updateTool(

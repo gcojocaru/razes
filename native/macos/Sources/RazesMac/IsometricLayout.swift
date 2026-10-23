@@ -64,6 +64,8 @@ enum IsometricLayout {
     case .paid: base = point(column: 12, row: 8)
     case .help: base = visitor
     case .supplies: base = stores
+    case .gatherWood: base = point(column: 1, row: 12)
+    case .gatherStone: base = point(column: 14, row: 3)
     case .buildWoodshed:
       let p = plot(.woodshed, state: state)
       base = CGPoint(x: p.x + 65, y: p.y - 20)

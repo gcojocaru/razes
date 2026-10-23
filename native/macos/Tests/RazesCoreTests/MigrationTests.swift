@@ -19,7 +19,7 @@ final class MigrationTests: XCTestCase {
         var expected = step.state
         expected.layout = Settlement.legacyLayout(for: expected)
         XCTAssertEqual(migrated, expected)
-        XCTAssertEqual(migrated.version, 6)
+        XCTAssertEqual(migrated.version, 7)
         XCTAssertTrue(migrated.buildings.isEmpty)
       }
     }
@@ -33,7 +33,7 @@ final class MigrationTests: XCTestCase {
   }
   func testV2RequiresRecordsAndRejectsImpossibleBuildings() throws {
     let original = Rules.newGame()
-    XCTAssertEqual(original.version, 6)
+    XCTAssertEqual(original.version, 7)
     var object =
       try JSONSerialization.jsonObject(with: SaveCodec.encode(original)) as! [String: Any]
     object.removeValue(forKey: "buildings")
