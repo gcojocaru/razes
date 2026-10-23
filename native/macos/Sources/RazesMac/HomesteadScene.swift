@@ -25,8 +25,12 @@ import SpriteKit
   let navigationCamera = SKCameraNode(), placementOverlay = SKNode()
   var cameraState = CameraState()
   var onCameraChange: ((Int) -> Void)?
-  var placementTool: PlacementTool?
-  var placementFacing = 0
+  var placementTool: PlacementTool? {
+    didSet { if placementTool != oldValue { lastPainted = nil } }
+  }
+  var placementFacing = 0 {
+    didSet { if placementFacing != oldValue { lastPainted = nil } }
+  }
   private var lastPainted: GridPosition?
   var onPlacement: ((PlacementTool, GridPosition) -> Void)?
   var dragStart: CGPoint?, dragLast: CGPoint?, dragged = false
@@ -174,7 +178,7 @@ import SpriteKit
       height: 216)
     let houseNode = sprites["house"]!
     if s.layout.viewRotation >= 2 {
-      houseNode.texture = rearTexture(index: 0)
+      houseNode.texture = rearTexture(index: 0, winter: s.displaySeason == 3)
       if let texture = houseNode.texture {
         houseNode.size.height = houseNode.size.width * texture.size().height / texture.size().width
       }
@@ -214,7 +218,11 @@ import SpriteKit
       let facing = (scenery.facing + s.layout.viewRotation) % 4
       if facing >= 2, scenery.kind != .fence {
         sceneryNode.texture = rearTexture(
-          index: scenery.kind == .barn ? 3 : scenery.kind == .well ? 4 : 11)
+          index: scenery.kind == .barn ? 3 : scenery.kind == .well ? 4 : 11,
+          winter: s.displaySeason == 3)
+        if let texture = sceneryNode.texture {
+          sceneryNode.size.height = width * texture.size().height / texture.size().width
+        }
       }
       sceneryNode.xScale = facing % 2 == 0 ? 1 : -1
     }

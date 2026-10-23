@@ -61,6 +61,25 @@ final class SeasonalSettlementTests: XCTestCase {
     s.layout.pavement = [.init(x: Int.max, y: 0)]
     XCTAssertThrowsError(try SaveCodec.decode(SaveCodec.encode(s)))
   }
+  func testMixedSurfacesAndMalformedNewInfrastructureRejectWithoutRepairingTheSave() throws {
+    var s = Rules.newGame()
+    s.layout.dirtPaths = [.init(x: 1, y: 1)]
+    s.layout.fences = [.init(position: .init(x: 1, y: 1), facing: 0, style: .wattle)]
+    XCTAssertEqual(try SaveCodec.decode(SaveCodec.encode(s)), s)
+    s.layout.pavement = [.init(x: 1, y: 1)]
+    XCTAssertThrowsError(try SaveCodec.decode(SaveCodec.encode(s)))
+    s.layout.pavement = []
+    s.layout.dirtPaths = [.init(x: Int.min, y: 1)]
+    XCTAssertThrowsError(try SaveCodec.decode(SaveCodec.encode(s)))
+    s.layout.dirtPaths = []
+    var object = try JSONSerialization.jsonObject(with: SaveCodec.encode(s)) as! [String: Any]
+    var layout = object["layout"] as! [String: Any]
+    var fences = layout["fences"] as! [[String: Any]]
+    fences[0]["style"] = "unknown"
+    layout["fences"] = fences
+    object["layout"] = layout
+    XCTAssertThrowsError(try SaveCodec.decode(JSONSerialization.data(withJSONObject: object)))
+  }
 }
 
 extension SeasonalSettlementTests {

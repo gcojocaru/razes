@@ -20,32 +20,33 @@ extension HomesteadScene {
     return result
   }
 
-  func rearTexture(index: Int) -> SKTexture? {
+  func rearTexture(index: Int, winter: Bool = false) -> SKTexture? {
+    // Shared seasonal crops keep snow, anchors and scale consistent.
     let frames: [CGRect] = [
-      CGRect(x: 24, y: 51, width: 333, height: 354),
-      CGRect(x: 379, y: 101, width: 333, height: 304),
-      CGRect(x: 732, y: 163, width: 324, height: 241),
-      CGRect(x: 1071, y: 73, width: 356, height: 342),
-      CGRect(x: 40, y: 447, width: 299, height: 315),
-      CGRect(x: 345, y: 423, width: 349, height: 352),
-      CGRect(x: 719, y: 471, width: 359, height: 304),
-      CGRect(x: 1091, y: 429, width: 329, height: 339),
-      CGRect(x: 29, y: 761, width: 317, height: 317),
-      CGRect(x: 357, y: 790, width: 350, height: 291),
-      CGRect(x: 722, y: 847, width: 347, height: 234),
-      CGRect(x: 1093, y: 846, width: 324, height: 229),
+      CGRect(x: 18, y: 49, width: 329, height: 343),
+      CGRect(x: 372, y: 95, width: 351, height: 294),
+      CGRect(x: 723, y: 138, width: 343, height: 255),
+      CGRect(x: 1077, y: 70, width: 356, height: 330),
+      CGRect(x: 37, y: 439, width: 294, height: 307),
+      CGRect(x: 362, y: 421, width: 344, height: 328),
+      CGRect(x: 724, y: 460, width: 367, height: 287),
+      CGRect(x: 1091, y: 422, width: 341, height: 330),
+      CGRect(x: 29, y: 763, width: 315, height: 288),
+      CGRect(x: 372, y: 782, width: 341, height: 273),
+      CGRect(x: 729, y: 826, width: 345, height: 226),
+      CGRect(x: 1094, y: 834, width: 334, height: 209),
     ]
-    return texture("settlement-rear", rect: frames[index])
+    return texture(winter ? "settlement-rear-winter" : "settlement-rear-v2", rect: frames[index])
   }
   func buildingTexture(_ id: BuildingID, level: Int, planned: Bool, winter: Bool, facing: Int = 0)
     -> SKTexture?
   {
-    if facing >= 2 {
+    if facing >= 2 && !planned {
       let index: [BuildingID: Int] = [
         .woodshed: 1, .cellar: 2, .barn: 3, .well: 4, .granary: 5, .workshop: 6, .bakery: 7,
         .smithy: 8, .stable: 9, .apiary: 10,
       ]
-      return rearTexture(index: index[id]!)
+      return rearTexture(index: index[id]!, winter: winter)
     }
     if id == .woodshed || id == .cellar {
       return texture(
@@ -59,14 +60,15 @@ extension HomesteadScene {
           : CGRect(x: 0, y: 503, width: 426, height: 521))
     }
     let frames: [BuildingID: CGRect] = [
-      .granary: CGRect(x: 34, y: 86, width: 451, height: 393),
-      .workshop: CGRect(x: 518, y: 77, width: 506, height: 392),
-      .bakery: CGRect(x: 1039, y: 18, width: 483, height: 461),
-      .smithy: CGRect(x: 17, y: 510, width: 479, height: 436),
-      .stable: CGRect(x: 512, y: 580, width: 523, height: 350),
-      .apiary: CGRect(x: 1055, y: 602, width: 458, height: 336),
+      .granary: CGRect(x: 32, y: 78, width: 455, height: 410),
+      .workshop: CGRect(x: 516, y: 71, width: 510, height: 412),
+      .bakery: CGRect(x: 1037, y: 16, width: 487, height: 477),
+      .smithy: CGRect(x: 15, y: 494, width: 483, height: 469),
+      .stable: CGRect(x: 509, y: 567, width: 532, height: 381),
+      .apiary: CGRect(x: 1053, y: 590, width: 462, height: 350),
     ]
-    return texture("settlement-buildings", rect: frames[id])
+    return texture(
+      winter ? "settlement-buildings-winter" : "settlement-buildings", rect: frames[id])
   }
 
   func updateBuildingLayers(_ node: SKSpriteNode, record: BuildingRecord?, stage: BuildingStage) {

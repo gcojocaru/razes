@@ -11,7 +11,7 @@ public enum SaveCodec {
       guard var object = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
         throw GameError("This save could not be read.")
       }
-      guard (1...5).contains(version) else {
+      guard (1...6).contains(version) else {
         throw GameError("This save belongs to an unsupported version.")
       }
       if version == 1 {
@@ -53,6 +53,16 @@ public enum SaveCodec {
         object["version"] = 4
       }
       if version < 5 { try migrateSeasonal(&object) }
+      if version < 6 {
+        guard var layout = object["layout"] as? [String: Any],
+          var fences = layout["fences"] as? [[String: Any]]
+        else { throw GameError("Missing legacy infrastructure.") }
+        layout["dirtPaths"] = []
+        for index in fences.indices { fences[index]["style"] = "rail" }
+        layout["fences"] = fences
+        object["layout"] = layout
+        object["version"] = 6
+      }
       s = try JSONDecoder().decode(
         GameState.self, from: JSONSerialization.data(withJSONObject: object))
       if version < 3 { s.layout = Settlement.legacyLayout(for: s) }

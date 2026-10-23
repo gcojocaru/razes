@@ -58,6 +58,26 @@ extension PlacementSessionTests {
 }
 
 extension PlacementSessionTests {
+  @MainActor func testDirtAndWattleShareOccupancyCostsAndEraseWithExistingMaterials() throws {
+    let dirt = try XCTUnwrap(InfrastructureKind(rawValue: "dirtPath"))
+    let wattle = try XCTUnwrap(InfrastructureKind(rawValue: "wattleFence"))
+    let session = GameSession(store: nil)
+    XCTAssertTrue(session.placeInfrastructure(dirt, at: .init(x: 1, y: 1)))
+    XCTAssertTrue(session.placeInfrastructure(wattle, at: .init(x: 1, y: 1), facing: 0))
+    XCTAssertEqual(session.state.money, 10)
+    let before = session.state
+    XCTAssertFalse(session.placeInfrastructure(.pavement, at: .init(x: 1, y: 1)))
+    XCTAssertFalse(session.placeInfrastructure(.fence, at: .init(x: 1, y: 0), facing: 2))
+    XCTAssertFalse(session.placeBuilding(.woodshed, at: .init(x: 1, y: 1), instant: true))
+    XCTAssertFalse(session.placeInfrastructure(dirt, at: Settlement.house))
+    XCTAssertFalse(session.placeInfrastructure(wattle, at: .init(x: 16, y: 0)))
+    XCTAssertEqual(session.state, before)
+    XCTAssertEqual(try SaveCodec.decode(SaveCodec.encode(before)), before)
+    XCTAssertTrue(session.placeInfrastructure(.erase, at: .init(x: 1, y: 1)))
+    XCTAssertTrue(session.placeInfrastructure(.pavement, at: .init(x: 1, y: 1)))
+    XCTAssertTrue(session.placeInfrastructure(.fence, at: .init(x: 1, y: 0), facing: 2))
+    XCTAssertEqual(session.state.money, 8)
+  }
   @MainActor func testInfrastructureCostsSharedEdgesEraseAndSeasonPreviewPersist() throws {
     let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     defer { try? FileManager.default.removeItem(at: dir) }

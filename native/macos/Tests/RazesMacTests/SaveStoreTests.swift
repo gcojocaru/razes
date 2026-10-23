@@ -79,7 +79,7 @@ extension SaveStoreTests {
     try original.write(to: url)
     let store = SaveStore(url: url)
     let migrated = try XCTUnwrap(store.load())
-    XCTAssertEqual(migrated.version, 5)
+    XCTAssertEqual(migrated.version, 6)
     XCTAssertEqual(try Data(contentsOf: url), original)
     let blocked = SaveStore(
       url: url, preserveOriginal: { _, _ in throw CocoaError(.fileWriteNoPermission) })
@@ -96,6 +96,35 @@ extension SaveStoreTests {
 }
 
 extension SaveStoreTests {
+  func testV5InfrastructureMigrationPreservesOriginalBeforeSavingNewStyles() throws {
+    let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let url = directory.appendingPathComponent("save.json")
+    var state = Rules.newGame()
+    state.layout.pavement = [.init(x: 1, y: 1)]
+    state.layout.fences = [.init(position: .init(x: 1, y: 1), facing: 3)]
+    var object = try JSONSerialization.jsonObject(with: SaveCodec.encode(state)) as! [String: Any]
+    object["version"] = 5
+    var layout = object["layout"] as! [String: Any]
+    layout.removeValue(forKey: "dirtPaths")
+    var fences = layout["fences"] as! [[String: Any]]
+    fences[0].removeValue(forKey: "style")
+    layout["fences"] = fences
+    object["layout"] = layout
+    let bytes = try JSONSerialization.data(withJSONObject: object)
+    try bytes.write(to: url)
+    let store = SaveStore(url: url)
+    let loaded = try XCTUnwrap(store.load())
+    XCTAssertEqual(loaded.version, 6)
+    XCTAssertEqual(loaded.layout, state.layout)
+    try store.save(loaded)
+    let backups = try FileManager.default.contentsOfDirectory(
+      at: directory, includingPropertiesForKeys: nil
+    ).filter { $0.lastPathComponent.contains("migration") }
+    XCTAssertEqual(backups.count, 1)
+    XCTAssertEqual(try Data(contentsOf: XCTUnwrap(backups.first)), bytes)
+  }
   func testInvalidReplacementDoesNotPoisonAValidSave() throws {
     let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     defer { try? FileManager.default.removeItem(at: directory) }
@@ -125,7 +154,7 @@ extension SaveStoreTests {
     try original.write(to: url)
     let store = SaveStore(url: url)
     let loaded = try XCTUnwrap(store.load())
-    XCTAssertEqual(loaded.version, 5)
+    XCTAssertEqual(loaded.version, 6)
     try store.save(loaded)
     try store.save(loaded)
     let backups = try FileManager.default.contentsOfDirectory(

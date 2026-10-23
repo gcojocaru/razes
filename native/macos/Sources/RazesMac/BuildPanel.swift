@@ -14,8 +14,12 @@ struct BuildPanel: View {
       ).font(.caption).foregroundStyle(GamePalette.muted)
       Text("ROADS & BOUNDARIES").font(.caption).foregroundStyle(GamePalette.gold)
       HStack {
-        Button("Pavement") { infrastructure(.pavement) }
-        Button("Fence") { infrastructure(.fence) }
+        Button("Stone pavement") { infrastructure(.pavement) }
+        Button("Dirt path") { infrastructure(.dirtPath) }
+      }.buttonStyle(.bordered)
+      HStack {
+        Button("Rail fence") { infrastructure(.fence) }
+        Button("Wattle fence") { infrastructure(.wattleFence) }
         Button("Erase") { infrastructure(.erase) }
       }.buttonStyle(.bordered)
       Text("1 coin per tile or edge. Drag to paint; R rotates the fence edge. Erase has no refund.")

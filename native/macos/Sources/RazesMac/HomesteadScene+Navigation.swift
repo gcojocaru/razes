@@ -98,21 +98,18 @@ extension HomesteadScene {
       ghost.alpha = 0.55
       placementOverlay.addChild(ghost)
     }
-    if tool.kind == .infrastructure(.fence) {
-      let (a, b) = fenceEndpoints(
-        .init(position: position, facing: placementFacing), rotation: state.layout.viewRotation)
-      let edge = CGMutablePath()
-      edge.move(to: CGPoint(x: a.x, y: a.y + 27))
-      edge.addLine(to: CGPoint(x: b.x, y: b.y + 27))
-      for p in [a, b] {
-        edge.move(to: p)
-        edge.addLine(to: CGPoint(x: p.x, y: p.y + 36))
-      }
-      let fence = SKShapeNode(path: edge)
-      fence.strokeColor = outline.strokeColor
-      fence.lineWidth = 5
-      fence.zPosition = 2
-      placementOverlay.addChild(fence)
+    if case .infrastructure(let kind) = tool, kind.isFence {
+      let ghost = SKNode()
+      ghost.name = "fence-preview"
+      drawFence(
+        ghost,
+        fence: .init(
+          position: position, facing: placementFacing,
+          style: kind == .wattleFence ? .wattle : .rail),
+        rotation: state.layout.viewRotation, winter: state.displaySeason == 3)
+      ghost.alpha = 0.65
+      ghost.zPosition = 2
+      placementOverlay.addChild(ghost)
     }
     let label = SKLabelNode(fontNamed: "DMSans9pt-Regular")
     label.text =
