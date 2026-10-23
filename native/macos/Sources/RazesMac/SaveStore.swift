@@ -28,7 +28,7 @@ struct SaveStore {
       let original = try Data(contentsOf: url)
       _ = try SaveCodec.decode(original)
       let object = try JSONSerialization.jsonObject(with: original) as? [String: Any]
-      if let version = object?["version"] as? Int, version < 5 {
+      if let version = object?["version"] as? Int, version < 6 {
         let backup = url.deletingLastPathComponent().appendingPathComponent(
           "household-migration-\(UUID().uuidString).json")
         try preserveOriginal(url, backup)

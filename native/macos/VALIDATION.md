@@ -1,5 +1,15 @@
 # Native macOS validation — 2026-10-23
 
+## Fence styles, dirt paths and directional snow
+
+- Full native suite: **71 tests passed** (28 core, 43 macOS). New coverage checks dirt/wattle placement costs, overlapping surfaces, mixed-style duplicate edges, protected ground, erasing, save round trips, schema-5 migration backup, malformed styles/extreme coordinates, all four fence edges in all four map views, preview/commit agreement, seasonal texture selection and rotated foundations. Existing reference years, recovery, camera, construction, reduced-motion and progression checks also pass.
+- Debug and Release packaging, resource assertions and local signature verification passed, including all three new seasonal/directional atlases. The Release build needed permission to run dSYM generation outside the sandbox; the app was then packaged and its signature independently reverified.
+- Inspected the native construction panel: Stone pavement, Dirt path, Rail fence, Wattle fence and Erase are exposed. Selecting Wattle fence displays Rotate fence edge (R); pressing R changes North edge to East edge. Native 180-degree summer/winter inspection showed snowy rear roofs/ground restoring to warm materials/grass. UI captures were small window previews, so they do not establish a full-resolution art audit.
+- Used a new `build/strategy-validation/fences-weather-household.json`, copied from an existing isolated test household. It migrated from schema 5 to 6 with an original-byte backup. The actual story remained spring/work while seasonal preview and map rotation changed. The player's household was not edited. A separately identified validation app ran the UI checks.
+- Alpha/pixel inspection of source art confirmed twelve distinct major sprites in each rear atlas and six in each front atlas; all eighteen seasonal pairs gained more than ten percentage points of light neutral snow coverage. Shared crop rectangles avoid seasonal rescaling and neighboring-sprite leakage. Cropped SpriteKit textures did not provide readable `CGImage` data in the test runner, so source image inspection performed the pixel check; scene tests check actual selected textures and node behavior.
+- No new dependencies or browser runtime changes. No Intel/macOS 14 hardware, full VoiceOver, minimum-window-size or large-text audit in this pass. Directional facades remain painted 2D approximations; construction weather, prices and seasonal simulation retain their existing rules. Browser E2E was not rerun.
+
+
 Validated on the development Apple Silicon Mac running macOS 27.0.1 with Apple Swift 6.4. The deployment target is macOS 14; this does not establish macOS 14 or Intel hardware compatibility.
 
 ## Automated results

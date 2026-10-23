@@ -75,6 +75,30 @@ extension SceneConstructionTests {
 }
 
 extension SceneConstructionTests {
+  @MainActor func testEveryCompletedBuildingHasWinterArtInEveryFacing() throws {
+    let scene = HomesteadScene()
+    for id in BuildingID.allCases {
+      for facing in 0..<4 {
+        let summer = try XCTUnwrap(
+          scene.buildingTexture(id, level: 1, planned: false, winter: false, facing: facing))
+        let winter = try XCTUnwrap(
+          scene.buildingTexture(id, level: 1, planned: false, winter: true, facing: facing))
+        XCTAssertFalse(summer === winter, "\(id) facing \(facing) needs snowy artwork")
+        if id != .woodshed && id != .cellar { XCTAssertEqual(summer.size(), winter.size()) }
+      }
+    }
+    XCTAssertNil(scene.resourceWarning)
+  }
+  @MainActor func testRotatingFoundationsDoesNotShowACompletedRearFacade() throws {
+    let scene = HomesteadScene()
+    for id in [BuildingID.woodshed, .cellar] {
+      let front = try XCTUnwrap(
+        scene.buildingTexture(id, level: 0, planned: true, winter: false, facing: 0))
+      let rear = try XCTUnwrap(
+        scene.buildingTexture(id, level: 0, planned: true, winter: true, facing: 2))
+      XCTAssertTrue(front === rear)
+    }
+  }
   @MainActor func testDirectionalArtAndInfrastructurePersistAcrossRotationAndSeasonPreview() throws
   {
     var s = Rules.newGame()
@@ -84,7 +108,11 @@ extension SceneConstructionTests {
       s.buildings.append(.init(id: id, completedSeason: 0, debugPlaced: true))
     }
     s.layout.pavement = [.init(x: 10, y: 14)]
-    s.layout.fences = [.init(position: .init(x: 10, y: 14), facing: 0)]
+    s.layout.dirtPaths = [.init(x: 11, y: 14)]
+    s.layout.fences = [
+      .init(position: .init(x: 10, y: 14), facing: 0),
+      .init(position: .init(x: 11, y: 14), facing: 0, style: .wattle),
+    ]
     let scene = HomesteadScene()
     var pavement: SKNode?
     var fenceChildCount: Int?
@@ -100,6 +128,10 @@ extension SceneConstructionTests {
         XCTAssertEqual(node.childNode(withName: "level-badge")?.xScale, 1)
       }
       let road = try XCTUnwrap(scene.childNode(withName: "//p:10:14"))
+      let dirt = try XCTUnwrap(scene.childNode(withName: "//d:11:14") as? SKSpriteNode)
+      XCTAssertEqual(dirt.position, IsometricLayout.point(column: 11, row: 14, rotation: rotation))
+      XCTAssertEqual(dirt.colorBlendFactor, rotation == 3 ? 0.65 : 0, accuracy: 0.0001)
+      XCTAssertNotNil(scene.childNode(withName: "//f:h:11:14/woven-0"))
       if let pavement { XCTAssertTrue(road === pavement) } else { pavement = road }
       XCTAssertEqual(road.position, IsometricLayout.point(column: 10, row: 14, rotation: rotation))
       let fence = try XCTUnwrap(scene.childNode(withName: "//f:h:10:14"))
@@ -112,9 +144,11 @@ extension SceneConstructionTests {
       scene.enumerateChildNodes(withName: "//*") { node, _ in XCTAssertFalse(node.hasActions()) }
     }
     s.layout.pavement = []
+    s.layout.dirtPaths = []
     s.layout.fences = []
     scene.update(state: s, reducedMotion: true)
     XCTAssertNil(scene.childNode(withName: "//p:10:14"))
+    XCTAssertNil(scene.childNode(withName: "//d:11:14"))
     XCTAssertNil(scene.childNode(withName: "//f:h:10:14"))
   }
   @MainActor func testPaintingFillsSkippedCellsInRotatedViewsWithoutDoubleCharging() {
@@ -135,6 +169,37 @@ extension SceneConstructionTests {
       scene.paintInfrastructure(IsometricLayout.point(column: 4, row: 3, rotation: rotation))
       XCTAssertEqual(session.state.layout.pavement.count, 6)
       XCTAssertEqual(session.state.money, 6)
+    }
+  }
+  @MainActor func testFenceRotationPaintsEachEdgeAtTheSamePointerInEveryMapView() throws {
+    for rotation in 0..<4 {
+      for kind in [InfrastructureKind.fence, .wattleFence] {
+        let session = GameSession(store: nil)
+        session.rotateView(rotation)
+        let scene = HomesteadScene()
+        scene.update(state: session.state, reducedMotion: true)
+        scene.onPlacement = { tool, point in
+          if case .infrastructure(let material) = tool {
+            session.placeInfrastructure(material, at: point, facing: scene.placementFacing)
+            scene.update(state: session.state, reducedMotion: true)
+          }
+        }
+        scene.setPlacement(.infrastructure(kind))
+        let pointer = IsometricLayout.point(column: 1, row: 1, rotation: rotation)
+        for facing in 0..<4 {
+          scene.placementFacing = facing
+          scene.updatePlacement(at: pointer)
+          let ghost = try XCTUnwrap(scene.placementOverlay.childNode(withName: "fence-preview"))
+          let previewPosition = ghost.position
+          scene.paintInfrastructure(pointer)
+          let edge = ["h:1:1", "v:2:1", "h:1:2", "v:1:1"][facing]
+          let placed = try XCTUnwrap(scene.childNode(withName: "//f:" + edge))
+          XCTAssertEqual(placed.position, previewPosition)
+          XCTAssertEqual(placed.childNode(withName: "woven-0") != nil, kind == .wattleFence)
+        }
+        XCTAssertEqual(session.state.layout.fences.count, 4)
+        XCTAssertEqual(session.state.money, 8)
+      }
     }
   }
 }

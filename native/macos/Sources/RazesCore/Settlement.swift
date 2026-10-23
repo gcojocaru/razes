@@ -8,7 +8,20 @@ public struct GridPosition: Codable, Equatable, Hashable, Sendable {
   }
 }
 public enum SceneryKind: String, Codable, CaseIterable, Sendable { case barn, well, stores, fence }
-public enum InfrastructureKind: String, CaseIterable, Sendable { case pavement, fence, erase }
+public enum InfrastructureKind: String, CaseIterable, Sendable {
+  case pavement, dirtPath, fence, wattleFence, erase
+  public var isFence: Bool { self == .fence || self == .wattleFence }
+  public var title: String {
+    switch self {
+    case .pavement: "Stone pavement"
+    case .dirtPath: "Dirt path"
+    case .fence: "Rail fence"
+    case .wattleFence: "Wattle fence"
+    case .erase: "Erase"
+    }
+  }
+}
+public enum FenceStyle: String, Codable, Sendable { case rail, wattle }
 public enum StructureKind: Equatable, Sendable {
   case building(BuildingID)
   case scenery(SceneryKind)
@@ -41,9 +54,11 @@ public struct SceneryPlacement: Codable, Equatable, Sendable, Identifiable {
 public struct FenceSegment: Codable, Equatable, Hashable, Sendable {
   public var position: GridPosition
   public var facing: Int
-  public init(position: GridPosition, facing: Int = 0) {
+  public var style: FenceStyle
+  public init(position: GridPosition, facing: Int = 0, style: FenceStyle = .rail) {
     self.position = position
     self.facing = facing
+    self.style = style
   }
   public var edgeKey: String {
     facing % 2 == 0
@@ -55,6 +70,7 @@ public struct SettlementLayout: Codable, Equatable, Sendable {
   public var buildings: [BuildingPlacement] = []
   public var scenery: [SceneryPlacement] = []
   public var pavement: [GridPosition] = []
+  public var dirtPaths: [GridPosition] = []
   public var fences: [FenceSegment] = []
   public var viewRotation = 0
   public init() {}
@@ -92,10 +108,12 @@ public enum Settlement {
     else { return "Keep the whole footprint inside the playing area." }
     if kind == .infrastructure(.erase) { return nil }
     if checkDuplicate {
-      if kind == .infrastructure(.pavement), layout.pavement.contains(point) {
-        return "Pavement is already laid here."
+      if kind == .infrastructure(.pavement) || kind == .infrastructure(.dirtPath),
+        layout.pavement.contains(point) || layout.dirtPaths.contains(point)
+      {
+        return "A path surface is already laid here."
       }
-      if kind == .infrastructure(.fence),
+      if case .infrastructure(let material) = kind, material.isFence,
         layout.fences.contains(where: {
           $0.edgeKey == FenceSegment(position: point, facing: facing).edgeKey
         })
@@ -116,6 +134,7 @@ public enum Settlement {
     if case .infrastructure = kind {
     } else {
       occupied.formUnion(layout.pavement)
+      occupied.formUnion(layout.dirtPaths)
       occupied.formUnion(layout.fences.map(\.position))
     }
     return proposed.isDisjoint(with: occupied)
@@ -150,10 +169,11 @@ public enum Settlement {
   }
   public static func validate(_ state: GameState) throws {
     let layout = state.layout
+    let surfaces = layout.pavement + layout.dirtPaths
     guard layout.buildings.count <= BuildingID.allCases.count,
       Set(layout.buildings.map(\.id)).count == layout.buildings.count,
       layout.scenery.count <= 128, Set(layout.scenery.map(\.id)).count == layout.scenery.count,
-      layout.pavement.count <= 256, Set(layout.pavement).count == layout.pavement.count,
+      surfaces.count <= 256, Set(surfaces).count == surfaces.count,
       layout.fences.count <= 1024, (0...3).contains(layout.viewRotation),
       (layout.buildings.map(\.facing) + layout.scenery.map(\.facing) + layout.fences.map(\.facing))
         .allSatisfy({ (0...3).contains($0) })
@@ -164,7 +184,7 @@ public enum Settlement {
     let footprints =
       layout.buildings.map { ($0.position, self.footprint(.building($0.id), facing: $0.facing)) }
       + layout.scenery.map { ($0.position, self.footprint(.scenery($0.kind), facing: $0.facing)) }
-      + (layout.pavement + layout.fences.map(\.position)).map { ($0, (width: 1, height: 1)) }
+      + (surfaces + layout.fences.map(\.position)).map { ($0, (width: 1, height: 1)) }
     for (point, footprint) in footprints {
       guard point.x >= 0, point.y >= 0, point.x <= size - footprint.width,
         point.y <= size - footprint.height
@@ -192,6 +212,7 @@ public enum Settlement {
       }
     }
     for (point, kind, facing) in layout.pavement.map({ ($0, InfrastructureKind.pavement, 0) })
+      + layout.dirtPaths.map({ ($0, InfrastructureKind.dirtPath, 0) })
       + layout.fences.map({ ($0.position, InfrastructureKind.fence, $0.facing) })
     {
       if let problem = problem(

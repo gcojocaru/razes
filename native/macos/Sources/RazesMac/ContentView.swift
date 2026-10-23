@@ -108,7 +108,7 @@ struct ContentView: View {
             JournalView(state: state)
           } else {
             Text(
-              "Read the seasonal conversation, then select a household portrait or a place in the homestead to assign work. Each adult has one assignment. End season opens a forecast; confirm to resolve work, then answer the evening conversation.\n\nBuild lets you choose free locations on the isometric map. Drag or scroll to pan, and pinch or Option-scroll to zoom. The map controls also provide pan, zoom and a Home reset. Green placement footprints are free; red footprints are occupied, outside the map or reserved for the house and farmland. Click to place; Escape cancels. Construction completes at season end. Completed buildings produce their level-scaled food/coins once per season and lose 20 condition afterwards. Upgrades and repairs are immediate. At zero condition a building loses a level and returns to 60 condition; level 1 becomes inactive until repaired. No building timers or offline decay run. The year ending offers Next settlement season for ongoing building progress.\n\nRotate the map with the arrow controls; the HUD stays upright. Rotate a building from its inspector or press R while placing. Build also offers pavement and fences (1 coin per tile/edge). Click or drag to paint; the tool stays active. Rotate the fence tool to change its edge. Erase removes placed pavement/fences without a refund. Debug season preview changes the scene only; choose Actual season to restore the story view.\n\nHarvest needs two adults. Honouring the ox promise reserves Petru in autumn. All choices and draft assignments save on this Mac.\n\nCommand-J opens the journal. The Places menu provides keyboard alternatives to scene targets. Escape closes optional commands; conversations remain until answered."
+              "Read the seasonal conversation, then select a household portrait or a place in the homestead to assign work. Each adult has one assignment. End season opens a forecast; confirm to resolve work, then answer the evening conversation.\n\nBuild lets you choose free locations on the isometric map. Drag or scroll to pan, and pinch or Option-scroll to zoom. The map controls also provide pan, zoom and a Home reset. Green placement footprints are free; red footprints are occupied, outside the map or reserved for the house and farmland. Click to place; Escape cancels. Construction completes at season end. Completed buildings produce their level-scaled food/coins once per season and lose 20 condition afterwards. Upgrades and repairs are immediate. At zero condition a building loses a level and returns to 60 condition; level 1 becomes inactive until repaired. No building timers or offline decay run. The year ending offers Next settlement season for ongoing building progress.\n\nRotate the map with the arrow controls; the HUD stays upright. Rotate a building from its inspector or press R while placing. Build offers stone pavement, dirt paths, rail fences and woven wattle fences (1 coin per tile/edge). Click or drag to paint; the tool stays active. Press R or Rotate fence edge to choose the north, east, south or west edge. Erase removes placed pavement/fences without a refund. Debug season preview changes the scene only; choose Actual season to restore the story view.\n\nHarvest needs two adults. Honouring the ox promise reserves Petru in autumn. All choices and draft assignments save on this Mac.\n\nCommand-J opens the journal. The Places menu provides keyboard alternatives to scene targets. Escape closes optional commands; conversations remain until answered."
             ).lineSpacing(5)
           }
         }
@@ -126,13 +126,23 @@ struct ContentView: View {
     .onExitCommand { ui.dismissOptional() }
     .onAppear {
       if keyMonitor == nil {
-        // SpriteKit consumes Escape before SwiftUI's exit command sees it.
+        // SpriteKit can consume keys before SwiftUI shortcuts see them.
         keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
-          guard event.keyCode == 53, event.window === scene.view?.window,
+          guard event.window === scene.view?.window,
             event.window?.attachedSheet == nil, sheet == nil, !restart
           else { return event }
-          ui.dismissOptional()
-          return nil
+          if event.keyCode == 53 {
+            ui.dismissOptional()
+            return nil
+          }
+          if ui.placement != nil, event.charactersIgnoringModifiers?.lowercased() == "r",
+            event.modifierFlags.intersection([.command, .control, .option]).isEmpty,
+            !(event.window?.firstResponder is NSTextView)
+          {
+            rotatePlacement()
+            return nil
+          }
+          return event
         }
       }
       scene.onCameraChange = { cameraZoom = $0 }
@@ -297,9 +307,15 @@ struct ContentView: View {
       if let tool = ui.placement {
         Label("Place \(tool.title) · click a green footprint", systemImage: "square.dashed").font(
           .caption)
-        Button("Rotate placement 90°") { ui.placementFacing = (ui.placementFacing + 1) % 4 }
-          .keyboardShortcut("r", modifiers: [])
-        Text("\(ui.placementFacing*90)°").font(.caption.monospacedDigit())
+        Button(
+          tool.isFence ? "Rotate fence edge (R)" : "Rotate placement 90°", action: rotatePlacement
+        )
+        .keyboardShortcut("r", modifiers: [])
+        Text(
+          tool.isFence
+            ? ["North edge", "East edge", "South edge", "West edge"][ui.placementFacing]
+            : "\(ui.placementFacing*90)°"
+        ).font(.caption.monospacedDigit())
         Button("Cancel placement") { ui.dismissOptional() }
       }
       Spacer()
@@ -325,6 +341,11 @@ struct ContentView: View {
         GamePalette.panel.opacity(0.94), in: RoundedRectangle(cornerRadius: 5))
     }.padding(.horizontal, 18).padding(.top, 8)
       .help("Drag or scroll to pan. Pinch or Option-scroll to zoom. Escape cancels placement.")
+  }
+  private func rotatePlacement() {
+    ui.placementFacing = (ui.placementFacing + 1) % 4
+    scene.placementFacing = ui.placementFacing
+    scene.updatePlacement(at: scene.lastPointer)
   }
   private func refreshScene() {
     scene.update(

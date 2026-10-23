@@ -194,14 +194,18 @@ import RazesCore
       }
       if kind == .erase {
         next.layout.pavement.removeAll { $0 == point }
+        next.layout.dirtPaths.removeAll { $0 == point }
         let edges = Set((0..<4).map { FenceSegment(position: point, facing: $0).edgeKey })
         next.layout.fences.removeAll { edges.contains($0.edgeKey) }
       } else {
         try Construction.spend(1, state: &next)
         if kind == .pavement {
           next.layout.pavement.append(point)
+        } else if kind == .dirtPath {
+          next.layout.dirtPaths.append(point)
         } else {
-          next.layout.fences.append(.init(position: point, facing: facing))
+          next.layout.fences.append(
+            .init(position: point, facing: facing, style: kind == .wattleFence ? .wattle : .rail))
         }
       }
     }
