@@ -4,6 +4,26 @@ import XCTest
 @testable import RazesMac
 
 final class MaterialsSessionTests: XCTestCase {
+  @MainActor func testSeedPurchasePersistsAndCannotSpendReservedCoins() throws {
+    let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: dir) }
+    let store = SaveStore(url: dir.appendingPathComponent("save.json"))
+    let session = GameSession(store: store)
+    session.send(.init(type: "assign", revision: 0, worker: .ion, task: .supplies))
+    session.buySeeds(quantity: 8)
+    XCTAssertNil(session.error)
+    XCTAssertEqual(session.state.seeds, 16)
+    XCTAssertEqual(session.state.money, 4)
+    XCTAssertEqual(session.state.week, 0)
+    XCTAssertEqual(session.state.assignments["ion"], .supplies)
+    XCTAssertEqual(GameSession(store: store).state, session.state)
+    let before = session.state
+    let bytes = try Data(contentsOf: store.url)
+    session.buySeeds(quantity: 1)
+    XCTAssertNotNil(session.error)
+    XCTAssertEqual(session.state, before)
+    XCTAssertEqual(try Data(contentsOf: store.url), bytes)
+  }
   @MainActor func testImmediateMarketCraftAndHouseUpgradePersistWithoutUsingWorkers() throws {
     let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     defer { try? FileManager.default.removeItem(at: dir) }

@@ -46,13 +46,13 @@ struct GameHUD: View {
   private var phaseLabel: String {
     switch state.phase {
     case .work: "PLAN YOUR WORK"
-    case .summary: "SEASON REPORT"
+    case .summary: "WEEK REPORT"
     }
   }
   private var primaryLabel: String {
     switch state.phase {
-    case .work: "End season"
-    case .summary: "Review season"
+    case .work: "End week"
+    case .summary: "Review week"
     }
   }
 }

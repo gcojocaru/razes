@@ -42,8 +42,10 @@ extension PlacementSessionTests {
   @MainActor func testSeasonalFoundationCompletesInSpringWithoutAClock() {
     let session = GameSession(store: nil)
     session.placeBuilding(.cellar, at: .init(x: 1, y: 1))
-    session.send(.init(type: "resolve", revision: session.state.revision))
-    session.send(.init(type: "continue", revision: session.state.revision))
+    for _ in 0..<12 {
+      session.send(.init(type: "resolve", revision: session.state.revision))
+      session.send(.init(type: "continue", revision: session.state.revision))
+    }
     XCTAssertEqual(session.state.season, 1)
     session.finishConstruction(.cellar)
     XCTAssertEqual(session.state.buildings.first?.completedSeason, 0)
@@ -152,8 +154,12 @@ extension PlacementSessionTests {
     session.send(.init(type: "continue", revision: session.state.revision))
     XCTAssertFalse(session.placeInfrastructure(.erase, at: .init(x: 5, y: 10)))
     XCTAssertFalse(session.placeInfrastructure(farmland, at: .init(x: 2, y: 1)))
-    session.send(.init(type: "resolve", revision: session.state.revision))
-    session.send(.init(type: "continue", revision: session.state.revision))
+    for _ in 1..<24 {
+      session.send(.init(type: "resolve", revision: session.state.revision))
+      session.send(.init(type: "continue", revision: session.state.revision))
+    }
+    XCTAssertEqual(session.state.cropWeeks, 24)
+    XCTAssertEqual(session.state.season, 2)
     session.send(
       .init(type: "assign", revision: session.state.revision, worker: .ion, task: .harvest))
     session.send(.init(type: "resolve", revision: session.state.revision))

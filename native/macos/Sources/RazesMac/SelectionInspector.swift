@@ -41,10 +41,12 @@ struct SelectionInspector: View {
           }
           let task = Rules.task(Materials.assignments(state)[worker.rawValue]!)
           Text(task.description).font(.caption).foregroundStyle(GamePalette.muted)
-          Text("Current work cost: \(task.moneyCost) money · \(task.foodCost) food").font(
+          Text(
+            "Current work cost: \(task.moneyCost) money · \(task.foodCost) food · \(task.id == .plant ? Farming.seedCost : 0) seeds"
+          ).font(
             .caption)
         } else {
-          Text("Continue to the next season to assign work.").font(.caption)
+          Text("Continue to the next week to assign work.").font(.caption)
         }
       case .building(let id):
         BuildingInspector(session: session, state: state, id: id, beginPlacement: beginPlacement)
@@ -86,13 +88,33 @@ struct SelectionInspector: View {
           if let reason = Settlement.farmlandEditingProblem(state) {
             Text(reason).font(.caption).foregroundStyle(GamePalette.muted)
           }
+          Text("Grain seeds: \(state.seeds) · sowing needs \(Farming.seedCost)").font(.caption)
+          Button("Buy 4 grain seeds · 4 coins") { session.buySeeds(quantity: 4) }
+            .disabled(
+              state.money - (state.phase == .work ? Rules.preview(state).moneyCost : 0) < 4
+                || state.seeds > 99996)
+          if state.planted && state.season != 3 && !state.harvested {
+            ProgressView(value: Double(state.cropWeeks), total: Double(Farming.growingWeeks))
+              .accessibilityLabel("Grain growth")
+              .accessibilityValue("\(state.cropWeeks) of 24 growing weeks")
+            Text(
+              "Expected harvest: \(Farming.foodYield(state)) food + \(Farming.seedYield(state)) seeds"
+            )
+            .font(.caption).foregroundStyle(GamePalette.gold)
+            Text(
+              state.tended
+                ? "Tended · bonus secured"
+                : "Tend once after week 4 of growth, before ripening, for +8 food and +2 seeds."
+            )
+            .font(.caption)
+          }
           if let task = Rules.taskOptions(state).first(where: {
             [TaskID.plant, .tend, .harvest].contains($0.id)
           }) {
             Text(task.description).font(.caption)
             assignmentButtons(task.id)
           } else {
-            Text("No field work is available this season.").font(.caption)
+            Text("No field work is available this week.").font(.caption)
           }
         }
       }

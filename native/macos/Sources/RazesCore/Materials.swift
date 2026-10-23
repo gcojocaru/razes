@@ -77,8 +77,8 @@ public enum Materials {
     return Task(
       id: id, name: id == .gatherWood ? "Gather timber" : "Gather stone",
       description: id == .gatherWood
-        ? "Bring home up to 6 wood at season end, limited by shared storage."
-        : "Bring home up to 4 stone at season end, limited by shared storage.",
+        ? "Bring home up to 2 wood at week end, limited by shared storage."
+        : "Bring home up to 1 stone at week end, limited by shared storage.",
       icon: "hammer", workers: 1, moneyCost: 0, foodCost: 0, foodGain: 0, moneyGain: 0, houseGain: 0
     )
   }
@@ -89,7 +89,7 @@ public enum Materials {
       let task = assignments(s)[worker.rawValue]
       guard task == .gatherWood || task == .gatherStone else { continue }
       let id: MaterialID = task == .gatherWood ? .wood : .stone
-      let expected = id == .wood ? 6 : 4
+      let expected = id == .wood ? 2 : 1
       let received = min(expected, room)
       haul.expected[id] += expected
       haul.gained[id] += received

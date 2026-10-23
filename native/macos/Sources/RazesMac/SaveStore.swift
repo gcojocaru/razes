@@ -2,7 +2,7 @@ import Foundation
 import RazesCore
 
 struct SaveStore {
-  static let filename = "settlement-v8.json"
+  static let filename = "settlement-v9.json"
   let url: URL
   private let preserveOriginal: (URL, URL) throws -> Void
   init(

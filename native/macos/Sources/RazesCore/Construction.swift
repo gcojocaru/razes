@@ -100,7 +100,7 @@ public enum Construction {
       return "Already completed or under construction."
     }
     if state.phase != .work {
-      return "Continue to the next season before assigning work."
+      return "Continue to the next week before assigning work."
     }
     if state.season == 3 {
       return "Worker construction is unavailable in winter. Use the building palette."

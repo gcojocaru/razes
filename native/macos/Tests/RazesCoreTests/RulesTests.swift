@@ -18,8 +18,9 @@ final class RulesTests: XCTestCase {
   }
   func testSeveralYearsRoundTripAndMatchForecastsIncludingShortages() throws {
     var s = Rules.newGame()
-    for turn in 0..<24 {
-      let task: TaskID = turn < 12 ? [.plant, .tend, .harvest, .repair][turn % 4] : .rest
+    for week in 0..<288 {
+      let task: TaskID =
+        week < 144 && s.week == 0 ? [.plant, .tend, .harvest, .repair][s.season] : .rest
       s = try ConstructionTests().assign(s, .ion, task)
       XCTAssertEqual(try SaveCodec.decode(SaveCodec.encode(s)), s)
       let p = Rules.preview(s)
@@ -30,7 +31,7 @@ final class RulesTests: XCTestCase {
       XCTAssertEqual(s.report?.deficit, max(0, -p.foodAfter))
       XCTAssertEqual(try SaveCodec.decode(SaveCodec.encode(s)), s)
       s = try Rules.dispatch(s, action: .init(type: "continue", revision: s.revision))
-      XCTAssertEqual(s.turn, turn + 1)
+      XCTAssertEqual(s.turn, (week + 1) / 12)
       XCTAssertEqual(s.assignments, ["ion": .rest])
       XCTAssertEqual(try SaveCodec.decode(SaveCodec.encode(s)), s)
     }
@@ -41,6 +42,7 @@ final class RulesTests: XCTestCase {
       var s = Rules.newGame()
       s.season = 2
       s.planted = true
+      s.cropWeeks = 24
       s.tended = tended
       s = try ConstructionTests().assign(s, .ion, .harvest)
       XCTAssertEqual(Rules.preview(s).foodGain, tended ? 28 : 20)

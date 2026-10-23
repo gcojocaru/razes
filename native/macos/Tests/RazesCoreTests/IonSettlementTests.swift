@@ -8,13 +8,14 @@ final class IonSettlementTests: XCTestCase {
     XCTAssertEqual(s.phase, .work)
     XCTAssertEqual(WorkerID.allCases.map(\.rawValue), ["ion"])
     XCTAssertEqual(s.assignments, ["ion": .rest])
-    XCTAssertEqual(Rules.preview(s).consumption, 3)
+    XCTAssertEqual(Rules.preview(s).consumption, 0)
   }
 
   func testSoloHarvestResolvesDirectlyToReportAndWinterRepeats() throws {
     var s = Rules.newGame()
     s.phase = .work
-    for task: TaskID in [.plant, .tend, .harvest, .repair] {
+    for week in 0..<48 {
+      let task: TaskID = week % 12 == 0 ? [.plant, .tend, .harvest, .repair][week / 12] : .rest
       s = try Rules.dispatch(
         s, action: .init(type: "assign", revision: s.revision, worker: .ion, task: task))
       let forecast = Rules.preview(s)
@@ -39,6 +40,7 @@ extension IonSettlementTests {
   func testBuildingsAndGatheringResolveOnceAcrossYearBoundary() throws {
     var s = Rules.newGame()
     s.season = 3
+    s.week = 11
     s.buildings = [.init(id: .workshop, completedSeason: 0, legacyAssignment: false)]
     s.layout.buildings = [.init(id: .workshop, position: .init(x: 1, y: 1))]
     try Construction.start(.woodshed, state: &s)
@@ -61,7 +63,7 @@ extension IonSettlementTests {
     XCTAssertEqual(s.materials, resolved.materials)
     XCTAssertEqual(s.buildings, resolved.buildings)
     XCTAssertTrue(Construction.active(.woodshed, state: s))
-    XCTAssertEqual(Rules.preview(s).moneyGain, 3)
+    XCTAssertEqual(Rules.preview(s).moneyGain, 0)
     XCTAssertEqual(try SaveCodec.decode(SaveCodec.encode(s)), s)
     s = try ConstructionTests().assign(s, .ion, .buildCellar)
     s = try Rules.dispatch(s, action: .init(type: "resolve", revision: s.revision))

@@ -106,7 +106,7 @@ struct ContentView: View {
             MaterialsPanel(session: session, state: state)
           } else {
             Text(
-              "Select Ion’s portrait or a place in the settlement to assign one job each season. End season opens a forecast; confirm to resolve work, food use, shelter wear and construction. Read the report and continue. Winter returns to spring with a fresh field.\n\nSow in spring, optionally tend in summer, and harvest with Ion in autumn. Food use is 3 each season; an active woodshed reduces winter use to 2. Cold winter shelter adds 1 food. Wages, gathering, provisions and repairs compete for Ion’s one assignment. Shortages appear in the report; the settlement continues.\n\nBuild lets you place structures on free ground. Foundations finish at season end and produce from the following season. Completed buildings produce once per season and lose 20 condition afterwards. Upgrades and repairs are immediate. At zero condition a building above level 1 loses a level and returns to 60 condition; level 1 stays inactive until repaired. No timers or offline decay run.\n\nDrag or scroll to pan; pinch or Option-scroll to zoom. Home resets the camera. Rotate the map with the arrow controls. Rotate a building in its inspector, or press R while placing. Farmland, paths and fences cost 1 coin per tile or edge; click or drag to paint any shape. R changes the fence edge. Erase removes infrastructure and farmland without refund. Harvest crops and cancel farming assignments before changing farmland. At least one farmland tile is needed to sow; yields do not scale with plot size. Escape cancels placement or closes commands.\n\nSelect the house to see food, coins, wood, stone and planks. Buy supplies opens purchasing and shared storage. Food provisions use Ion’s seasonal assignment. Materials also opens shared wood, stone and plank storage. Buy and craft immediately (2 wood → 1 plank), or assign Ion to gather at season end. The forecast shows what fits. House storage upgrades add 10 slots; storehouses add 40 per completed level. Discard unwanted supplies to free room.\n\nDraft assignments and settlement changes save on this Mac. The Places menu offers keyboard alternatives to map targets. Debug season preview changes scenery only; Actual season restores the simulation view."
+              "Select Ion’s portrait or a place in the settlement to assign one job each week. End week opens a forecast; confirm to resolve work and crop growth. Food is consumed at month end; shelter wear and construction resolve at season end. Each season has 3 months of 4 weeks (48 weeks per year). Read the weekly report and continue. Winter returns to spring with a fresh field.\n\nSow 4 grain seeds in spring. Crops sprout, grow and ripen after 24 weeks; tend once after 4 growing weeks, before ripening. Harvest ripe grain before winter for 20 food and 4 seeds (28 food and 6 seeds when tended). Buy seeds for 1 coin each in Materials or at the field. Food use is 3 at each month end; an active woodshed reduces winter use to 2. Cold winter shelter adds 1 food. Wages, gathering, provisions and repairs compete for Ion’s weekly assignment. Wages earn 1 coin per week. Shortages appear in the report; the settlement continues.\n\nBuild lets you place structures on free ground. Foundations finish at season end and produce from the following season. Completed buildings produce once per season and lose 20 condition afterwards. Upgrades and repairs are immediate. At zero condition a building above level 1 loses a level and returns to 60 condition; level 1 stays inactive until repaired. No timers or offline decay run.\n\nDrag or scroll to pan; pinch or Option-scroll to zoom. Home resets the camera. Rotate the map with the arrow controls. Rotate a building in its inspector, or press R while placing. Farmland, paths and fences cost 1 coin per tile or edge; click or drag to paint any shape. R changes the fence edge. Erase removes infrastructure and farmland without refund. Harvest crops and cancel farming assignments before changing farmland. At least one farmland tile is needed to sow; yields do not scale with plot size. Escape cancels placement or closes commands.\n\nSelect the house to see food, seeds, coins and materials. Buy supplies opens the purchasing panel. Provisions use Ion’s weekly assignment. Materials opens shared wood, stone and plank storage. Buy and craft immediately (2 wood → 1 plank), or assign Ion to gather up to 2 wood or 1 stone at week end. The forecast shows what fits. House storage upgrades add 10 slots; storehouses add 40 per completed level. Discard unwanted supplies to free room.\n\nDraft assignments and settlement changes save on this Mac. The Places menu offers keyboard alternatives to map targets. Debug season preview changes scenery only; Actual season restores the simulation view."
             ).lineSpacing(5)
           }
         }
@@ -174,11 +174,13 @@ struct ContentView: View {
   private var topStrip: some View {
     HStack(spacing: 18) {
       Text("Răzeș").font(.system(size: 20, design: .serif)).foregroundStyle(GamePalette.gold)
-      Text(
-        "\(Content.seasons[state.displaySeason].uppercased()) · \(String(1495 + state.turn / 4))\(state.debugSeason != nil ? " · PREVIEW":"")"
-      ).font(
-        .system(size: 10, weight: .semibold)
-      ).tracking(1)
+      VStack(alignment: .leading, spacing: 2) {
+        Text(
+          "\(Content.seasons[state.displaySeason].uppercased()) · \(String(1495 + state.year))\(state.debugSeason != nil ? " · PREVIEW":"")"
+        )
+        Text("Month \(state.month) · Week \(state.weekOfMonth)")
+      }.font(.system(size: 10, weight: .semibold))
+        .accessibilityElement(children: .combine).help(state.calendarLabel)
       Divider().frame(height: 18).overlay(GamePalette.gold.opacity(0.4))
       resource("Food", value: "\(state.food)", icon: "leaf")
       resource("Money", value: "\(state.money)", icon: "circle")
@@ -187,9 +189,7 @@ struct ContentView: View {
         sheet = "materials"
       }
       .help("\(state.materials.text). Buy, craft, gather and expand shared storage.")
-      resource(
-        "Free", value: "\(Materials.assignments(state).values.filter{$0 == .rest}.count)/1",
-        icon: "person")
+      resource("Seeds", value: "\(state.seeds)", icon: "leaf.circle")
       Spacer(minLength: 0)
       Button("Debug", systemImage: "wrench.and.screwdriver") {
         ui.dismissOptional()

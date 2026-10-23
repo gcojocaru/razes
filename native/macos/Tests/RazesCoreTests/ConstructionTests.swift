@@ -37,20 +37,23 @@ final class ConstructionTests: XCTestCase {
     XCTAssertEqual(s.buildings.first?.level, 0)
   }
   func testCellarBenefitBeginsFollowingSeason() throws {
-    var s = try assign(Rules.newGame(), .ion, .buildCellar)
+    var initial = Rules.newGame()
+    initial.week = 11
+    var s = try assign(initial, .ion, .buildCellar)
     XCTAssertEqual(Rules.suppliesGain(s), 7)
     s = try Rules.dispatch(s, action: .init(type: "resolve", revision: s.revision))
     XCTAssertEqual(Rules.suppliesGain(s), 7)
     s = try Rules.dispatch(s, action: .init(type: "continue", revision: s.revision))
     s = try assign(s, .ion, .supplies)
     XCTAssertEqual(Rules.suppliesGain(s), 10)
-    XCTAssertEqual(Rules.preview(s).foodGain, 12)
+    XCTAssertEqual(Rules.preview(s).foodGain, 10)
   }
   func testWinterConsumptionAndWeatheringMatchForecastEvenWhenWoodshedWearsOut() throws {
     for woodshed in [false, true] {
       for house in [39, 40] {
         var s = Rules.newGame()
         s.season = 3
+        s.week = 11
         s.food = 30
         s.house = house
         if woodshed {

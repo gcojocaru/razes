@@ -22,7 +22,7 @@ struct PhaseOverlay: View {
         let forecast = Rules.preview(state)
         HStack(alignment: .top, spacing: 24) {
           VStack(alignment: .leading, spacing: 8) {
-            Text("A season’s work").font(.system(size: 26, design: .serif))
+            Text("A week’s work").font(.system(size: 26, design: .serif))
             ForEach(WorkerID.allCases, id: \.self) { worker in
               Text(
                 "\(Content.shared.people[worker.rawValue]!.name): \(Rules.task(state.assignments[worker.rawValue]!).name)"
@@ -31,12 +31,21 @@ struct PhaseOverlay: View {
             Text("Work costs: \(forecast.moneyCost) money · \(forecast.foodCost) food").font(
               .caption
             ).foregroundStyle(GamePalette.gold)
+            Text(
+              "Seeds: \(state.seeds) → \(forecast.seedsAfter) · sowing uses \(forecast.seedCost) · harvest returns \(forecast.seedGain)"
+            )
+            .font(.caption).foregroundStyle(GamePalette.gold)
+            Text(Rules.fieldLabel(state)).font(.caption)
             if Materials.reserved(state).total > 0 {
               Text("Building supplies: \(Materials.reserved(state).text)").font(.caption)
             }
             ForEach(Materials.forecast(state).lines, id: \.self) { Text($0).font(.caption) }
           }.frame(maxWidth: .infinity, alignment: .leading)
           VStack(alignment: .leading, spacing: 8) {
+            Text(
+              "Food use: \(forecast.consumption) at month end · Wear: \(forecast.wear) at season end"
+            )
+            .font(.caption).foregroundStyle(GamePalette.muted)
             Text("AFTER WORK & CONSUMPTION").font(.system(size: 10, weight: .semibold)).tracking(1)
             Text(
               "Food \(forecast.foodAfter) · Money \(forecast.moneyAfter) · Shelter \(forecast.houseAfter)"
@@ -47,13 +56,14 @@ struct PhaseOverlay: View {
             ForEach(forecast.warnings, id: \.self) {
               Text($0).font(.caption).foregroundStyle(GamePalette.gold)
             }
-            Button("Confirm season’s work") {
+            Button("Confirm week’s work") {
               session.send(Action(type: "resolve", revision: state.revision))
             }.buttonStyle(.borderedProminent).disabled(!forecast.errors.isEmpty)
           }.frame(maxWidth: .infinity, alignment: .leading)
         }
       case .summary:
-        Text("\(Content.seasons[state.season]) report").font(.system(size: 27, design: .serif))
+        Text("Month \(state.month) · Week \(state.weekOfMonth) report").font(
+          .system(size: 27, design: .serif))
         if let report = state.report {
           HStack(alignment: .top, spacing: 24) {
             VStack(alignment: .leading, spacing: 6) {
@@ -63,6 +73,7 @@ struct PhaseOverlay: View {
               Text(
                 "Food \(report.foodBefore) → \(report.foodAfter) · Money \(report.moneyBefore) → \(report.moneyAfter)"
               )
+              Text("Seeds \(report.seedsBefore) → \(report.seedsAfter)")
               Text("Shelter \(report.houseBefore) → \(report.houseAfter)")
               if let haul = state.lastMaterialHaul {
                 Text("Gathered: \(haul.text)").font(.caption)
@@ -77,7 +88,7 @@ struct PhaseOverlay: View {
             }.frame(maxWidth: .infinity, alignment: .leading)
           }
         }
-        Button("Continue to \(Content.seasons[(state.season + 1) % 4])") {
+        Button("Continue to \(state.nextWeekLabel)") {
           session.send(Action(type: "continue", revision: state.revision))
         }.buttonStyle(.borderedProminent)
       }
@@ -86,7 +97,7 @@ struct PhaseOverlay: View {
   private var title: String {
     switch state.phase {
     case .work: "REVIEW & CONFIRM"
-    case .summary: "SEASON REPORT"
+    case .summary: "WEEK REPORT"
     }
   }
 }
