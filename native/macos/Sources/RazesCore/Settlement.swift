@@ -9,12 +9,13 @@ public struct GridPosition: Codable, Equatable, Hashable, Sendable {
 }
 public enum SceneryKind: String, Codable, CaseIterable, Sendable { case barn, well, stores, fence }
 public enum InfrastructureKind: String, CaseIterable, Sendable {
-  case pavement, dirtPath, fence, wattleFence, erase
+  case pavement, dirtPath, farmland, fence, wattleFence, erase
   public var isFence: Bool { self == .fence || self == .wattleFence }
   public var title: String {
     switch self {
     case .pavement: "Stone pavement"
     case .dirtPath: "Dirt path"
+    case .farmland: "Farmland"
     case .fence: "Rail fence"
     case .wattleFence: "Wattle fence"
     case .erase: "Erase"
@@ -71,12 +72,54 @@ public struct SettlementLayout: Codable, Equatable, Sendable {
   public var scenery: [SceneryPlacement] = []
   public var pavement: [GridPosition] = []
   public var dirtPaths: [GridPosition] = []
+  public var farmland: [GridPosition] = Settlement.startingFarmland
   public var fences: [FenceSegment] = []
   public var viewRotation = 0
   public init() {}
+  private enum CodingKeys: String, CodingKey {
+    case buildings, scenery, pavement, dirtPaths, farmland, fences, viewRotation
+  }
+  public init(from decoder: Decoder) throws {
+    let c = try decoder.container(keyedBy: CodingKeys.self)
+    buildings = try c.decode([BuildingPlacement].self, forKey: .buildings)
+    scenery = try c.decode([SceneryPlacement].self, forKey: .scenery)
+    pavement = try c.decode([GridPosition].self, forKey: .pavement)
+    dirtPaths = try c.decode([GridPosition].self, forKey: .dirtPaths)
+    // Missing means an older save; an explicitly empty field must stay empty.
+    farmland =
+      try c.decodeIfPresent([GridPosition].self, forKey: .farmland) ?? Settlement.startingFarmland
+    fences = try c.decode([FenceSegment].self, forKey: .fences)
+    viewRotation = try c.decode(Int.self, forKey: .viewRotation)
+  }
 }
 public enum Settlement {
   public static let size = 16
+  public static let startingFarmland = (5...7).flatMap { x in
+    (10...12).map { y in GridPosition(x: x, y: y) }
+  }
+  public static func farmlandEditingProblem(_ state: GameState) -> String? {
+    if state.planted && !state.harvested && state.season < 3 {
+      return "Harvest the crop before changing farmland."
+    }
+    if state.phase == .work
+      && state.assignments.values.contains(where: {
+        [TaskID.plant, .tend, .harvest].contains($0)
+      })
+    {
+      return "Cancel the farming assignment before changing farmland."
+    }
+    return nil
+  }
+  public static func infrastructureProblem(
+    _ kind: InfrastructureKind, at point: GridPosition, state: GameState, facing: Int = 0
+  ) -> String? {
+    if kind == .farmland || (kind == .erase && state.layout.farmland.contains(point)),
+      let problem = farmlandEditingProblem(state)
+    {
+      return problem
+    }
+    return problem(.infrastructure(kind), at: point, layout: state.layout, facing: facing)
+  }
   public static let house = GridPosition(x: 6, y: 6), farm = GridPosition(x: 5, y: 10)
   public static func footprint(_ kind: StructureKind, facing: Int = 0) -> (width: Int, height: Int)
   {
@@ -122,7 +165,11 @@ public enum Settlement {
       }
     }
     let proposed = cells(point, footprint)
-    var occupied = cells(house, (3, 3)).union(cells(farm, (3, 3)))
+    var occupied = cells(house, (3, 3))
+    occupied.formUnion(
+      layout.farmland.filter {
+        !(kind == .infrastructure(.farmland) && !checkDuplicate && $0 == point)
+      })
     for building in layout.buildings where kind != .building(building.id) {
       occupied.formUnion(
         cells(building.position, self.footprint(.building(building.id), facing: building.facing)))
@@ -131,7 +178,7 @@ public enum Settlement {
       occupied.formUnion(
         cells(scenery.position, self.footprint(.scenery(scenery.kind), facing: scenery.facing)))
     }
-    if case .infrastructure = kind {
+    if case .infrastructure(let material) = kind, material != .farmland {
     } else {
       occupied.formUnion(layout.pavement)
       occupied.formUnion(layout.dirtPaths)
@@ -169,7 +216,7 @@ public enum Settlement {
   }
   public static func validate(_ state: GameState) throws {
     let layout = state.layout
-    let surfaces = layout.pavement + layout.dirtPaths
+    let surfaces = layout.pavement + layout.dirtPaths + layout.farmland
     guard layout.buildings.count <= BuildingID.allCases.count,
       Set(layout.buildings.map(\.id)).count == layout.buildings.count,
       layout.scenery.count <= 128, Set(layout.scenery.map(\.id)).count == layout.scenery.count,
@@ -213,6 +260,7 @@ public enum Settlement {
     }
     for (point, kind, facing) in layout.pavement.map({ ($0, InfrastructureKind.pavement, 0) })
       + layout.dirtPaths.map({ ($0, InfrastructureKind.dirtPath, 0) })
+      + layout.farmland.map({ ($0, InfrastructureKind.farmland, 0) })
       + layout.fences.map({ ($0.position, InfrastructureKind.fence, $0.facing) })
     {
       if let problem = problem(
@@ -220,6 +268,9 @@ public enum Settlement {
       {
         throw GameError(problem)
       }
+    }
+    if state.planted && !state.harvested && state.season < 3 && layout.farmland.isEmpty {
+      throw GameError("A growing crop is missing its farmland.")
     }
     for id in BuildingID.allCases where Construction.stage(id, state: state) != .empty {
       guard position(for: id, in: layout) != nil else {

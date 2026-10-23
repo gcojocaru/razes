@@ -57,7 +57,7 @@ struct ContentView: View {
                       } else if let selection = ui.selection {
                         SelectionInspector(
                           session: session, state: state, selection: selection,
-                          beginPlacement: beginPlacement)
+                          beginPlacement: beginPlacement, buySupplies: { sheet = "materials" })
                       } else {
                         BuildPanel(
                           state: state,
@@ -96,7 +96,7 @@ struct ContentView: View {
     .sheet(item: Binding(get: { sheet.map(SheetID.init) }, set: { sheet = $0?.id })) { item in
       VStack(alignment: .leading, spacing: 18) {
         HStack {
-          Text(item.id == "materials" ? "Materials & storage" : "How to play").font(
+          Text(item.id == "materials" ? "Supplies & storage" : "How to play").font(
             .system(size: 28, design: .serif))
           Spacer()
           Button("Done") { sheet = nil }.keyboardShortcut(.cancelAction)
@@ -106,7 +106,7 @@ struct ContentView: View {
             MaterialsPanel(session: session, state: state)
           } else {
             Text(
-              "Select Ion’s portrait or a place in the settlement to assign one job each season. End season opens a forecast; confirm to resolve work, food use, shelter wear and construction. Read the report and continue. Winter returns to spring with a fresh field.\n\nSow in spring, optionally tend in summer, and harvest with Ion in autumn. Food use is 3 each season; an active woodshed reduces winter use to 2. Cold winter shelter adds 1 food. Wages, gathering, provisions and repairs compete for Ion’s one assignment. Shortages appear in the report; the settlement continues.\n\nBuild lets you place structures on free ground. Foundations finish at season end and produce from the following season. Completed buildings produce once per season and lose 20 condition afterwards. Upgrades and repairs are immediate. At zero condition a building above level 1 loses a level and returns to 60 condition; level 1 stays inactive until repaired. No timers or offline decay run.\n\nDrag or scroll to pan; pinch or Option-scroll to zoom. Home resets the camera. Rotate the map with the arrow controls. Rotate a building in its inspector, or press R while placing. Paths and fences cost 1 coin per tile or edge; click or drag to paint. R changes the fence edge. Erase removes infrastructure without refund. Escape cancels placement or closes commands.\n\nMaterials opens shared wood, stone and plank storage. Buy and craft immediately (2 wood → 1 plank), or assign Ion to gather at season end. The forecast shows what fits. House storage upgrades add 10 slots; storehouses add 40 per completed level. Discard unwanted supplies to free room.\n\nDraft assignments and settlement changes save on this Mac. The Places menu offers keyboard alternatives to map targets. Debug season preview changes scenery only; Actual season restores the simulation view."
+              "Select Ion’s portrait or a place in the settlement to assign one job each season. End season opens a forecast; confirm to resolve work, food use, shelter wear and construction. Read the report and continue. Winter returns to spring with a fresh field.\n\nSow in spring, optionally tend in summer, and harvest with Ion in autumn. Food use is 3 each season; an active woodshed reduces winter use to 2. Cold winter shelter adds 1 food. Wages, gathering, provisions and repairs compete for Ion’s one assignment. Shortages appear in the report; the settlement continues.\n\nBuild lets you place structures on free ground. Foundations finish at season end and produce from the following season. Completed buildings produce once per season and lose 20 condition afterwards. Upgrades and repairs are immediate. At zero condition a building above level 1 loses a level and returns to 60 condition; level 1 stays inactive until repaired. No timers or offline decay run.\n\nDrag or scroll to pan; pinch or Option-scroll to zoom. Home resets the camera. Rotate the map with the arrow controls. Rotate a building in its inspector, or press R while placing. Farmland, paths and fences cost 1 coin per tile or edge; click or drag to paint any shape. R changes the fence edge. Erase removes infrastructure and farmland without refund. Harvest crops and cancel farming assignments before changing farmland. At least one farmland tile is needed to sow; yields do not scale with plot size. Escape cancels placement or closes commands.\n\nSelect the house to see food, coins, wood, stone and planks. Buy supplies opens purchasing and shared storage. Food provisions use Ion’s seasonal assignment. Materials also opens shared wood, stone and plank storage. Buy and craft immediately (2 wood → 1 plank), or assign Ion to gather at season end. The forecast shows what fits. House storage upgrades add 10 slots; storehouses add 40 per completed level. Discard unwanted supplies to free room.\n\nDraft assignments and settlement changes save on this Mac. The Places menu offers keyboard alternatives to map targets. Debug season preview changes scenery only; Actual season restores the simulation view."
             ).lineSpacing(5)
           }
         }

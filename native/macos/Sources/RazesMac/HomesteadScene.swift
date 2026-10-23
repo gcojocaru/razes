@@ -163,13 +163,6 @@ import SpriteKit
     land.color = NSColor(red: 0.10, green: 0.18, blue: 0.13, alpha: 1)
     land.colorBlendFactor = 0.68
     ground.update(state: s) { texture($0) }
-    let fields = ["bare", "sown", "growing", "ripe", "harvested", "snow"]
-    let i = fields.firstIndex(of: p.field)!
-    isoSprite(
-      "field", art: "fields",
-      crop: CGRect(x: (i % 3) * 525, y: (i / 3) * 499, width: 525, height: 499),
-      point: IsometricLayout.field, width: 290, height: 185)
-    sprites["field"]?.isHidden = !s.planted && !s.assignments.values.contains(.plant)
     isoSprite(
       "house", art: atlas,
       crop: p.house == "intact"
@@ -513,8 +506,16 @@ import SpriteKit
           label: Construction.definition(id).title)
       }
     case .hotspot(let spot):
+      if spot == .field {
+        for point in previous?.layout.farmland ?? [] {
+          marker(
+            at: IsometricLayout.point(column: CGFloat(point.x), row: CGFloat(point.y)), width: 125,
+            label: "")
+        }
+        break
+      }
       let points: [Hotspot: CGPoint] = [
-        .field: IsometricLayout.field, .house: IsometricLayout.house,
+        .house: IsometricLayout.house,
         .stores: IsometricLayout.stores,
       ]
       marker(at: points[spot]!, width: spot == .field ? 200 : 100, label: spot.rawValue.capitalized)
@@ -538,7 +539,6 @@ import SpriteKit
     }
     for (spot, id) in [
       (Hotspot.stores, "store-0"), (.stores, "store-1"), (.house, "house"),
-      (.field, "field"),
     ] {
       if let node = sprites[id] { targets.append((node, .hotspot(spot))) }
     }
@@ -547,8 +547,13 @@ import SpriteKit
         targets.append((node, .scenery(scenery.id)))
       }
     }
-    return targets.filter { !$0.0.isHidden && $0.0.frame.contains(point) }
-      .max { $0.0.zPosition < $1.0.zPosition }?.1
+    if let selected = targets.filter({ !$0.0.isHidden && $0.0.frame.contains(point) })
+      .max(by: { $0.0.zPosition < $1.0.zPosition })?.1
+    {
+      return selected
+    }
+    let cell = placementPosition(at: point, kind: .infrastructure(.farmland))
+    return previous?.layout.farmland.contains(cell) == true ? .hotspot(.field) : nil
   }
   override func didMove(to view: SKView) {
     view.window?.acceptsMouseMovedEvents = true

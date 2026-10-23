@@ -199,14 +199,15 @@ import RazesCore
     _ kind: InfrastructureKind, at point: GridPosition, facing: Int = 0
   ) -> Bool {
     editSettlement { next in
-      if let problem = Settlement.problem(
-        .infrastructure(kind), at: point, layout: next.layout, facing: facing)
+      if let problem = Settlement.infrastructureProblem(
+        kind, at: point, state: next, facing: facing)
       {
         throw GameError(problem)
       }
       if kind == .erase {
         next.layout.pavement.removeAll { $0 == point }
         next.layout.dirtPaths.removeAll { $0 == point }
+        next.layout.farmland.removeAll { $0 == point }
         let edges = Set((0..<4).map { FenceSegment(position: point, facing: $0).edgeKey })
         next.layout.fences.removeAll { edges.contains($0.edgeKey) }
       } else {
@@ -215,6 +216,8 @@ import RazesCore
           next.layout.pavement.append(point)
         } else if kind == .dirtPath {
           next.layout.dirtPaths.append(point)
+        } else if kind == .farmland {
+          next.layout.farmland.append(point)
         } else {
           next.layout.fences.append(
             .init(position: point, facing: facing, style: kind == .wattleFence ? .wattle : .rail))

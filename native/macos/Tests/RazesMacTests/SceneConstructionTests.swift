@@ -203,3 +203,70 @@ extension SceneConstructionTests {
     }
   }
 }
+
+extension SceneConstructionTests {
+  @MainActor func testFarmlandPaintingFillsSkippedCellsAndAvoidsDoubleChargingInEveryView() {
+    for rotation in 0..<4 {
+      let session = GameSession(store: nil)
+      session.rotateView(rotation)
+      let scene = HomesteadScene()
+      scene.update(state: session.state, reducedMotion: true)
+      scene.onPlacement = { tool, point in
+        if case .infrastructure(let kind) = tool {
+          session.placeInfrastructure(kind, at: point)
+          scene.update(state: session.state, reducedMotion: true)
+        }
+      }
+      scene.setPlacement(.infrastructure(.farmland))
+      scene.paintInfrastructure(IsometricLayout.point(column: 1, row: 1, rotation: rotation))
+      scene.paintInfrastructure(IsometricLayout.point(column: 4, row: 3, rotation: rotation))
+      scene.paintInfrastructure(IsometricLayout.point(column: 4, row: 3, rotation: rotation))
+      XCTAssertEqual(session.state.layout.farmland.count, 15)
+      XCTAssertEqual(session.state.money, 6)
+    }
+  }
+  @MainActor func testFarmlandMovesCropArtSelectionTerrainAndWorkerToPaintedTiles() throws {
+    var state = Rules.newGame()
+    state.layout.farmland = [.init(x: 1, y: 1)]
+    let scene = HomesteadScene()
+    for rotation in 0..<4 {
+      state.layout.viewRotation = rotation
+      scene.update(state: state, reducedMotion: true)
+      let tile = try XCTUnwrap(scene.childNode(withName: "//farm:1:1"))
+      let center = IsometricLayout.point(column: 1, row: 1, rotation: rotation)
+      XCTAssertEqual(tile.position, center)
+      XCTAssertEqual(scene.selection(at: center), .hotspot(.field))
+      XCTAssertNil(scene.childNode(withName: "//field"))
+      scene.select(.hotspot(.field), buildMode: false)
+      let patch = try XCTUnwrap(scene.childNode(withName: "//tile-2-2") as? SKSpriteNode)
+      XCTAssertEqual(patch.colorBlendFactor, 0.12, accuracy: 0.001)
+    }
+    XCTAssertEqual(IsometricLayout.worker(.plant, state: state), CGPoint(x: 630, y: 549))
+    state.planted = true
+    state.season = 1
+    scene.update(state: state, reducedMotion: true)
+    let tile = try XCTUnwrap(scene.childNode(withName: "//farm:1:1"))
+    XCTAssertNotNil(tile.childNode(withName: "crop"))
+    state.season = 3
+    scene.update(state: state, reducedMotion: true)
+    XCTAssertNil(tile.childNode(withName: "crop"))
+    state.layout.farmland = []
+    scene.update(state: state, reducedMotion: true)
+    XCTAssertNil(scene.childNode(withName: "//farm:1:1"))
+  }
+  @MainActor func testCropProtectionAppearsInPlacementPreviewAndBlocksCommit() throws {
+    var state = Rules.newGame()
+    state.assignments["ion"] = .plant
+    let scene = HomesteadScene()
+    scene.update(state: state, reducedMotion: true)
+    var commits = 0
+    scene.onPlacement = { _, _ in commits += 1 }
+    scene.setPlacement(.infrastructure(.farmland))
+    scene.updatePlacement(at: IsometricLayout.point(column: 1, row: 1))
+    let label = try XCTUnwrap(
+      scene.placementOverlay.children.compactMap { $0 as? SKLabelNode }.first)
+    XCTAssertTrue(label.text?.contains("Cancel the farming assignment") == true)
+    scene.commitPlacement(at: IsometricLayout.point(column: 1, row: 1))
+    XCTAssertEqual(commits, 0)
+  }
+}

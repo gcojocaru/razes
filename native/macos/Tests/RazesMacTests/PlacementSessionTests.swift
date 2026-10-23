@@ -116,3 +116,48 @@ extension PlacementSessionTests {
     XCTAssertEqual(scene.placementPosition(at: center, kind: .scenery(.fence)), .init(x: 15, y: 14))
   }
 }
+
+extension PlacementSessionTests {
+  @MainActor func testFarmlandPaintCostsPersistsAndErasesWithoutRefund() throws {
+    let farmland = try XCTUnwrap(InfrastructureKind(rawValue: "farmland"))
+    let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let store = SaveStore(url: directory.appendingPathComponent("save.json"))
+    let session = GameSession(store: store)
+    XCTAssertTrue(session.placeInfrastructure(farmland, at: .init(x: 1, y: 1)))
+    XCTAssertEqual(session.state.money, 11)
+    let before = session.state
+    for kind in [farmland, .pavement, .dirtPath, .fence] {
+      XCTAssertFalse(session.placeInfrastructure(kind, at: .init(x: 1, y: 1)))
+      XCTAssertEqual(session.state, before)
+    }
+    XCTAssertEqual(GameSession(store: store).state, before)
+    XCTAssertTrue(session.placeInfrastructure(.erase, at: .init(x: 1, y: 1)))
+    XCTAssertEqual(session.state.money, 11)
+    XCTAssertTrue(session.placeInfrastructure(.pavement, at: .init(x: 1, y: 1)))
+    XCTAssertFalse(session.placeInfrastructure(farmland, at: .init(x: 1, y: 1)))
+  }
+  @MainActor func testFarmlandEditsProtectAssignedWorkAndGrowingCrop() throws {
+    let farmland = try XCTUnwrap(InfrastructureKind(rawValue: "farmland"))
+    let session = GameSession(store: nil)
+    session.send(
+      .init(type: "assign", revision: session.state.revision, worker: .ion, task: .plant))
+    let assigned = session.state
+    XCTAssertFalse(session.placeInfrastructure(farmland, at: .init(x: 1, y: 1)))
+    XCTAssertFalse(session.placeInfrastructure(.erase, at: .init(x: 5, y: 10)))
+    XCTAssertEqual(session.state, assigned)
+    // Roads remain editable while crops are protected.
+    XCTAssertTrue(session.placeInfrastructure(.pavement, at: .init(x: 1, y: 1)))
+    session.send(.init(type: "resolve", revision: session.state.revision))
+    session.send(.init(type: "continue", revision: session.state.revision))
+    XCTAssertFalse(session.placeInfrastructure(.erase, at: .init(x: 5, y: 10)))
+    XCTAssertFalse(session.placeInfrastructure(farmland, at: .init(x: 2, y: 1)))
+    session.send(.init(type: "resolve", revision: session.state.revision))
+    session.send(.init(type: "continue", revision: session.state.revision))
+    session.send(
+      .init(type: "assign", revision: session.state.revision, worker: .ion, task: .harvest))
+    session.send(.init(type: "resolve", revision: session.state.revision))
+    session.send(.init(type: "continue", revision: session.state.revision))
+    XCTAssertTrue(session.placeInfrastructure(.erase, at: .init(x: 5, y: 10)))
+  }
+}

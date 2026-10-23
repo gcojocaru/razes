@@ -58,7 +58,10 @@ enum IsometricLayout {
   static func worker(_ task: TaskID, state: GameState) -> CGPoint {
     let base: CGPoint
     switch task {
-    case .plant, .tend, .harvest: base = CGPoint(x: field.x + 30, y: field.y - 45)
+    case .plant, .tend, .harvest:
+      let tile = state.layout.farmland.first
+      let target = tile.map { point(column: CGFloat($0.x), row: CGFloat($0.y)) } ?? house
+      base = CGPoint(x: target.x + 30, y: target.y - 45)
     case .repair: base = CGPoint(x: house.x + 45, y: house.y - 4)
     case .paid: base = point(column: 12, row: 8)
     case .supplies: base = stores
