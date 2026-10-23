@@ -1,5 +1,11 @@
 # Native macOS validation — 2026-10-23
 
+## Planting clarity follow-up — 2026-10-23
+
+- Native suite: **95 tests passed** (47 core, 48 macOS). Four new tests cover closed-season reasons, already-planted fields, the last Spring report, and every eligible Spring week plus missing requirements. Before implementation, three tests reproduced generic or misleading availability messages.
+- The field and Ion inspector share persistent planting controls; unavailable actions remain visible with reasons. The seed market repeats the Spring-only window; stale seasonal food-purchase wording now describes weekly resolution.
+
+
 ## Weekly calendar, seeds and painted-field harvest — 2026-10-23
 
 - Integrated on main `85b740a`, preserving the house supplies panel and painted farmland. All tiles share one crop cycle and fixed seed costs/yields; this is the existing area limitation, now documented alongside the weekly rules.

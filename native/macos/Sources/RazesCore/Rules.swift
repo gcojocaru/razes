@@ -121,10 +121,8 @@ public enum Rules {
     return p
   }
   public static func assignmentProblem(_ s: GameState, worker: WorkerID, task: TaskID) -> String? {
+    if task == .plant, let reason = Farming.plantingProblem(s) { return reason }
     if s.phase != .work { return "Continue to the next week before assigning work." }
-    if task == .plant && s.layout.farmland.isEmpty {
-      return "Paint farmland in Construction before sowing."
-    }
     if !taskOptions(s).contains(where: { $0.id == task }) {
       return "That task is unavailable this week."
     }

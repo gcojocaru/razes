@@ -12,9 +12,9 @@ struct MaterialsPanel: View {
     VStack(alignment: .leading, spacing: 16) {
       Text("Food: \(state.food) · Coins: \(state.money)").font(.headline)
       Text("FOOD PROVISIONS").font(.headline)
-      Text("\(Rules.suppliesGain(state)) food · 4 coins · arrives at season end")
+      Text("\(Rules.suppliesGain(state)) food · 4 coins · arrives at week end")
       Text(
-        "Ion buys provisions instead of another seasonal job. Food does not use material storage slots."
+        "Ion buys provisions instead of another weekly job. Food does not use material storage slots."
       )
       .font(.caption).foregroundStyle(GamePalette.muted)
       if state.phase == .work {
@@ -26,7 +26,7 @@ struct MaterialsPanel: View {
         }.disabled(reason != nil)
         if let reason { Text(reason).font(.caption).foregroundStyle(GamePalette.muted) }
       } else {
-        Text("Continue to seasonal planning to buy food.").font(.caption)
+        Text("Continue to weekly planning to buy food.").font(.caption)
       }
       Divider()
       Text("Shared storage: \(state.materials.total) / \(Materials.capacity(state))")
@@ -53,7 +53,7 @@ struct MaterialsPanel: View {
         }.disabled(freeCoins < quantity || state.seeds > 100000 - quantity)
       }
       Text(
-        "Sow 4 seeds in spring. Grain ripens after 24 weeks; harvest returns food and next year’s seeds."
+        "Planting window: Spring only — all 12 weeks, once per year. Plant 4 seeds through Places → Field. Grain ripens after 24 weeks."
       )
       .font(.caption).foregroundStyle(GamePalette.muted)
       ForEach(MaterialID.allCases, id: \.self) { id in

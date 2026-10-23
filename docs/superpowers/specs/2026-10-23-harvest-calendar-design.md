@@ -15,3 +15,8 @@ Food consumption is monthly: 3 at weeks 4, 8 and 12 (winter woodshed/cold modifi
 Update core state, rules, validation, presentation, forecasts, native controls/help, seed purchases, save filename, tests and documentation. Preserve stale-action protection, atomic edits, storage and money reservations, accessibility and reduced-motion behavior. No crop catalog, multiple fields, offline timers or new assets/dependencies.
 
 Per the user's project rule, the app is unreleased and progress may reset: use schema 9 and `settlement-v9.json`, with no migration or compatibility layer.
+
+
+## Planting clarity follow-up
+
+Keep a shared Plant seeds control visible in the field and Ion inspectors. Show Spring-only planting across all 12 weeks, once per year, and the four-seed cost. During eligible planning show weeks remaining and a last-week warning. When unavailable, explain next Spring, existing crops, missing farmland, seed shortages, or continuing from a report. Once assigned, show how to confirm the week and provide Cancel sowing. The seed purchasing panel repeats the planting window. Gameplay timing and costs stay unchanged.

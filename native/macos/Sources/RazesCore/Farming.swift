@@ -8,6 +8,23 @@ public enum Farming {
   public static let seedCost = 4
   public static let growingWeeks = 24
 
+  public static func plantingProblem(_ s: GameState) -> String? {
+    if s.planted {
+      return s.harvested
+        ? "This year’s harvest is complete. Plant again next Spring."
+        : "This field is already planted. Plant again next Spring."
+    }
+    if s.season != 0 || (s.phase == .summary && s.isSeasonEnd) {
+      return "Planting is closed. Plant grain seeds next Spring."
+    }
+    if s.phase != .work { return "Continue to the next week to assign planting." }
+    if s.layout.farmland.isEmpty { return "Paint farmland in Construction before planting." }
+    if s.seeds < seedCost {
+      return "Planting needs \(seedCost) grain seeds; you have \(s.seeds). Buy seeds first."
+    }
+    return nil
+  }
+
   public static func stage(_ s: GameState) -> CropStage {
     if s.season == 3 { return .snow }
     if s.harvested { return .harvested }
