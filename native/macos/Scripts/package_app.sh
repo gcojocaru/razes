@@ -12,7 +12,7 @@ APP="$ROOT/build/Razes.app"
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN/RazesMac" "$APP/Contents/MacOS/RazesMac"
-for resource in Razes_RazesCore.bundle Razes_RazesMac.bundle; do
+for resource in Razes_RazesMac.bundle; do
     cp -R "$BIN/$resource" "$APP/Contents/Resources/"
 done
 cat > "$APP/Contents/Info.plist" <<'PLIST'
@@ -35,7 +35,6 @@ codesign --force --deep --sign - "$APP"
 test -x "$APP/Contents/MacOS/RazesMac"
 test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP/Contents/Info.plist")" = com.razes.game
 test "$(/usr/libexec/PlistBuddy -c 'Print :LSMinimumSystemVersion' "$APP/Contents/Info.plist")" = 14.0
-test -f "$APP/Contents/Resources/Razes_RazesCore.bundle/Contents/Resources/content.json" || test -f "$APP/Contents/Resources/Razes_RazesCore.bundle/content.json"
 test -f "$APP/Contents/Resources/Razes_RazesMac.bundle/Contents/Resources/Resources/Art/spring.png" || test -f "$APP/Contents/Resources/Razes_RazesMac.bundle/Resources/Art/spring.png"
 for art in settlement-rear-v2 settlement-rear-winter settlement-buildings settlement-buildings-winter terrain-grass terrain-earth terrain-snow woodshed-construction woodshed-complete woodshed-winter cellar-construction cellar-complete cellar-winter; do
     test -f "$APP/Contents/Resources/Razes_RazesMac.bundle/Contents/Resources/Resources/Art/$art.png" || test -f "$APP/Contents/Resources/Razes_RazesMac.bundle/Resources/Art/$art.png"

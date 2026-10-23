@@ -70,7 +70,7 @@ public enum Materials {
   }
   public static func available(_ s: GameState) -> MaterialStock { s.materials - reserved(s) }
   public static func assignments(_ s: GameState) -> [String: TaskID] {
-    s.phase == .ending ? s.gatheringAssignments : s.assignments
+    s.assignments
   }
   public static func gatheringTask(_ id: TaskID) -> Task? {
     guard id == .gatherWood || id == .gatherStone else { return nil }

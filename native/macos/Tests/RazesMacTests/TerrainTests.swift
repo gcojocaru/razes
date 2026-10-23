@@ -32,11 +32,11 @@ final class TerrainTests: XCTestCase {
     let remote = try XCTUnwrap(scene.childNode(withName: "//tile-0-0") as? SKSpriteNode)
     let remoteGrass = remote.texture
     state.layout.buildings = [.init(id: .woodshed, position: .init(x: 1, y: 1))]
-    state.assignments["ana"] = .buildWoodshed
+    state.assignments["ion"] = .buildWoodshed
     scene.update(state: state, reducedMotion: true)
     XCTAssertFalse(patch.texture === grass)
     XCTAssertTrue(remote.texture === remoteGrass)
-    state.assignments["ana"] = .rest
+    state.assignments["ion"] = .rest
     scene.update(state: state, reducedMotion: true)
     XCTAssertTrue(patch.texture === grass)
   }

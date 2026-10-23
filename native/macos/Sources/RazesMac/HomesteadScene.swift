@@ -138,7 +138,7 @@ import SpriteKit
     node.position = id == "land" ? point : projected(point)
     node.zPosition =
       id == "land"
-      ? z : 1000 - node.position.y + (id.hasPrefix("worker-") || id == "visitor" ? 10 : 0)
+      ? z : 1000 - node.position.y + (id.hasPrefix("worker-") ? 10 : 0)
     node.isHidden = false
     return node
   }
@@ -290,7 +290,8 @@ import SpriteKit
         "worker-\(worker.rawValue)", art: "people",
         crop: CGRect(x: j * 307, y: 0, width: 307, height: 590), x: x, y: y, w: 34, h: 65,
         z: 1000 - (760 - y) + 10)
-      if old.map({ Materials.assignments($0)[worker.rawValue] }) != task || old?.phase != s.phase || old == nil
+      if old.map({ Materials.assignments($0)[worker.rawValue] }) != task || old?.phase != s.phase
+        || old == nil
         || motionChanged || moved || reduced
       {
         person.removeAllActions()
@@ -302,7 +303,8 @@ import SpriteKit
           .repeatForever(
             .sequence([.scaleY(to: 1.012, duration: 1.4), .scaleY(to: 1, duration: 1.4)])))
       }
-      if old.map({ Materials.assignments($0)[worker.rawValue] }) != task || old?.phase != s.phase || old == nil
+      if old.map({ Materials.assignments($0)[worker.rawValue] }) != task || old?.phase != s.phase
+        || old == nil
         || motionChanged || moved
       {
         updateTool(
@@ -311,12 +313,6 @@ import SpriteKit
           depth: person.zPosition + 1)
       }
     }
-    let visitor = sprite(
-      "visitor", art: "people",
-      crop: CGRect(x: (p.visitor == "dumitru" ? 4 : 3) * 307, y: 0, width: 307, height: 590),
-      x: IsometricLayout.visitor.x, y: 760 - IsometricLayout.visitor.y, w: 34, h: 65,
-      z: 1010 - IsometricLayout.visitor.y)
-    visitor.isHidden = p.visitor == nil
     updateInfrastructure(state: s)
     updateWeather(p.weather)
     if let old, animateChanges && !reduced && old.revision != s.revision {
@@ -368,7 +364,7 @@ import SpriteKit
     tool.position = point
     tool.zPosition = depth
     world.addChild(tool)
-    guard !reduced && (phase == .work || phase == .consequence) else { return }
+    guard !reduced && phase == .work else { return }
     tool.run(
       .repeatForever(
         .sequence([.rotate(toAngle: 0.3, duration: 0.4), .rotate(toAngle: -0.3, duration: 0.4)])))
@@ -519,7 +515,7 @@ import SpriteKit
     case .hotspot(let spot):
       let points: [Hotspot: CGPoint] = [
         .field: IsometricLayout.field, .house: IsometricLayout.house,
-        .stores: IsometricLayout.stores, .visitor: IsometricLayout.visitor,
+        .stores: IsometricLayout.stores,
       ]
       marker(at: points[spot]!, width: spot == .field ? 200 : 100, label: spot.rawValue.capitalized)
     case .scenery(let id):
@@ -541,7 +537,7 @@ import SpriteKit
       if let node = sprites["plot-\(id.rawValue)"] { targets.append((node, .building(id))) }
     }
     for (spot, id) in [
-      (Hotspot.visitor, "visitor"), (.stores, "store-0"), (.stores, "store-1"), (.house, "house"),
+      (Hotspot.stores, "store-0"), (.stores, "store-1"), (.house, "house"),
       (.field, "field"),
     ] {
       if let node = sprites[id] { targets.append((node, .hotspot(spot))) }

@@ -15,7 +15,7 @@ final class SceneConstructionTests: XCTestCase {
     XCTAssertTrue(scene.childNode(withName: "weather") === weather)
     var completed = state
     completed.buildings = [BuildingRecord(id: .woodshed, completedSeason: 0)]
-    completed.phase = .consequence
+    completed.phase = .summary
     scene.update(state: completed, reducedMotion: false)
     XCTAssertEqual(scene.completionEffectCount, 1)
     scene.update(state: completed, reducedMotion: false)

@@ -47,7 +47,6 @@ enum IsometricLayout {
   static let house = center(Settlement.house, width: 3, height: 3)
   static let field = center(Settlement.farm, width: 3, height: 3)
   static let stores = point(column: 9, row: 8)
-  static let visitor = point(column: 9, row: 7)
   static let woodshed = center(GridPosition(x: 3, y: 8), kind: .building(.woodshed))
   static let cellar = center(GridPosition(x: 10, y: 5), kind: .building(.cellar))
   static func plot(_ id: BuildingID, state: GameState? = nil) -> CGPoint {
@@ -62,7 +61,6 @@ enum IsometricLayout {
     case .plant, .tend, .harvest: base = CGPoint(x: field.x + 30, y: field.y - 45)
     case .repair: base = CGPoint(x: house.x + 45, y: house.y - 4)
     case .paid: base = point(column: 12, row: 8)
-    case .help: base = visitor
     case .supplies: base = stores
     case .gatherWood: base = point(column: 1, row: 12)
     case .gatherStone: base = point(column: 14, row: 3)

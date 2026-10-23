@@ -3,122 +3,52 @@ import XCTest
 @testable import RazesCore
 
 final class RulesTests: XCTestCase {
-  func testInitialStateMatchesReference() throws {
-    let state = try Reference.load().initial
-    XCTAssertEqual(Rules.newGame(), state)
+  func testStaleActionsAndDuplicateResolutionDoNotApply() throws {
+    let s = Rules.newGame()
+    XCTAssertThrowsError(try Rules.dispatch(s, action: .init(type: "resolve", revision: 1)))
+    XCTAssertThrowsError(try Rules.dispatch(s, action: .init(type: "choose", revision: 0)))
+    XCTAssertThrowsError(try Rules.dispatch(s, action: .init(type: "settlement", revision: 0)))
+    let summary = try Rules.dispatch(s, action: .init(type: "resolve", revision: 0))
+    XCTAssertThrowsError(
+      try Rules.dispatch(summary, action: .init(type: "resolve", revision: summary.revision)))
+    XCTAssertThrowsError(
+      try Rules.dispatch(
+        summary,
+        action: .init(type: "assign", revision: summary.revision, worker: .ion, task: .paid)))
   }
-}
-
-struct Reference: Decodable {
-  var initial: GameState
-  struct Run: Decodable {
-    var steps: [Step]
-    var ending: Ending
-  }
-  struct Step: Decodable {
-    var action: Action
-    var state: GameState
-    var projection: Projection
-    var presentation: Presentation
-  }
-  var runs: [Run]
-  static func normalized(_ data: Data) throws -> Data {
-    func visit(_ value: Any) -> Any {
-      if var object = value as? [String: Any] {
-        object = object.mapValues(visit)
-        if object["assignments"] != nil && object["phase"] != nil {
-          object["buildings"] = []
-          object["version"] = 7
-          object["materials"] = ["wood": 6, "stone": 4, "planks": 0]
-          object["houseLevel"] = 1
-          object["gatheringAssignments"] = ["ion": "rest", "ana": "rest", "petru": "rest"]
-          object["layout"] = [
-            "buildings": [], "scenery": [], "pavement": [], "dirtPaths": [], "fences": [],
-            "viewRotation": 0,
-          ]
-          object["settlementSeasons"] = 0
-        }
-        return object
-      }
-      if let array = value as? [Any] { return array.map(visit) }
-      return value
+  func testSeveralYearsRoundTripAndMatchForecastsIncludingShortages() throws {
+    var s = Rules.newGame()
+    for turn in 0..<24 {
+      let task: TaskID = turn < 12 ? [.plant, .tend, .harvest, .repair][turn % 4] : .rest
+      s = try ConstructionTests().assign(s, .ion, task)
+      XCTAssertEqual(try SaveCodec.decode(SaveCodec.encode(s)), s)
+      let p = Rules.preview(s)
+      s = try Rules.dispatch(s, action: .init(type: "resolve", revision: s.revision))
+      XCTAssertEqual(s.food, max(0, p.foodAfter))
+      XCTAssertEqual(s.money, p.moneyAfter)
+      XCTAssertEqual(s.house, p.houseAfter)
+      XCTAssertEqual(s.report?.deficit, max(0, -p.foodAfter))
+      XCTAssertEqual(try SaveCodec.decode(SaveCodec.encode(s)), s)
+      s = try Rules.dispatch(s, action: .init(type: "continue", revision: s.revision))
+      XCTAssertEqual(s.turn, turn + 1)
+      XCTAssertEqual(s.assignments, ["ion": .rest])
+      XCTAssertEqual(try SaveCodec.decode(SaveCodec.encode(s)), s)
     }
-    return try JSONSerialization.data(
-      withJSONObject: visit(JSONSerialization.jsonObject(with: data)))
+    XCTAssertEqual(s.year, 6)
   }
-  static func load() throws -> Reference {
-    try JSONDecoder().decode(
-      Self.self,
-      from: normalized(
-        Data(
-          contentsOf: Bundle.module.url(
-            forResource: "parity", withExtension: "json", subdirectory: "Fixtures")!)))
-  }
-}
-extension RulesTests {
-  func testReferenceYearsMatchEveryStateAndForecast() throws {
-    let reference = try Reference.load()
-    var endings = Set<String>()
-    var ox = Set<String>()
-    var fields = Set<String>()
-    for run in reference.runs {
-      var state = Rules.newGame()
-      for step in run.steps {
-        state = try Rules.dispatch(state, action: step.action)
-        XCTAssertEqual(state, step.state)
-        XCTAssertEqual(Rules.preview(state), step.projection)
-        XCTAssertEqual(Presentation(state: state), step.presentation)
-        fields.insert(Presentation(state: state).field)
-      }
-      XCTAssertEqual(Rules.ending(state), run.ending)
-      endings.insert(run.ending.category)
-      ox.insert(state.ox)
-    }
-    XCTAssertEqual(endings, ["secure", "cost", "crisis"])
-    XCTAssertTrue(Set(["honoured", "broken", "paid", "declined"]).isSubset(of: ox))
-    XCTAssertEqual(fields.count, 6)
-  }
-  func testRejectedActionsPreserveInputAndRevision() throws {
-    let original = Rules.newGame()
-    XCTAssertThrowsError(try Rules.dispatch(original, action: Action(type: "resolve", revision: 0)))
-    XCTAssertThrowsError(
-      try Rules.dispatch(
-        original, action: Action(type: "choose", revision: 1, event: "spring-ox", choice: "borrow"))
-    )
-    XCTAssertThrowsError(
-      try Rules.dispatch(
-        original, action: Action(type: "choose", revision: 0, event: "winter-friend", choice: "ask")
-      ))
-    let work = try Rules.dispatch(
-      original, action: Action(type: "choose", revision: 0, event: "spring-ox", choice: "borrow"))
-    let planted = try Rules.dispatch(
-      work, action: Action(type: "assign", revision: work.revision, worker: .ion, task: .plant))
-    XCTAssertThrowsError(
-      try Rules.dispatch(
-        planted,
-        action: Action(type: "assign", revision: planted.revision, worker: .ana, task: .plant)))
-    let resolved = try Rules.dispatch(
-      planted, action: Action(type: "resolve", revision: planted.revision))
-    XCTAssertThrowsError(
-      try Rules.dispatch(resolved, action: Action(type: "resolve", revision: resolved.revision)))
-    XCTAssertEqual(original, Rules.newGame())
-    for run in try Reference.load().runs.prefix(80) {
-      let end = run.steps.last!.state
-      XCTAssertThrowsError(
-        try Rules.dispatch(end, action: Action(type: "continue", revision: end.revision)))
-      for step in run.steps where step.state.phase == .work {
-        let state = step.state
-        if state.reservedWorker == "petru" {
-          XCTAssertNotNil(Rules.assignmentProblem(state, worker: .petru, task: .paid))
-        }
-        if state.season == 2 && state.planted {
-          var partial = state
-          partial.assignments = ["ion": .harvest, "ana": .rest, "petru": .rest]
-          XCTAssertFalse(Rules.preview(partial).errors.isEmpty)
-          partial.assignments = ["ion": .harvest, "ana": .harvest, "petru": .harvest]
-          XCTAssertFalse(Rules.preview(partial).errors.isEmpty)
-        }
-      }
+  func testHarvestCountsOnceWithAndWithoutTending() throws {
+    for tended in [false, true] {
+      var s = Rules.newGame()
+      s.season = 2
+      s.planted = true
+      s.tended = tended
+      s = try ConstructionTests().assign(s, .ion, .harvest)
+      XCTAssertEqual(Rules.preview(s).foodGain, tended ? 28 : 20)
+      XCTAssertEqual(Rules.taskOptions(s).first { $0.id == .harvest }?.workers, 1)
+      let p = Rules.preview(s)
+      s = try Rules.dispatch(s, action: .init(type: "resolve", revision: s.revision))
+      XCTAssertEqual(s.food, p.foodAfter)
+      XCTAssertTrue(s.harvested)
     }
   }
 }

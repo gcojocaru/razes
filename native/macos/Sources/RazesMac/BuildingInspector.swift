@@ -48,7 +48,7 @@ struct BuildingInspector: View {
           "Wear: 20 condition per season. At zero: lose one level and return to 60 condition. Level 1 becomes inactive until repaired."
         ).font(.caption).foregroundStyle(GamePalette.muted)
       } else if Construction.stage(id, state: state) == .planned {
-        Text("Legacy seasonal plan · completes when its worker's season resolves.").font(.caption)
+        Text("Seasonal plan · completes when Ion’s work resolves.").font(.caption)
         Button("Remove seasonal plan") { session.removePlan(id) }
       } else {
         Text(Construction.priceText(id)).foregroundStyle(GamePalette.gold)
