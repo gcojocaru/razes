@@ -51,20 +51,91 @@ import RazesCore
   func send(_ action: Action) {
     guard !needsRecovery else { return }
     do {
-      state = try Rules.dispatch(state, action: action)
-      acceptedRevision = state.revision
-      error = nil
-      do {
-        guard let store else { throw GameError("The save location is unavailable.") }
-        try store.save(state)
-        storageWarning = nil
-        hasSaved = true
-      } catch {
-        storageWarning =
-          "Your run continues, but changes could not be saved: \(error.localizedDescription)"
-      }
-      audio.cue()
+      accept(try Rules.dispatch(state, action: action))
     } catch { self.error = error.localizedDescription }
+  }
+  private func accept(_ next: GameState) {
+    state = next
+    acceptedRevision = next.revision
+    error = nil
+    do {
+      guard let store else { throw GameError("The save location is unavailable.") }
+      try store.save(state)
+      storageWarning = nil
+      hasSaved = true
+    } catch {
+      storageWarning =
+        "Your run continues, but changes could not be saved: \(error.localizedDescription)"
+    }
+    audio.cue()
+  }
+  @discardableResult private func editSettlement(_ edit: (inout GameState) throws -> Void) -> Bool {
+    guard !needsRecovery else { return false }
+    do {
+      var next = state
+      try edit(&next)
+      next.revision += 1
+      _ = try SaveCodec.decode(SaveCodec.encode(next))
+      accept(next)
+      return true
+    } catch {
+      self.error = error.localizedDescription
+      return false
+    }
+  }
+  @discardableResult func placeBuilding(
+    _ id: BuildingID, at position: GridPosition, instant: Bool = false
+  ) -> Bool {
+    editSettlement { next in
+      if !instant && next.phase != .work {
+        throw GameError("Place construction during seasonal planning.")
+      }
+      if let problem = Settlement.problem(.building(id), at: position, layout: next.layout) {
+        throw GameError(problem)
+      }
+      next.layout.buildings.removeAll { $0.id == id }
+      next.layout.buildings.append(.init(id: id, position: position))
+      if instant && !next.buildings.contains(where: { $0.id == id }) {
+        next.buildings.append(.init(id: id, completedSeason: next.season, debugPlaced: true))
+        for worker in WorkerID.allCases
+        where next.assignments[worker.rawValue] == Construction.definition(id).task {
+          next.assignments[worker.rawValue] = .rest
+        }
+      }
+    }
+  }
+  @discardableResult func placeScenery(_ kind: SceneryKind, at position: GridPosition) -> Bool {
+    editSettlement { next in
+      if let problem = Settlement.problem(.scenery(kind), at: position, layout: next.layout) {
+        throw GameError(problem)
+      }
+      next.layout.scenery.append(.init(kind: kind, position: position))
+    }
+  }
+  func finishConstruction(_ id: BuildingID) {
+    guard
+      let position = Settlement.position(for: id, in: state.layout)
+        ?? Settlement.firstAvailable(id, in: state.layout)
+    else {
+      error = "No free space remains."
+      return
+    }
+    placeBuilding(id, at: position, instant: true)
+  }
+  func removePlan(_ id: BuildingID) {
+    editSettlement { next in
+      guard !next.buildings.contains(where: { $0.id == id }) else {
+        throw GameError("Completed buildings cannot be removed from a live household.")
+      }
+      next.layout.buildings.removeAll { $0.id == id }
+      for worker in WorkerID.allCases
+      where next.assignments[worker.rawValue] == Construction.definition(id).task {
+        next.assignments[worker.rawValue] = .rest
+      }
+    }
+  }
+  func removeScenery(_ id: String? = nil) {
+    editSettlement { next in next.layout.scenery.removeAll { id == nil || $0.id == id } }
   }
   func startFresh() {
     let fresh = Rules.newGame()

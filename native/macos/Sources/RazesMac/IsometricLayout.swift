@@ -10,26 +10,43 @@ enum IsometricLayout {
     let vertical = (660 - point.y) / 33
     return CGPoint(x: (horizontal + vertical) / 2, y: (vertical - horizontal) / 2)
   }
-  static let house = point(column: 3.3, row: 2.5)
-  static let barn = point(column: 0.8, row: 3.4)
-  static let field = point(column: 5, row: 5.2)
-  static let well = point(column: 3.8, row: 3.7)
-  static let stores = point(column: 4.2, row: 2.6)
-  static let woodshed = point(column: 1.5, row: 5)
-  static let cellar = point(column: 5.2, row: 0.8)
-  static let visitor = point(column: 5, row: 2.7)
-  static let fence = point(column: 6.5, row: 5.5)
-  static func plot(_ id: BuildingID) -> CGPoint { id == .woodshed ? woodshed : cellar }
-  static func worker(_ task: TaskID) -> CGPoint {
-    switch task {
-    case .plant, .tend, .harvest: point(column: 5.4, row: 5.2)
-    case .repair: point(column: 3.8, row: 2.1)
-    case .paid: point(column: 6.7, row: 2)
-    case .help: point(column: 5.5, row: 2.1)
-    case .supplies: point(column: 4.8, row: 3.1)
-    case .buildWoodshed: point(column: 2.2, row: 5)
-    case .buildCellar: point(column: 5.6, row: 1.5)
-    case .rest: point(column: 4.1, row: 2.7)
+  static func center(_ point: GridPosition, width: Int, height: Int) -> CGPoint {
+    self.point(
+      column: CGFloat(point.x) + CGFloat(width - 1) / 2,
+      row: CGFloat(point.y) + CGFloat(height - 1) / 2)
+  }
+  static func center(_ point: GridPosition, kind: StructureKind) -> CGPoint {
+    let size = Settlement.footprint(kind)
+    return center(point, width: size.width, height: size.height)
+  }
+  static let house = center(Settlement.house, width: 3, height: 3)
+  static let field = center(Settlement.farm, width: 3, height: 3)
+  static let stores = point(column: 9, row: 8)
+  static let visitor = point(column: 9, row: 7)
+  static let woodshed = center(GridPosition(x: 3, y: 8), kind: .building(.woodshed))
+  static let cellar = center(GridPosition(x: 10, y: 5), kind: .building(.cellar))
+  static func plot(_ id: BuildingID, state: GameState? = nil) -> CGPoint {
+    if let state, let position = Settlement.position(for: id, in: state.layout) {
+      return center(position, kind: .building(id))
     }
+    return id == .woodshed ? woodshed : cellar
+  }
+  static func worker(_ task: TaskID, state: GameState) -> CGPoint {
+    let base: CGPoint
+    switch task {
+    case .plant, .tend, .harvest: base = CGPoint(x: field.x + 30, y: field.y - 45)
+    case .repair: base = CGPoint(x: house.x + 45, y: house.y - 4)
+    case .paid: base = point(column: 12, row: 8)
+    case .help: base = visitor
+    case .supplies: base = stores
+    case .buildWoodshed:
+      let p = plot(.woodshed, state: state)
+      base = CGPoint(x: p.x + 65, y: p.y - 20)
+    case .buildCellar:
+      let p = plot(.cellar, state: state)
+      base = CGPoint(x: p.x + 55, y: p.y - 20)
+    case .rest: base = CGPoint(x: house.x + 30, y: house.y - 30)
+    }
+    return base
   }
 }

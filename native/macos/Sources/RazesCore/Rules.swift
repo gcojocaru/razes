@@ -213,6 +213,14 @@ public enum Rules {
         throw GameError("Unknown work assignment.")
       }
       if let problem = assignmentProblem(s, worker: worker, task: task) { throw GameError(problem) }
+      if let id = Construction.building(for: task),
+        Settlement.position(for: id, in: s.layout) == nil
+      {
+        guard let point = Settlement.firstAvailable(id, in: s.layout) else {
+          throw GameError("There is no free space for that building.")
+        }
+        s.layout.buildings.append(.init(id: id, position: point))
+      }
       s.assignments[worker.rawValue] = task
     case "resolve":
       guard s.phase == .work else { throw GameError("Work has already been resolved.") }

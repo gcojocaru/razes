@@ -4,7 +4,12 @@ import SpriteKit
 
 @MainActor final class TerrainLayer: SKNode {
   private var tiles: [SKSpriteNode] = []
-  private var signature = ""
+  private struct Signature: Equatable {
+    var season: Int
+    var construction: [BuildingPlacement]
+    var farm: Bool
+  }
+  private var signature: Signature?
   private var surfaces: [String: SKTexture] = [:]
   private var edges: [SKShapeNode] = []
   override init() {
@@ -12,12 +17,12 @@ import SpriteKit
     name = "isometric-ground"
     for (index, corners) in [
       [
-        CGPoint(x: 72, y: 412.5), CGPoint(x: 600, y: 148.5), CGPoint(x: 600, y: 130.5),
-        CGPoint(x: 72, y: 394.5),
+        CGPoint(x: -456, y: 165), CGPoint(x: 600, y: -363), CGPoint(x: 600, y: -381),
+        CGPoint(x: -456, y: 147),
       ],
       [
-        CGPoint(x: 600, y: 148.5), CGPoint(x: 1128, y: 412.5), CGPoint(x: 1128, y: 394.5),
-        CGPoint(x: 600, y: 130.5),
+        CGPoint(x: 600, y: -363), CGPoint(x: 1656, y: 165), CGPoint(x: 1656, y: 147),
+        CGPoint(x: 600, y: -381),
       ],
     ].enumerated() {
       let path = CGMutablePath()
@@ -39,11 +44,12 @@ import SpriteKit
       destinationPositions: [
         SIMD2<Float>(0, 0.5), SIMD2<Float>(0.5, 0), SIMD2<Float>(0.5, 1), SIMD2<Float>(1, 0.5),
       ])
-    for column in 0..<16 {
-      for row in 0..<16 {
+    for column in 0..<32 {
+      for row in 0..<32 {
         let tile = SKSpriteNode()
         tile.name = "tile-\(column)-\(row)"
-        tile.position = IsometricLayout.point(column: CGFloat(column) / 2, row: CGFloat(row) / 2)
+        tile.position = IsometricLayout.point(
+          column: (CGFloat(column) - 0.5) / 2, row: (CGFloat(row) - 0.5) / 2)
         tile.size = CGSize(width: 66.2, height: 33.1)
         tile.warpGeometry = warp
         tiles.append(tile)
@@ -53,20 +59,25 @@ import SpriteKit
   }
   required init?(coder: NSCoder) { fatalError("Not used") }
   func update(state: GameState, texture: (String) -> SKTexture?) {
-    let woodshed = Construction.stage(.woodshed, state: state) != .empty
-    let cellar = Construction.stage(.cellar, state: state) != .empty
-    let next = "\(state.season)-\(woodshed)-\(cellar)"
+    let next = Signature(
+      season: state.season,
+      construction: state.layout.buildings.filter {
+        Construction.stage($0.id, state: state) != .empty
+      }, farm: state.planted || state.assignments.values.contains(.plant))
     guard next != signature else { return }
     signature = next
     for edge in edges { edge.fillTexture = texture("terrain-earth") }
-    for column in 0..<16 {
-      for row in 0..<16 {
-        let tile = tiles[column * 16 + row]
-        let path = row == 7 || column == 8
-        let field = (8...11).contains(column) && (9...12).contains(row)
-        let construction =
-          woodshed && (1...5).contains(column) && (9...11).contains(row)
-          || cellar && (9...12).contains(column) && (0...3).contains(row)
+    for column in 0..<32 {
+      for row in 0..<32 {
+        let tile = tiles[column * 32 + row]
+        let path =
+          row == 18 && column >= 4 && column <= 29 || column == 18 && row >= 12 && row <= 29
+        let logical = GridPosition(x: column / 2, y: row / 2)
+        let field = next.farm && (5...7).contains(logical.x) && (10...12).contains(logical.y)
+        let construction = next.construction.contains { building in
+          logical.x >= building.position.x && logical.x < building.position.x + 2
+            && logical.y >= building.position.y && logical.y < building.position.y + 2
+        }
         let winter = state.season == 3
         let earth = path || field || construction
         let material = winter && !path ? "terrain-snow" : earth ? "terrain-earth" : "terrain-grass"

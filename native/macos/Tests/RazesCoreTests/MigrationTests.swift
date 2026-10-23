@@ -7,6 +7,7 @@ final class MigrationTests: XCTestCase {
     var object = try JSONSerialization.jsonObject(with: SaveCodec.encode(state)) as! [String: Any]
     object["version"] = 1
     object.removeValue(forKey: "buildings")
+    object.removeValue(forKey: "layout")
     return try JSONSerialization.data(withJSONObject: object)
   }
   func testLegacyHouseholdsMigrateAtEveryPhase() throws {
@@ -14,8 +15,10 @@ final class MigrationTests: XCTestCase {
       for step in run.steps {
         let raw = try legacy(step.state)
         let migrated = try SaveCodec.decode(raw)
-        XCTAssertEqual(migrated, step.state)
-        XCTAssertEqual(migrated.version, 2)
+        var expected = step.state
+        expected.layout = Settlement.legacyLayout(for: expected)
+        XCTAssertEqual(migrated, expected)
+        XCTAssertEqual(migrated.version, 3)
         XCTAssertTrue(migrated.buildings.isEmpty)
       }
     }
@@ -29,7 +32,7 @@ final class MigrationTests: XCTestCase {
   }
   func testV2RequiresRecordsAndRejectsImpossibleBuildings() throws {
     let original = Rules.newGame()
-    XCTAssertEqual(original.version, 2)
+    XCTAssertEqual(original.version, 3)
     var object =
       try JSONSerialization.jsonObject(with: SaveCodec.encode(original)) as! [String: Any]
     object.removeValue(forKey: "buildings")

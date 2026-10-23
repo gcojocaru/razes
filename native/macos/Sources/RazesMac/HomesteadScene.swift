@@ -6,7 +6,7 @@ import SpriteKit
   var onSelection: ((SceneSelection) -> Void)?
   private(set) var resourceWarning: String?
   private(set) var completionEffectCount = 0
-  private var previous: GameState?
+  private(set) var previous: GameState?
   private var reduced = false
   private var selection: SceneSelection?
   private var buildMode = false
@@ -18,11 +18,13 @@ import SpriteKit
   private let weather = SKNode(), smoke = SKNode(), markers = SKNode(), feedback = SKNode()
   private var weatherSignature = ""
   private var workerPositions: [WorkerID: CGPoint] = [:]
-  static let plotPositions: [BuildingID: CGPoint] = Dictionary(
-    uniqueKeysWithValues: BuildingID.allCases.map { id in
-      let point = IsometricLayout.plot(id)
-      return (id, CGPoint(x: point.x, y: 760 - point.y))
-    })
+  let navigationCamera = SKCameraNode(), placementOverlay = SKNode()
+  var cameraState = CameraState()
+  var onCameraChange: ((Int) -> Void)?
+  var placementTool: PlacementTool?
+  var onPlacement: ((PlacementTool, GridPosition) -> Void)?
+  var dragStart: CGPoint?, dragLast: CGPoint?, dragged = false
+  var lastPointer = IsometricLayout.house
   static let plotSizes: [BuildingID: CGSize] = [
     .woodshed: CGSize(width: 185, height: 150), .cellar: CGSize(width: 180, height: 120),
   ]
@@ -34,6 +36,13 @@ import SpriteKit
   init(artDirectory: URL?) {
     self.artDirectory = artDirectory
     super.init(size: CGSize(width: 1200, height: 760))
+    navigationCamera.name = "camera"
+    addChild(navigationCamera)
+    camera = navigationCamera
+    placementOverlay.name = "placement"
+    placementOverlay.zPosition = 2060
+    addChild(placementOverlay)
+    applyCamera()
     scaleMode = .aspectFit
     backgroundColor = NSColor(red: 0.13, green: 0.17, blue: 0.13, alpha: 1)
     backdrop.name = "backdrop"
@@ -59,7 +68,7 @@ import SpriteKit
     addChild(feedback)
   }
   required init?(coder: NSCoder) { fatalError("Not used") }
-  private func texture(_ name: String, rect: CGRect? = nil) -> SKTexture? {
+  func texture(_ name: String, rect: CGRect? = nil) -> SKTexture? {
     if textures[name] == nil {
       guard let url = artDirectory?.appendingPathComponent(name + ".png"),
         let image = NSImage(contentsOf: url)
@@ -126,7 +135,7 @@ import SpriteKit
     let p = Presentation(state: s)
     let atlas = s.season == 3 ? "props-winter" : "props"
     let land = sprite(
-      "land", art: Content.seasons[s.season].lowercased(), x: 600, y: 760, w: 1200, h: 760, z: 0)
+      "land", art: Content.seasons[s.season].lowercased(), x: 600, y: 1760, w: 4000, h: 2500, z: 0)
     land.color = NSColor(red: 0.10, green: 0.18, blue: 0.13, alpha: 1)
     land.colorBlendFactor = 0.68
     ground.update(state: s) { texture($0) }
@@ -136,37 +145,56 @@ import SpriteKit
       "field", art: "fields",
       crop: CGRect(x: (i % 3) * 525, y: (i / 3) * 499, width: 525, height: 499),
       point: IsometricLayout.field, width: 290, height: 185)
-    isoSprite(
-      "barn", art: atlas, crop: CGRect(x: 1107, y: 0, width: 429, height: 503),
-      point: IsometricLayout.barn, width: 160, height: 170)
+    sprites["field"]?.isHidden = !s.planted && !s.assignments.values.contains(.plant)
     isoSprite(
       "house", art: atlas,
       crop: p.house == "intact"
         ? CGRect(x: 0, y: 0, width: 557, height: 503)
         : CGRect(x: 557, y: 0, width: 550, height: 503), point: IsometricLayout.house, width: 240,
       height: 216)
-    isoSprite(
-      "well", art: atlas, crop: CGRect(x: 0, y: 503, width: 426, height: 521),
-      point: IsometricLayout.well, width: 80, height: 98)
-    for j in 0..<2 {
-      let point = CGPoint(
-        x: IsometricLayout.stores.x + CGFloat(j * 42), y: IsometricLayout.stores.y - CGFloat(j * 12)
-      )
-      let node = isoSprite(
-        "store-\(j)", art: atlas, crop: CGRect(x: 426, y: 503, width: 634, height: 521),
-        point: point, width: 85, height: 70)
-      node.isHidden = j >= p.stores
+    let currentScenery = Set(s.layout.scenery.map { "scenery-" + $0.id })
+    for id in Array(sprites.keys) where id.hasPrefix("scenery-") && !currentScenery.contains(id) {
+      sprites.removeValue(forKey: id)?.removeFromParent()
+    }
+    for scenery in s.layout.scenery {
+      let crop: CGRect
+      let width: CGFloat
+      let height: CGFloat
+      switch scenery.kind {
+      case .barn:
+        crop = CGRect(x: 1107, y: 0, width: 429, height: 503)
+        width = 160
+        height = 170
+      case .well:
+        crop = CGRect(x: 0, y: 503, width: 426, height: 521)
+        width = 80
+        height = 98
+      case .stores:
+        crop = CGRect(x: 426, y: 503, width: 634, height: 521)
+        width = 85
+        height = 70
+      case .fence:
+        crop = CGRect(x: 1066, y: 503, width: 470, height: 521)
+        width = 160
+        height = 110
+      }
+      isoSprite(
+        "scenery-" + scenery.id, art: atlas, crop: crop,
+        point: IsometricLayout.center(scenery.position, kind: .scenery(scenery.kind)), width: width,
+        height: height)
     }
     for id in BuildingID.allCases {
       let stage = Construction.stage(id, state: s)
-      let pos = Self.plotPositions[id]!
+      let point = IsometricLayout.plot(id, state: s)
+      let pos = CGPoint(x: point.x, y: 760 - point.y)
       let size = Self.plotSizes[id]!
       let prefix = id == .woodshed ? "woodshed" : "cellar"
       let suffix = stage == .planned ? "construction" : s.season == 3 ? "winter" : "complete"
       let node = sprite(
         "plot-\(id.rawValue)", art: "\(prefix)-\(suffix)", x: pos.x, y: pos.y, w: size.width,
         h: size.height, z: 1000 - (760 - pos.y))
-      node.isHidden = stage == .empty && !buildMode
+      node.isHidden =
+        stage == .empty && (!buildMode || Settlement.position(for: id, in: s.layout) == nil)
       node.alpha = stage == .empty ? 0.38 : 1
       if stage == .complete && old != nil && !old!.buildings.contains(where: { $0.id == id })
         && !reduced && animateChanges
@@ -186,16 +214,17 @@ import SpriteKit
     }
     for (j, worker) in WorkerID.allCases.enumerated() {
       let task = s.assignments[worker.rawValue]!
-      let pos = IsometricLayout.worker(task)
+      let pos = IsometricLayout.worker(task, state: s)
       let x = pos.x + (j == 1 ? 26 : j == 2 ? -22 : 0)
       let y = 760 - pos.y + CGFloat(j * 5)
+      let moved = workerPositions[worker] != CGPoint(x: x, y: 760 - y)
       workerPositions[worker] = CGPoint(x: x, y: 760 - y)
       let person = sprite(
         "worker-\(worker.rawValue)", art: "people",
         crop: CGRect(x: j * 307, y: 0, width: 307, height: 590), x: x, y: y, w: 34, h: 65,
         z: 1000 - (760 - y) + 10)
       if old?.assignments[worker.rawValue] != task || old?.phase != s.phase || old == nil
-        || motionChanged || reduced
+        || motionChanged || moved || reduced
       {
         person.removeAllActions()
         person.zRotation = 0
@@ -207,7 +236,7 @@ import SpriteKit
             .sequence([.scaleY(to: 1.012, duration: 1.4), .scaleY(to: 1, duration: 1.4)])))
       }
       if old?.assignments[worker.rawValue] != task || old?.phase != s.phase || old == nil
-        || motionChanged
+        || motionChanged || moved
       {
         updateTool(
           worker: worker, task: task, point: CGPoint(x: x + 15, y: 760 - y + 28), phase: s.phase,
@@ -220,9 +249,6 @@ import SpriteKit
       x: IsometricLayout.visitor.x, y: 760 - IsometricLayout.visitor.y, w: 34, h: 65,
       z: 1010 - IsometricLayout.visitor.y)
     visitor.isHidden = p.visitor == nil
-    isoSprite(
-      "fence", art: atlas, crop: CGRect(x: 1066, y: 503, width: 470, height: 521),
-      point: IsometricLayout.fence, width: 160, height: 110)
     updateWeather(p.weather)
     if let old, animateChanges && !reduced && old.revision != s.revision {
       let changes = [
@@ -231,12 +257,13 @@ import SpriteKit
       ].filter { $0.1 != 0 }
       for (index, change) in changes.enumerated() {
         let text = SKLabelNode(fontNamed: "DMSans9pt-Regular")
-        text.fontSize = 18
+        text.fontSize = 18 * cameraState.scale
         text.fontColor = .white
+        text.name = "resource-feedback"
         text.text = "\(change.0) \(change.1 > 0 ? "+":"")\(change.1)"
         text.position = CGPoint(
-          x: ["Food": 280.0, "Money": 400.0, "Shelter": 520.0][change.0]!,
-          y: 690 - CGFloat(index * 4))
+          x: cameraState.center.x + CGFloat(index - 1) * 130 * cameraState.scale,
+          y: cameraState.center.y + (size.height / 2 - 105) * cameraState.scale)
         feedback.addChild(text)
         text.run(
           .sequence([
@@ -247,6 +274,8 @@ import SpriteKit
     }
     if reduced { feedback.removeAllChildren() }
     drawSelection()
+    updatePlacement(at: lastPointer)
+    applyCamera()
   }
   private func updateTool(
     worker: WorkerID, task: TaskID, point: CGPoint, phase: Phase, depth: CGFloat
@@ -344,7 +373,8 @@ import SpriteKit
     self.buildMode = buildMode
     if let s = previous {
       for id in BuildingID.allCases where Construction.stage(id, state: s) == .empty {
-        sprites["plot-\(id.rawValue)"]?.isHidden = !buildMode
+        sprites["plot-\(id.rawValue)"]?.isHidden =
+          !buildMode || Settlement.position(for: id, in: s.layout) == nil
         sprites["plot-\(id.rawValue)"]?.alpha = 0.38
       }
     }
@@ -373,8 +403,8 @@ import SpriteKit
   private func drawSelection() {
     markers.removeAllChildren()
     if buildMode {
-      for column in 0..<8 {
-        for row in 0..<8 {
+      for column in 0..<Settlement.size {
+        for row in 0..<Settlement.size {
           let center = IsometricLayout.point(column: CGFloat(column), row: CGFloat(row))
           let path = CGMutablePath()
           path.move(to: CGPoint(x: 0, y: 33))
@@ -393,9 +423,12 @@ import SpriteKit
     }
     if buildMode {
       for id in BuildingID.allCases {
-        let p = Self.plotPositions[id]!
+        guard let state = previous, Settlement.position(for: id, in: state.layout) != nil else {
+          continue
+        }
+        let p = IsometricLayout.plot(id, state: state)
         marker(
-          at: CGPoint(x: p.x, y: 760 - p.y), width: Self.plotSizes[id]!.width,
+          at: p, width: Self.plotSizes[id]!.width,
           label: Construction.definition(id).title)
       }
     }
@@ -406,9 +439,9 @@ import SpriteKit
       }
     case .building(let id):
       if !buildMode {
-        let p = Self.plotPositions[id]!
+        let p = IsometricLayout.plot(id, state: previous)
         marker(
-          at: CGPoint(x: p.x, y: 760 - p.y), width: Self.plotSizes[id]!.width,
+          at: p, width: Self.plotSizes[id]!.width,
           label: Construction.definition(id).title)
       }
     case .hotspot(let spot):
@@ -417,6 +450,13 @@ import SpriteKit
         .stores: IsometricLayout.stores, .visitor: IsometricLayout.visitor,
       ]
       marker(at: points[spot]!, width: spot == .field ? 200 : 100, label: spot.rawValue.capitalized)
+    case .scenery(let id):
+      if let node = sprites["scenery-" + id] {
+        marker(
+          at: node.position, width: 100,
+          label: previous?.layout.scenery.first(where: { $0.id == id })?.kind.rawValue.capitalized
+            ?? "Scenery")
+      }
     case nil: break
     }
   }
@@ -434,10 +474,32 @@ import SpriteKit
     ] {
       if let node = sprites[id] { targets.append((node, .hotspot(spot))) }
     }
+    for scenery in previous?.layout.scenery ?? [] {
+      if let node = sprites["scenery-" + scenery.id] {
+        targets.append((node, .scenery(scenery.id)))
+      }
+    }
     return targets.filter { !$0.0.isHidden && $0.0.frame.contains(point) }
       .max { $0.0.zPosition < $1.0.zPosition }?.1
   }
-  override func mouseDown(with event: NSEvent) {
-    if let target = selection(at: event.location(in: self)) { onSelection?(target) }
+  override func didMove(to view: SKView) {
+    view.window?.acceptsMouseMovedEvents = true
+    applyCamera()
+  }
+  override func mouseDown(with event: NSEvent) { beginPan(event) }
+  override func mouseDragged(with event: NSEvent) { continuePan(event) }
+  override func mouseUp(with event: NSEvent) { finishPan(event) }
+  override func rightMouseDown(with event: NSEvent) { beginPan(event, force: true) }
+  override func rightMouseDragged(with event: NSEvent) { continuePan(event) }
+  override func rightMouseUp(with event: NSEvent) { finishPan(event) }
+  override func otherMouseDown(with event: NSEvent) { beginPan(event, force: true) }
+  override func otherMouseDragged(with event: NSEvent) { continuePan(event) }
+  override func otherMouseUp(with event: NSEvent) { finishPan(event) }
+  override func mouseMoved(with event: NSEvent) { updatePlacement(at: event.location(in: self)) }
+  override func scrollWheel(with event: NSEvent) { scrollCamera(event) }
+  override func magnify(with event: NSEvent) {
+    cameraState.zoom(
+      by: 1 / max(0.1, 1 + event.magnification), anchor: event.location(in: self), viewport: size)
+    applyCamera()
   }
 }

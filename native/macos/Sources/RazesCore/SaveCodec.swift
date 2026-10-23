@@ -4,14 +4,14 @@ public enum SaveCodec {
   public static func encode(_ state: GameState) throws -> Data { try JSONEncoder().encode(state) }
   public static func decode(_ data: Data) throws -> GameState {
     guard data.count <= 1_000_000 else { throw GameError("This save is too large to read safely.") }
-    let s: GameState
+    var s: GameState
     do {
       struct Header: Decodable { let version: Int }
       let version = try JSONDecoder().decode(Header.self, from: data).version
       guard var object = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
         throw GameError("This save could not be read.")
       }
-      guard version == 1 || version == 2 else {
+      guard (1...3).contains(version) else {
         throw GameError("This save belongs to an unsupported version.")
       }
       if version == 1 {
@@ -24,8 +24,16 @@ public enum SaveCodec {
         object["version"] = 2
         object["buildings"] = []
       }
+      if version < 3 {
+        guard object["layout"] == nil else {
+          throw GameError("This legacy save contains unsupported placement data.")
+        }
+        object["layout"] = ["buildings": [], "scenery": []]
+        object["version"] = 3
+      }
       s = try JSONDecoder().decode(
         GameState.self, from: JSONSerialization.data(withJSONObject: object))
+      if version < 3 { s.layout = Settlement.legacyLayout(for: s) }
     } catch let error as GameError { throw error } catch {
       throw GameError("This save could not be read. You can start a fresh household.")
     }
@@ -136,9 +144,11 @@ public enum SaveCodec {
     try ensure(s.buildings.count <= BuildingID.allCases.count)
     try ensure(Set(s.buildings.map(\.id)).count == s.buildings.count)
     for record in s.buildings {
-      try ensure(integer(record.completedSeason, 0, 2) && record.completedSeason <= s.season)
+      try ensure(
+        integer(record.completedSeason, 0, record.debugPlaced == true ? 3 : 2)
+          && record.completedSeason <= s.season)
       let task = Construction.definition(record.id).task
-      if record.completedSeason == s.season {
+      if record.completedSeason == s.season && record.debugPlaced != true {
         try ensure(resolved && assigned.contains(task))
       }
     }
@@ -150,6 +160,7 @@ public enum SaveCodec {
         try ensure(resolved ? completion?.completedSeason == s.season : completion == nil)
       }
     }
+    try Settlement.validate(s)
     return s
   }
 }

@@ -28,7 +28,8 @@ struct Reference: Decodable {
         object = object.mapValues(visit)
         if object["assignments"] != nil && object["phase"] != nil {
           object["buildings"] = []
-          object["version"] = 2
+          object["version"] = 3
+          object["layout"] = ["buildings": [], "scenery": []]
         }
         return object
       }

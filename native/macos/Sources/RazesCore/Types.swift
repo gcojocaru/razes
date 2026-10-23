@@ -25,7 +25,7 @@ public struct SeasonReport: Codable, Equatable, Sendable {
   public var tasks: [String]
 }
 public struct GameState: Codable, Equatable, Sendable {
-  public var version = 2, revision = 0, season = 0
+  public var version = 3, revision = 0, season = 0
   public var phase: Phase = .opening
   public var food = 18, money = 12, house = 55
   public var assignments: [String: TaskID] = ["ion": .rest, "ana": .rest, "petru": .rest]
@@ -39,6 +39,7 @@ public struct GameState: Codable, Equatable, Sendable {
   public var hardship: [Hardship] = []
   public var report: SeasonReport? = nil
   public var buildings: [BuildingRecord] = []
+  public var layout = SettlementLayout()
 }
 public struct Action: Codable, Equatable, Sendable {
   public var type: String, revision: Int

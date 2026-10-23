@@ -12,6 +12,7 @@ struct ContentView: View {
   @State private var sheet: String?
   @State private var restart = false
   @State private var keyMonitor: Any?
+  @State private var cameraZoom = 111
   private var state: GameState { session.state }
   private var reduced: Bool { systemReduceMotion || session.reduceMotion }
   private var mandatory: Bool { state.phase == .opening || state.phase == .consequence }
@@ -26,6 +27,7 @@ struct ContentView: View {
           VStack(spacing: 0) {
             topStrip
             warnings
+            mapControls
             Spacer(minLength: 0)
             HStack(alignment: .bottom, spacing: 16) {
               if mandatory || ui.review {
@@ -38,23 +40,36 @@ struct ContentView: View {
                 }.frame(maxWidth: 760)
               }
               Spacer(minLength: 0)
-              if !mandatory, ui.selection != nil || ui.buildMode {
+              if ui.debug || !mandatory && (ui.selection != nil || ui.buildMode) {
                 GamePanel {
                   VStack(alignment: .leading, spacing: 12) {
                     HStack {
-                      Text(ui.buildMode ? "CONSTRUCTION" : "SELECTED").font(
-                        .system(size: 10, weight: .semibold)
-                      ).tracking(2).foregroundStyle(GamePalette.gold)
+                      Text(ui.debug ? "DEBUG BUILDER" : ui.buildMode ? "CONSTRUCTION" : "SELECTED")
+                        .font(
+                          .system(size: 10, weight: .semibold)
+                        ).tracking(2).foregroundStyle(GamePalette.gold)
                       Spacer()
                       Button("Close", systemImage: "xmark") { ui.dismissOptional() }.labelStyle(
                         .iconOnly
                       )
                     }
                     GameScroll(maximumHeight: min(420, geometry.size.height - 260)) {
-                      if let selection = ui.selection {
-                        SelectionInspector(session: session, state: state, selection: selection)
+                      if ui.debug {
+                        DebugBuildPanel(session: session, state: state, place: beginPlacement)
+                      } else if let selection = ui.selection {
+                        SelectionInspector(
+                          session: session, state: state, selection: selection,
+                          beginPlacement: beginPlacement)
                       } else {
-                        BuildPanel(state: state, select: { choose(.building($0)) })
+                        BuildPanel(
+                          state: state,
+                          select: { id in
+                            if Construction.stage(id, state: state) == .complete {
+                              choose(.building(id))
+                            } else {
+                              beginPlacement(.building(id, worker: nil, instant: false))
+                            }
+                          })
                       }
                     }
                   }
@@ -64,14 +79,13 @@ struct ContentView: View {
             GameHUD(
               state: state, selection: ui.selection, buildMode: ui.buildMode, choose: choose,
               build: {
-                ui.review = false
-                ui.buildMode.toggle()
-                ui.selection = nil
+                let show = !ui.buildMode
+                ui.dismissOptional()
+                ui.buildMode = show
               },
               primary: {
+                ui.dismissOptional()
                 ui.review = true
-                ui.selection = nil
-                ui.buildMode = false
               })
           }
         }
@@ -93,7 +107,7 @@ struct ContentView: View {
             JournalView(state: state)
           } else {
             Text(
-              "Read the seasonal conversation, then select a household portrait or a place in the homestead to assign work. Each adult has one assignment. End season opens a forecast; confirm to resolve work, then answer the evening conversation.\n\nBuild reveals two fixed plots. A woodshed costs 3 money and reduces winter consumption and wear; a root cellar costs 4 money and improves provisions purchases. Both require one adult’s assignment, finish when work resolves and help from the following season. Construction is unavailable in winter. Select the plot to change or cancel its builder.\n\nHarvest needs two adults. Honouring the ox promise reserves Petru in autumn. All choices and draft assignments save on this Mac.\n\nCommand-J opens the journal. The Places menu provides keyboard alternatives to scene targets. Escape closes optional commands; conversations remain until answered."
+              "Read the seasonal conversation, then select a household portrait or a place in the homestead to assign work. Each adult has one assignment. End season opens a forecast; confirm to resolve work, then answer the evening conversation.\n\nBuild lets you choose free locations on the isometric map. Drag or scroll to pan, and pinch or Option-scroll to zoom. The map controls also provide pan, zoom and a Home reset. Green placement footprints are free; red footprints are occupied, outside the map or reserved for the house and farmland. Click to place; Escape cancels. A debug workshop can place scenery and finish construction without cost. Debug building benefits still begin next season. A woodshed costs 3 money and reduces winter consumption and wear; a root cellar costs 4 money and improves provisions purchases. Both require one adult’s assignment, finish when work resolves and help from the following season. Construction is unavailable in winter. Select a building to move its plot, change its builder or remove an unfinished plan.\n\nHarvest needs two adults. Honouring the ox promise reserves Petru in autumn. All choices and draft assignments save on this Mac.\n\nCommand-J opens the journal. The Places menu provides keyboard alternatives to scene targets. Escape closes optional commands; conversations remain until answered."
             ).lineSpacing(5)
           }
         }
@@ -114,13 +128,15 @@ struct ContentView: View {
         // SpriteKit consumes Escape before SwiftUI's exit command sees it.
         keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
           guard event.keyCode == 53, event.window === scene.view?.window,
-            event.window?.attachedSheet == nil, sheet == nil, !restart, !mandatory
+            event.window?.attachedSheet == nil, sheet == nil, !restart
           else { return event }
           ui.dismissOptional()
           return nil
         }
       }
+      scene.onCameraChange = { cameraZoom = $0 }
       scene.onSelection = choose
+      scene.onPlacement = place
       if state.phase == .work { ui.review = false }
       refreshScene()
     }
@@ -136,6 +152,7 @@ struct ContentView: View {
       refreshScene()
     }
     .onChange(of: ui.selection) { scene.select(ui.selection, buildMode: ui.buildMode) }
+    .onChange(of: ui.placement) { scene.setPlacement(ui.placement) }
     .onChange(of: ui.buildMode) { scene.select(ui.selection, buildMode: ui.buildMode) }
     .onChange(of: reduced) { refreshScene() }
     .onChange(of: scenePhase) { session.active = scenePhase == .active }
@@ -157,6 +174,11 @@ struct ContentView: View {
       resource(
         "Free", value: "\(state.assignments.values.filter{$0 == .rest}.count)/3", icon: "person.2")
       Spacer(minLength: 0)
+      Button("Debug", systemImage: "wrench.and.screwdriver") {
+        ui.dismissOptional()
+        ui.debug = true
+      }
+      .help("Building and construction debug workshop")
       Menu("Places") {
         ForEach(Hotspot.allCases, id: \.rawValue) { spot in
           Button(spot.rawValue.capitalized) { choose(.hotspot(spot)) }
@@ -229,14 +251,63 @@ struct ContentView: View {
       ui.review = true
       return
     }
+    ui.dismissOptional()
     ui.selection = selection
     ui.review = false
+  }
+  private func beginPlacement(_ tool: PlacementTool) {
+    ui.dismissOptional()
+    ui.placement = tool
+  }
+  private func place(_ tool: PlacementTool, at point: GridPosition) {
+    switch tool {
+    case .building(let id, let worker, let instant):
+      guard session.placeBuilding(id, at: point, instant: instant) else { return }
+      if let worker {
+        session.send(
+          .init(
+            type: "assign", revision: session.state.revision, worker: worker,
+            task: Construction.definition(id).task))
+      }
+      ui.placement = nil
+      ui.selection = .building(id)
+      ui.review = false
+    case .scenery(let kind):
+      guard session.placeScenery(kind, at: point) else { return }
+    }
+  }
+  private var mapControls: some View {
+    HStack(spacing: 8) {
+      if let tool = ui.placement {
+        Label("Place \(tool.title) · click a green footprint", systemImage: "square.dashed").font(
+          .caption)
+        Button("Cancel placement") { ui.dismissOptional() }
+      }
+      Spacer()
+      HStack(spacing: 6) {
+        Menu("Pan") {
+          Button("North") { scene.panCamera(x: 0, y: 100) }
+          Button("South") { scene.panCamera(x: 0, y: -100) }
+          Button("West") { scene.panCamera(x: -100, y: 0) }
+          Button("East") { scene.panCamera(x: 100, y: 0) }
+        }.fixedSize()
+        Button("Zoom out", systemImage: "minus.magnifyingglass") { scene.zoomCamera(1.2) }
+          .labelStyle(.iconOnly)
+        Text("\(cameraZoom)%").font(.caption.monospacedDigit()).frame(width: 42)
+        Button("Home", systemImage: "house") { scene.resetCamera() }.labelStyle(.iconOnly)
+        Button("Zoom in", systemImage: "plus.magnifyingglass") { scene.zoomCamera(1 / 1.2) }
+          .labelStyle(.iconOnly)
+      }.padding(8).background(
+        GamePalette.panel.opacity(0.94), in: RoundedRectangle(cornerRadius: 5))
+    }.padding(.horizontal, 18).padding(.top, 8)
+      .help("Drag or scroll to pan. Pinch or Option-scroll to zoom. Escape cancels placement.")
   }
   private func refreshScene() {
     scene.update(
       state: state, reducedMotion: reduced,
       animateChanges: session.acceptedRevision == state.revision)
     scene.select(ui.selection, buildMode: ui.buildMode)
+    scene.setPlacement(ui.placement)
     resourceWarning = scene.resourceWarning
   }
 }

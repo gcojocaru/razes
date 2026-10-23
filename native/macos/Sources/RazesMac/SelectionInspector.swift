@@ -5,6 +5,7 @@ struct SelectionInspector: View {
   @Bindable var session: GameSession
   let state: GameState
   let selection: SceneSelection
+  let beginPlacement: (PlacementTool) -> Void
   var body: some View {
     VStack(alignment: .leading, spacing: 14) {
       switch selection {
@@ -25,8 +26,14 @@ struct SelectionInspector: View {
             ForEach(Rules.taskOptions(state)) { task in
               let reason = Rules.assignmentProblem(state, worker: worker, task: task.id)
               Button {
-                session.send(
-                  Action(type: "assign", revision: state.revision, worker: worker, task: task.id))
+                if let id = Construction.building(for: task.id),
+                  Settlement.position(for: id, in: state.layout) == nil
+                {
+                  beginPlacement(.building(id, worker: worker, instant: false))
+                } else {
+                  session.send(
+                    Action(type: "assign", revision: state.revision, worker: worker, task: task.id))
+                }
               } label: {
                 HStack {
                   Text(task.name)
@@ -51,6 +58,15 @@ struct SelectionInspector: View {
         let definition = Construction.definition(id)
         Text(definition.title).font(.system(size: 25, design: .serif))
         Text(definition.benefit).lineSpacing(3)
+        if let position = Settlement.position(for: id, in: state.layout) {
+          Text("Plot: \(position.x), \(position.y)").font(.caption).foregroundStyle(
+            GamePalette.muted)
+          if state.phase == .work {
+            Button("Move building plot") {
+              beginPlacement(.building(id, worker: nil, instant: false))
+            }
+          }
+        }
         if let record = state.buildings.first(where: { $0.id == id }) {
           Label(
             "Completed in \(Content.seasons[record.completedSeason])", systemImage: "checkmark.seal"
@@ -68,8 +84,23 @@ struct SelectionInspector: View {
           if let reason = Construction.unavailable(id, state: state) {
             Text(reason).foregroundStyle(GamePalette.muted)
           } else {
-            assignmentButtons(definition.task)
+            if Settlement.position(for: id, in: state.layout) == nil {
+              Button("Choose location") {
+                beginPlacement(.building(id, worker: nil, instant: false))
+              }
+            } else {
+              assignmentButtons(definition.task)
+              Button("Remove plan") { session.removePlan(id) }
+            }
           }
+        }
+      case .scenery(let id):
+        if let scenery = state.layout.scenery.first(where: { $0.id == id }) {
+          Text(scenery.kind.rawValue.capitalized).font(.system(size: 25, design: .serif))
+          Text("Debug scenery · no resource bonus").font(.caption).foregroundStyle(
+            GamePalette.muted)
+          Text("Position: \(scenery.position.x), \(scenery.position.y)")
+          Button("Remove scenery") { session.removeScenery(id) }
         }
       case .hotspot(let spot):
         Text(spot.rawValue.capitalized).font(.system(size: 25, design: .serif))

@@ -33,10 +33,80 @@ final class IsometricLayoutTests: XCTestCase {
     XCTAssertGreaterThan(tool.zPosition, person.zPosition)
     XCTAssertGreaterThan(tool.zPosition, house.zPosition)
   }
-  @MainActor func testOverlappingTargetsFollowVisibleDepth() {
+  @MainActor func testMovingAssignedPlotMovesItsToolAndDust() throws {
+    let session = GameSession(store: nil)
+    session.send(.init(type: "choose", revision: 0, event: "spring-ox", choice: "borrow"))
+    session.send(.init(type: "assign", revision: 1, worker: .ana, task: .buildWoodshed))
+    let scene = HomesteadScene()
+    scene.update(state: session.state, reducedMotion: false)
+    let old = try XCTUnwrap(scene.childNode(withName: "//tool-ana")?.position)
+    session.placeBuilding(.woodshed, at: .init(x: 1, y: 1))
+    scene.update(state: session.state, reducedMotion: false)
+    let tool = try XCTUnwrap(scene.childNode(withName: "//tool-ana"))
+    let worker = try XCTUnwrap(scene.childNode(withName: "//worker-ana"))
+    XCTAssertNotEqual(tool.position, old)
+    XCTAssertEqual(tool.position.x, worker.position.x + 15, accuracy: 0.001)
+    XCTAssertGreaterThan(tool.zPosition, worker.zPosition)
+  }
+  @MainActor func testResourceFeedbackIsInsideTheCurrentCamera() throws {
+    let scene = HomesteadScene()
+    var state = Rules.newGame()
+    scene.update(state: state, reducedMotion: false)
+    scene.panCamera(x: 100, y: -100)
+    scene.zoomCamera(0.8)
+    state.revision += 1
+    state.money += 2
+    scene.update(state: state, reducedMotion: false)
+    let feedback = try XCTUnwrap(scene.childNode(withName: "//resource-feedback"))
+    XCTAssertLessThan(
+      feedback.position.y,
+      scene.cameraState.center.y + scene.size.height * scene.cameraState.scale / 2)
+    XCTAssertGreaterThan(
+      feedback.position.y,
+      scene.cameraState.center.y - scene.size.height * scene.cameraState.scale / 2)
+  }
+  @MainActor func testDraggingDoesNotCommitAPlacement() throws {
     let scene = HomesteadScene()
     scene.update(state: Rules.newGame(), reducedMotion: true)
-    XCTAssertEqual(scene.selection(at: CGPoint(x: 590, y: 486)), .hotspot(.field))
+    scene.setPlacement(.scenery(.well))
+    var placements = 0
+    scene.onPlacement = { _, _ in placements += 1 }
+    func event(_ type: NSEvent.EventType, _ point: CGPoint) throws -> NSEvent {
+      try XCTUnwrap(
+        NSEvent.mouseEvent(
+          with: type, location: point, modifierFlags: [], timestamp: 0, windowNumber: 0,
+          context: nil, eventNumber: 0, clickCount: 1, pressure: 1))
+    }
+    let before = scene.cameraState.center
+    scene.beginPan(try event(.leftMouseDown, .init(x: 600, y: 300)))
+    scene.continuePan(try event(.leftMouseDragged, .init(x: 650, y: 350)))
+    scene.finishPan(try event(.leftMouseUp, .init(x: 650, y: 350)))
+    XCTAssertEqual(placements, 0)
+    XCTAssertNotEqual(scene.cameraState.center, before)
+    XCTAssertNil(scene.dragStart)
+  }
+  @MainActor func testOverlappingTargetsFollowVisibleDepth() {
+    var state = Rules.newGame()
+    state.layout.buildings = [.init(id: .woodshed, position: .init(x: 7, y: 4))]
+    state.buildings = [.init(id: .woodshed, completedSeason: 0, debugPlaced: true)]
+    let scene = HomesteadScene()
+    scene.update(state: state, reducedMotion: true)
+    XCTAssertEqual(scene.selection(at: CGPoint(x: 710, y: 300)), .hotspot(.house))
+  }
+  @MainActor func testNewSettlementHasOnlyHouseAndPlacementRejectsOccupiedGround() {
+    let scene = HomesteadScene()
+    var state = Rules.newGame()
+    state.phase = .work
+    scene.update(state: state, reducedMotion: true)
+    XCTAssertNil(scene.childNode(withName: "//scenery-legacy-barn"))
+    XCTAssertTrue(scene.childNode(withName: "//field")?.isHidden == true)
+    var placed: GridPosition?
+    scene.onPlacement = { _, point in placed = point }
+    scene.setPlacement(.building(.woodshed, worker: nil, instant: false))
+    scene.commitPlacement(at: IsometricLayout.center(.init(x: 6, y: 6), kind: .building(.woodshed)))
+    XCTAssertNil(placed)
+    scene.commitPlacement(at: IsometricLayout.center(.init(x: 1, y: 1), kind: .building(.woodshed)))
+    XCTAssertEqual(placed, .init(x: 1, y: 1))
   }
   @MainActor func testHouseholdIsDepthSortedOnAnIsometricGroundPlane() {
     let scene = HomesteadScene()

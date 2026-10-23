@@ -7,8 +7,12 @@ import XCTest
 final class GameUIStateTests: XCTestCase {
   func testEscapeClearsOptionalCommandsAndPhaseChangeRestoresReview() {
     var ui = GameUIState(selection: .building(.cellar), buildMode: true, review: true)
+    ui.debug = true
+    ui.placement = .scenery(.barn)
     ui.dismissOptional()
     XCTAssertNil(ui.selection)
+    XCTAssertNil(ui.placement)
+    XCTAssertFalse(ui.debug)
     XCTAssertFalse(ui.buildMode)
     XCTAssertFalse(ui.review)
     ui.changedPhase()

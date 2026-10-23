@@ -7,7 +7,7 @@ struct BuildPanel: View {
   var body: some View {
     VStack(alignment: .leading, spacing: 16) {
       Text("Shape the homestead").font(.system(size: 23, design: .serif))
-      Text("One adult’s season. A lasting change.").font(.caption).foregroundStyle(
+      Text("Choose a building, then click a free spot on the map.").font(.caption).foregroundStyle(
         GamePalette.muted)
       ForEach(Construction.definitions) { definition in
         Button {
@@ -32,6 +32,6 @@ struct BuildPanel: View {
   private func status(_ id: BuildingID) -> String {
     if let reason = Construction.unavailable(id, state: state) { return reason }
     return Construction.stage(id, state: state) == .planned
-      ? "Worker assigned · construction planned" : "Select plot and assign a worker"
+      ? "Worker assigned · construction planned" : "Choose location and assign a worker"
   }
 }

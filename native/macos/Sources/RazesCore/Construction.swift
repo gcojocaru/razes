@@ -4,9 +4,11 @@ public enum BuildingID: String, Codable, CaseIterable, Sendable { case woodshed,
 public struct BuildingRecord: Codable, Equatable, Sendable {
   public var id: BuildingID
   public var completedSeason: Int
-  public init(id: BuildingID, completedSeason: Int) {
+  public var debugPlaced: Bool?
+  public init(id: BuildingID, completedSeason: Int, debugPlaced: Bool? = nil) {
     self.id = id
     self.completedSeason = completedSeason
+    self.debugPlaced = debugPlaced
   }
 }
 public struct BuildingDefinition: Sendable, Identifiable {

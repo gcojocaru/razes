@@ -73,4 +73,4 @@ The proposed 20–30-minute pacing and the emotional/replayability acceptance cr
 
 ## Native macOS app
 
-A SwiftUI + SpriteKit version lives in [`native/macos/`](native/macos/README.md), with the four-season rules, a large layered isometric household, portrait commands, local saves and native woodshed/root-cellar construction. Open its `Package.swift` in Xcode or use its packaging script to build a locally runnable `.app`. The browser game remains independently runnable.
+A SwiftUI + SpriteKit version lives in [`native/macos/`](native/macos/README.md), with the four-season rules, a large layered isometric household, portrait commands, a pannable/zoomable map, freely placed woodshed/root-cellar construction, a building debug workshop and local saves. Open its `Package.swift` in Xcode or use its packaging script to build a locally runnable `.app`. The browser game remains independently runnable.
