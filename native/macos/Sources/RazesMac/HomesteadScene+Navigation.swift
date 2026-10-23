@@ -64,9 +64,10 @@ extension HomesteadScene {
     placementOverlay.addChild(outline)
     let center = IsometricLayout.center(position, kind: tool.kind)
     if case .building(let id, _, let instant) = tool {
-      let art =
-        id.rawValue + "-" + (instant ? state.season == 3 ? "winter" : "complete" : "construction")
-      let ghost = SKSpriteNode(texture: texture(art))
+      let ghost = SKSpriteNode(
+        texture: buildingTexture(
+          id, level: state.buildings.first { $0.id == id }?.level ?? 1, planned: !instant,
+          winter: state.season == 3))
       ghost.anchorPoint = CGPoint(x: 0.5, y: 0)
       let width = Self.plotSizes[id]!.width
       ghost.size = CGSize(

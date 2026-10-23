@@ -59,7 +59,7 @@ public enum Rules {
     }
     let construction = Construction.definitions.filter {
       Construction.unavailable($0.id, state: s) == nil
-    }.map { task($0.task) }
+    }.compactMap { $0.task.map(task) }
     return tasks
       + [TaskID.repair, .paid, .help, .supplies, .rest].map { id in
         var value = task(id)
@@ -106,8 +106,8 @@ public enum Rules {
     }
     let repaired = min(100, s.house + p.houseGain)
     p.consumption = consumption(s, house: repaired)
-    p.foodAfter = s.food - p.foodCost + p.foodGain - p.consumption
-    p.moneyAfter = s.money - p.moneyCost + p.moneyGain
+    p.foodAfter = min(100000, s.food - p.foodCost + p.foodGain) - p.consumption
+    p.moneyAfter = min(100000, s.money - p.moneyCost + p.moneyGain)
     p.houseAfter = max(0, repaired - p.wear)
     if p.foodAfter < 0 {
       p.warnings.append(
@@ -167,8 +167,8 @@ public enum Rules {
       }
       if let problem = choiceProblem(s, choice: c) { throw GameError(problem) }
       let e = c.effect
-      s.food += e.food ?? 0
-      s.money += e.money ?? 0
+      s.food = min(100000, s.food + (e.food ?? 0))
+      s.money = min(100000, s.money + (e.money ?? 0))
       s.house = max(0, min(100, s.house + (e.house ?? 0)))
       s.trust = max(-5, min(5, s.trust + (e.trust ?? 0)))
       if let ox = e.ox { s.ox = ox }
@@ -193,7 +193,9 @@ public enum Rules {
         let consumption = consumption(s, house: s.house)
         let deficit = max(0, consumption - s.food)
         s.food = max(0, s.food - consumption)
-        s.house = max(0, s.house - weathering(s))
+        let appliedWear = weathering(s)
+        s.house = max(0, s.house - appliedWear)
+        s.report?.wear = appliedWear
         if deficit > 0 {
           s.hardship.append(Hardship(season: s.season, kind: "food", amount: deficit))
         }
@@ -232,11 +234,11 @@ public enum Rules {
         tasks: WorkerID.allCases.map {
           "\(Content.shared.people[$0.rawValue]!.name): \(task(s.assignments[$0.rawValue]!).name)"
         })
-      s.food = s.food - p.foodCost + p.foodGain
-      s.money = s.money - p.moneyCost + p.moneyGain
+      s.food = min(100000, s.food - p.foodCost + p.foodGain)
+      s.money = min(100000, s.money - p.moneyCost + p.moneyGain)
       s.house = min(100, s.house + p.houseGain)
       let tasks = Array(s.assignments.values)
-      for definition in Construction.definitions where tasks.contains(definition.task) {
+      for definition in Construction.definitions where definition.task.map(tasks.contains) == true {
         s.buildings.append(BuildingRecord(id: definition.id, completedSeason: s.season))
       }
       if tasks.contains(.plant) {

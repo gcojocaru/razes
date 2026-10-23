@@ -10,6 +10,7 @@ import RazesCore
   var error: String?
   var storageWarning: String?
   private let store: SaveStore?
+  private var lastClockSave: Double = 0
   let audio = Ambience()
   var soundEnabled = false { didSet { audio.setEnabled(soundEnabled && active) } }
   var active = true { didSet { audio.setEnabled(soundEnabled && active) } }
@@ -58,16 +59,32 @@ import RazesCore
     state = next
     acceptedRevision = next.revision
     error = nil
+    persist()
+    audio.cue()
+  }
+  private func persist() {
     do {
       guard let store else { throw GameError("The save location is unavailable.") }
       try store.save(state)
+      lastClockSave = state.buildingClock ?? 0
       storageWarning = nil
       hasSaved = true
     } catch {
       storageWarning =
         "Your run continues, but changes could not be saved: \(error.localizedDescription)"
     }
-    audio.cue()
+  }
+  func tick(now: Double = Date().timeIntervalSince1970) {
+    guard !needsRecovery else { return }
+    var next = state
+    Construction.catchUp(state: &next, now: now)
+    guard next != state else { return }
+    let completed = zip(state.buildings, next.buildings).contains {
+      $0.work?.kind != $1.work?.kind || $0.level != $1.level
+    }
+    state = next
+    if completed { acceptedRevision = next.revision }
+    if completed || (next.buildingClock ?? 0) - lastClockSave >= 15 { persist() }
   }
   @discardableResult private func editSettlement(_ edit: (inout GameState) throws -> Void) -> Bool {
     guard !needsRecovery else { return false }
@@ -87,20 +104,19 @@ import RazesCore
     _ id: BuildingID, at position: GridPosition, instant: Bool = false
   ) -> Bool {
     editSettlement { next in
-      if !instant && next.phase != .work {
-        throw GameError("Place construction during seasonal planning.")
-      }
       if let problem = Settlement.problem(.building(id), at: position, layout: next.layout) {
         throw GameError(problem)
       }
       next.layout.buildings.removeAll { $0.id == id }
       next.layout.buildings.append(.init(id: id, position: position))
-      if instant && !next.buildings.contains(where: { $0.id == id }) {
-        next.buildings.append(.init(id: id, completedSeason: next.season, debugPlaced: true))
-        for worker in WorkerID.allCases
-        where next.assignments[worker.rawValue] == Construction.definition(id).task {
-          next.assignments[worker.rawValue] = .rest
+      if !next.buildings.contains(where: { $0.id == id }) {
+        if instant {
+          next.buildings.append(.init(id: id, completedSeason: next.season, debugPlaced: true))
+          clearLegacyBuilder(id, state: &next)
+        } else if Construction.stage(id, state: next) == .empty {
+          try Construction.start(id, state: &next)
         }
+        if next.buildingClock == nil { next.buildingClock = Date().timeIntervalSince1970 }
       }
     }
   }
@@ -112,15 +128,52 @@ import RazesCore
       next.layout.scenery.append(.init(kind: kind, position: position))
     }
   }
-  func finishConstruction(_ id: BuildingID) {
-    guard
-      let position = Settlement.position(for: id, in: state.layout)
-        ?? Settlement.firstAvailable(id, in: state.layout)
-    else {
-      error = "No free space remains."
-      return
+  private func clearLegacyBuilder(_ id: BuildingID, state: inout GameState) {
+    guard state.phase == .work, let task = Construction.definition(id).task else { return }
+    for worker in WorkerID.allCases where state.assignments[worker.rawValue] == task {
+      state.assignments[worker.rawValue] = .rest
     }
-    placeBuilding(id, at: position, instant: true)
+  }
+  func upgradeBuilding(_ id: BuildingID) {
+    editSettlement { try Construction.upgrade(id, state: &$0) }
+  }
+  func repairBuilding(_ id: BuildingID) {
+    editSettlement { try Construction.repair(id, state: &$0) }
+  }
+  func finishConstruction(_ id: BuildingID) {
+    if let record = state.buildings.first(where: { $0.id == id }) {
+      debugSetBuilding(
+        id, level: record.work?.kind == .upgrade ? record.level + 1 : max(1, record.level),
+        condition: 100)
+    } else if let position = Settlement.position(for: id, in: state.layout)
+      ?? Settlement.firstAvailable(id, in: state.layout)
+    {
+      placeBuilding(id, at: position, instant: true)
+    }
+  }
+  func debugSetBuilding(_ id: BuildingID, level: Int, condition: Double) {
+    editSettlement { next in
+      guard (1...5).contains(level), condition.isFinite, (0...100).contains(condition),
+        let index = next.buildings.firstIndex(where: { $0.id == id })
+      else { throw GameError("Choose an existing building, level 1–5 and condition 0–100.") }
+      if next.buildings[index].work?.kind == .build {
+        next.buildings[index].completedSeason = next.season
+      }
+      next.buildings[index].level = level
+      next.buildings[index].condition = condition
+      next.buildings[index].work = nil
+      next.buildings[index].debugPlaced = true
+      clearLegacyBuilder(id, state: &next)
+    }
+  }
+  func debugAdvance(_ seconds: Double) {
+    editSettlement { try Construction.advance(state: &$0, seconds: seconds) }
+  }
+  func debugResources() {
+    editSettlement {
+      $0.money = min(100000, $0.money + 100)
+      $0.food = min(100000, $0.food + 100)
+    }
   }
   func removePlan(_ id: BuildingID) {
     editSettlement { next in

@@ -31,7 +31,7 @@ struct GameHUD: View {
       }
       Divider().overlay(GamePalette.gold.opacity(0.5)).frame(height: 52)
       Button(action: build) { Label("Build", systemImage: "hammer").padding(.vertical, 8) }
-        .disabled(state.phase != .work).help("Plan a woodshed or root cellar")
+        .help("Build and manage ten structure types, each with five levels")
       Spacer(minLength: 8)
       VStack(alignment: .trailing, spacing: 7) {
         Text(phaseLabel).font(.system(size: 10, weight: .semibold)).tracking(1).foregroundStyle(

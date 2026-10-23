@@ -4,11 +4,21 @@ Validated on the development Apple Silicon Mac running macOS 27.0.1 with Apple S
 
 ## Automated results
 
-- **47 XCTest cases passed**: 28 native/session/scene cases and 19 core cases. Coverage includes the unchanged 40 deterministic TypeScript reference years, three additional complete construction years, assignment changes/cancellation, costs, next-season benefits, outgoing conversation/review snapshots, and reduced-motion actions throughout the scene tree.
-- Schema 1 migration covers every phase; schema 2 migration retains construction and adds backed-up layout data. Schema 3 tests reject missing or impossible building records, duplicate construction and malformed versions (including JSON booleans). Filesystem tests verify one migration backup before replacement and preserve existing bytes when backup or recovery fails.
+- **61 XCTest cases passed**: 33 native/session/scene cases and 28 core cases. Coverage includes the unchanged 40 deterministic TypeScript reference years, three additional complete construction years, assignment changes/cancellation, costs, next-season benefits, outgoing conversation/review snapshots, and reduced-motion actions throughout the scene tree.
+- Schema 1 migration covers every phase; schema 2 migration retains construction and adds backed-up layout data. Schema 4 tests reject missing or impossible building records, duplicate construction and malformed versions (including JSON booleans). Filesystem tests verify one migration backup before replacement and preserve existing bytes when backup or recovery fails.
 - Terrain tests verify 1,024 projected material tiles, cached seasonal texture changes without replacing nodes, and a construction patch returning to grass after cancellation. Scene tests verify persistent layers, frontmost hit selection, tool depth and no replay of completion effects on load.
+- Strict Swift format lint reports the existing `ReplaceForEachWithForLoop` warning in unchanged `Tests/RazesCoreTests/SaveTests.swift:27`; touched Swift files format cleanly.
 - Browser suite: **66 tests passed**; strict TypeScript and production build passed. Browser runtime code is unchanged.
 - The release packaging script checks its executable, Info.plist, original and new resource assets, and local ad-hoc signature. Public distribution signing and notarization are outside this build.
+
+## Real-time building progression
+
+- Ten catalog entries and all five levels are exercised through construction, upgrades and save roundtrips. Tests cover build prices, idle production, repairs, level caps, ruins, multiple downgrades, fractional time, 24-hour cap and reversed clock handling.
+- Session tests cover paid placement, reserved seasonal coins, completion and upgraded timers across relaunch, debug condition edits and clock steps. Schema-3 backup tests verify original bytes are preserved once, alongside retained v1/v2 migration checks.
+- One independent final review found three reproducible issues: uncapped seasonal gains could poison saves; completion recorded the starting season; a fractional exhaustion boundary could omit a final payout. All three failed in regression tests before fixes, then the complete 61-case suite passed. SaveStore now also rejects an invalid replacement before writing it.
+- The new 1536×1024 painted atlas contains six transparent sprites; RGBA alpha and runtime textures were verified. Existing artwork remains. Layer tests exercise all ten textures, five level badges, wear/repair indicators and stable child counts under repeated/reduced-motion updates.
+- In the isolated schema-4 test household, the inspector charged six coins for a 120-second woodshed upgrade. Relaunch resumed it at 58 seconds, and it completed at level 2 with doubled income. The paid 20-second repair command and progress indicator were exercised. A native screenshot confirmed the painted atlas matches the original structures. Advancing 24 hours through the debug panel changed the well from level 4 to level 2 at about 48 condition, made the level-1 bakery inactive, and retained spring/work without changing seasonal assignments. Screenshot: `build/strategy-validation/ten-buildings-levels.png`.
+- Economy values and pacing remain prototype balance. Buildings can continue producing after the authored first-year ending; the starter house keeps the original shelter rules.
 
 ## Native app checks
 

@@ -11,7 +11,7 @@ public enum SaveCodec {
       guard var object = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
         throw GameError("This save could not be read.")
       }
-      guard (1...3).contains(version) else {
+      guard (1...4).contains(version) else {
         throw GameError("This save belongs to an unsupported version.")
       }
       if version == 1 {
@@ -30,6 +30,27 @@ public enum SaveCodec {
         }
         object["layout"] = ["buildings": [], "scenery": []]
         object["version"] = 3
+      }
+      if version < 4 {
+        guard object["buildingClock"] == nil else {
+          throw GameError("Unsupported legacy clock data.")
+        }
+        guard var records = object["buildings"] as? [[String: Any]] else {
+          throw GameError("Missing buildings.")
+        }
+        for index in records.indices {
+          guard ["woodshed", "cellar"].contains(records[index]["id"] as? String ?? ""),
+            ["level", "condition", "production", "work", "realtime"].allSatisfy({
+              records[index][$0] == nil
+            })
+          else { throw GameError("Unsupported legacy progression data.") }
+          records[index]["level"] = 1
+          records[index]["condition"] = 100
+          records[index]["production"] = 0
+          records[index]["realtime"] = false
+        }
+        object["buildings"] = records
+        object["version"] = 4
       }
       s = try JSONDecoder().decode(
         GameState.self, from: JSONSerialization.data(withJSONObject: object))
@@ -114,7 +135,8 @@ public enum SaveCodec {
       "spring-ox", "spring-table", "summer-brother", s.tended ? "summer-tended" : "summer-dry",
       opening?.choice == "borrow" ? "autumn-promise" : "autumn-free", "autumn-dispute",
       ox == "broken" ? "winter-isolation" : "winter-friend",
-      s.house + Rules.weathering(s) < b.coldThreshold ? "winter-cold" : "winter-hearth",
+      s.house + (s.report?.wear ?? Rules.weathering(s)) < b.coldThreshold
+        ? "winter-cold" : "winter-hearth",
     ]
     for (i, h) in s.history.enumerated() { try ensure(h.event == events[i] && h.season == i / 2) }
     try ensure(
@@ -143,21 +165,53 @@ public enum SaveCodec {
     }
     try ensure(s.buildings.count <= BuildingID.allCases.count)
     try ensure(Set(s.buildings.map(\.id)).count == s.buildings.count)
+    if let clock = s.buildingClock {
+      try ensure(clock.isFinite && (0...32_503_680_000).contains(clock))
+    }
     for record in s.buildings {
       try ensure(
-        integer(record.completedSeason, 0, record.debugPlaced == true ? 3 : 2)
+        integer(record.level, 0, 5) && record.condition.isFinite
+          && (0...100).contains(record.condition)
+          && record.production.isFinite && (0..<60).contains(record.production))
+      try ensure(
+        integer(record.completedSeason, 0, record.debugPlaced == true || record.realtime ? 3 : 2)
           && record.completedSeason <= s.season)
-      let task = Construction.definition(record.id).task
-      if record.completedSeason == s.season && record.debugPlaced != true {
-        try ensure(resolved && assigned.contains(task))
+      if let work = record.work {
+        let duration: Double
+        switch work.kind {
+        case .build:
+          try ensure(record.level == 0 && record.realtime)
+          duration = Construction.definition(record.id).buildTime
+        case .upgrade:
+          try ensure((1...4).contains(record.level))
+          duration = Double(60 * (record.level + 1))
+        case .repair:
+          try ensure(record.level > 0 && record.condition < 100)
+          duration = 20
+        }
+        try ensure(
+          work.duration == duration && work.remaining.isFinite && work.remaining > 0
+            && work.remaining <= duration)
+      } else {
+        try ensure(record.level > 0)
+      }
+      if !record.realtime && record.debugPlaced != true {
+        guard let task = Construction.definition(record.id).task else {
+          throw GameError("Invalid seasonal building.")
+        }
+        if record.completedSeason == s.season { try ensure(resolved && assigned.contains(task)) }
       }
     }
     for definition in Construction.definitions {
-      try ensure(n(definition.task) <= 1)
-      if n(definition.task) > 0 {
+      guard let task = definition.task else { continue }
+      try ensure(n(task) <= 1)
+      if n(task) > 0 {
         try ensure(s.season < 3)
         let completion = s.buildings.first { $0.id == definition.id }
-        try ensure(resolved ? completion?.completedSeason == s.season : completion == nil)
+        try ensure(
+          resolved
+            ? completion?.completedSeason == s.season && completion?.realtime == false
+            : completion == nil)
       }
     }
     try Settlement.validate(s)

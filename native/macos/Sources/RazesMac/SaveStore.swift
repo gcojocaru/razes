@@ -28,7 +28,7 @@ struct SaveStore {
       let original = try Data(contentsOf: url)
       _ = try SaveCodec.decode(original)
       let object = try JSONSerialization.jsonObject(with: original) as? [String: Any]
-      if let version = object?["version"] as? Int, version < 3 {
+      if let version = object?["version"] as? Int, version < 4 {
         let backup = url.deletingLastPathComponent().appendingPathComponent(
           "household-migration-\(UUID().uuidString).json")
         try preserveOriginal(url, backup)
@@ -38,6 +38,7 @@ struct SaveStore {
   }
   private func write(_ state: GameState) throws {
     let bytes = try SaveCodec.encode(state)
+    _ = try SaveCodec.decode(bytes)
     try FileManager.default.createDirectory(
       at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
     try bytes.write(to: url, options: .atomic)

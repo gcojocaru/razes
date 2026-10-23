@@ -104,7 +104,7 @@ public enum Settlement {
   }
   public static func validate(_ state: GameState) throws {
     let layout = state.layout
-    guard layout.buildings.count <= 2,
+    guard layout.buildings.count <= BuildingID.allCases.count,
       Set(layout.buildings.map(\.id)).count == layout.buildings.count,
       layout.scenery.count <= 128, Set(layout.scenery.map(\.id)).count == layout.scenery.count
     else { throw GameError("This settlement contains duplicate or excessive structures.") }

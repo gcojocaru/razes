@@ -23,7 +23,8 @@ struct SelectionInspector: View {
           if state.reservedWorker == worker.rawValue {
             Text("Reserved for your promise to Vasile.").foregroundStyle(GamePalette.gold)
           } else {
-            ForEach(Rules.taskOptions(state)) { task in
+            ForEach(Rules.taskOptions(state).filter { Construction.building(for: $0.id) == nil }) {
+              task in
               let reason = Rules.assignmentProblem(state, worker: worker, task: task.id)
               Button {
                 if let id = Construction.building(for: task.id),
@@ -55,45 +56,7 @@ struct SelectionInspector: View {
           Text("Assign work after the opening conversation.").font(.caption)
         }
       case .building(let id):
-        let definition = Construction.definition(id)
-        Text(definition.title).font(.system(size: 25, design: .serif))
-        Text(definition.benefit).lineSpacing(3)
-        if let position = Settlement.position(for: id, in: state.layout) {
-          Text("Plot: \(position.x), \(position.y)").font(.caption).foregroundStyle(
-            GamePalette.muted)
-          if state.phase == .work {
-            Button("Move building plot") {
-              beginPlacement(.building(id, worker: nil, instant: false))
-            }
-          }
-        }
-        if let record = state.buildings.first(where: { $0.id == id }) {
-          Label(
-            "Completed in \(Content.seasons[record.completedSeason])", systemImage: "checkmark.seal"
-          )
-          Text(
-            Construction.active(id, state: state)
-              ? "Benefits are available this season\(id == .woodshed && state.season != 3 ? " when winter arrives":"")."
-              : "Benefits begin next season."
-          ).font(.caption).foregroundStyle(GamePalette.gold)
-        } else {
-          Text("\(definition.cost) money · one adult’s seasonal assignment").font(.headline)
-            .foregroundStyle(GamePalette.gold)
-          Text("Completes when work is confirmed. Benefits begin the following season.").font(
-            .caption)
-          if let reason = Construction.unavailable(id, state: state) {
-            Text(reason).foregroundStyle(GamePalette.muted)
-          } else {
-            if Settlement.position(for: id, in: state.layout) == nil {
-              Button("Choose location") {
-                beginPlacement(.building(id, worker: nil, instant: false))
-              }
-            } else {
-              assignmentButtons(definition.task)
-              Button("Remove plan") { session.removePlan(id) }
-            }
-          }
-        }
+        BuildingInspector(session: session, state: state, id: id, beginPlacement: beginPlacement)
       case .scenery(let id):
         if let scenery = state.layout.scenery.first(where: { $0.id == id }) {
           Text(scenery.kind.rawValue.capitalized).font(.system(size: 25, design: .serif))
@@ -108,7 +71,7 @@ struct SelectionInspector: View {
         case .house:
           Text("Shelter: \(state.house)/100")
           Text(
-            "Winter wear: \(state.buildings.contains(where:{$0.id == .woodshed}) ? 6:14). Keep the roof ready for the cold."
+            "Winter wear: \(Construction.active(.woodshed, state: state) ? 6:14). Keep the roof ready for the cold."
           ).font(.caption)
           assignmentButtons(.repair)
         case .stores:

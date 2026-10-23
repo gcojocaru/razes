@@ -7,7 +7,7 @@ import SpriteKit
   private(set) var resourceWarning: String?
   private(set) var completionEffectCount = 0
   private(set) var previous: GameState?
-  private var reduced = false
+  private(set) var reduced = false
   private var selection: SceneSelection?
   private var buildMode = false
   private let artDirectory: URL?
@@ -25,9 +25,15 @@ import SpriteKit
   var onPlacement: ((PlacementTool, GridPosition) -> Void)?
   var dragStart: CGPoint?, dragLast: CGPoint?, dragged = false
   var lastPointer = IsometricLayout.house
-  static let plotSizes: [BuildingID: CGSize] = [
-    .woodshed: CGSize(width: 185, height: 150), .cellar: CGSize(width: 180, height: 120),
-  ]
+  static let plotSizes: [BuildingID: CGSize] = Dictionary(
+    uniqueKeysWithValues: BuildingID.allCases.map {
+      (
+        $0,
+        $0 == .well
+          ? CGSize(width: 100, height: 130)
+          : $0 == .cellar ? CGSize(width: 180, height: 120) : CGSize(width: 185, height: 150)
+      )
+    })
   override convenience init() {
     self.init(
       artDirectory: Bundle.module.url(
@@ -188,15 +194,32 @@ import SpriteKit
       let point = IsometricLayout.plot(id, state: s)
       let pos = CGPoint(x: point.x, y: 760 - point.y)
       let size = Self.plotSizes[id]!
-      let prefix = id == .woodshed ? "woodshed" : "cellar"
-      let suffix = stage == .planned ? "construction" : s.season == 3 ? "winter" : "complete"
-      let node = sprite(
-        "plot-\(id.rawValue)", art: "\(prefix)-\(suffix)", x: pos.x, y: pos.y, w: size.width,
-        h: size.height, z: 1000 - (760 - pos.y))
+      let record = s.buildings.first { $0.id == id }
+      let node: SKSpriteNode
+      if let existing = sprites["plot-\(id.rawValue)"] {
+        node = existing
+      } else {
+        node = SKSpriteNode()
+        node.name = "plot-\(id.rawValue)"
+        node.anchorPoint = CGPoint(x: 0.5, y: 0)
+        sprites["plot-\(id.rawValue)"] = node
+        world.addChild(node)
+      }
+      node.texture = buildingTexture(
+        id, level: record?.level ?? 0, planned: stage == .planned, winter: s.season == 3)
+      let textureSize = node.texture?.size() ?? size
+      node.size = CGSize(
+        width: size.width, height: size.width * textureSize.height / max(1, textureSize.width))
+      node.position = CGPoint(x: pos.x, y: 760 - pos.y)
+      node.zPosition = 1000 - node.position.y
+      node.color = .brown
+      node.colorBlendFactor = record?.condition == 0 ? 0.45 : stage == .planned ? 0.25 : 0
+      updateBuildingLayers(node, record: record, stage: stage)
       node.isHidden =
         stage == .empty && (!buildMode || Settlement.position(for: id, in: s.layout) == nil)
       node.alpha = stage == .empty ? 0.38 : 1
-      if stage == .complete && old != nil && !old!.buildings.contains(where: { $0.id == id })
+      if stage == .complete && old != nil
+        && !old!.buildings.contains(where: { $0.id == id && $0.level >= (record?.level ?? 1) })
         && !reduced && animateChanges
       {
         completionEffectCount += 1

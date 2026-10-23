@@ -1,3 +1,4 @@
+import Combine
 import RazesCore
 import SpriteKit
 import SwiftUI
@@ -40,7 +41,7 @@ struct ContentView: View {
                 }.frame(maxWidth: 760)
               }
               Spacer(minLength: 0)
-              if ui.debug || !mandatory && (ui.selection != nil || ui.buildMode) {
+              if ui.debug || ui.selection != nil || ui.buildMode {
                 GamePanel {
                   VStack(alignment: .leading, spacing: 12) {
                     HStack {
@@ -64,7 +65,7 @@ struct ContentView: View {
                         BuildPanel(
                           state: state,
                           select: { id in
-                            if Construction.stage(id, state: state) == .complete {
+                            if Construction.stage(id, state: state) != .empty {
                               choose(.building(id))
                             } else {
                               beginPlacement(.building(id, worker: nil, instant: false))
@@ -107,7 +108,7 @@ struct ContentView: View {
             JournalView(state: state)
           } else {
             Text(
-              "Read the seasonal conversation, then select a household portrait or a place in the homestead to assign work. Each adult has one assignment. End season opens a forecast; confirm to resolve work, then answer the evening conversation.\n\nBuild lets you choose free locations on the isometric map. Drag or scroll to pan, and pinch or Option-scroll to zoom. The map controls also provide pan, zoom and a Home reset. Green placement footprints are free; red footprints are occupied, outside the map or reserved for the house and farmland. Click to place; Escape cancels. A debug workshop can place scenery and finish construction without cost. Debug building benefits still begin next season. A woodshed costs 3 money and reduces winter consumption and wear; a root cellar costs 4 money and improves provisions purchases. Both require one adult’s assignment, finish when work resolves and help from the following season. Construction is unavailable in winter. Select a building to move its plot, change its builder or remove an unfinished plan.\n\nHarvest needs two adults. Honouring the ox promise reserves Petru in autumn. All choices and draft assignments save on this Mac.\n\nCommand-J opens the journal. The Places menu provides keyboard alternatives to scene targets. Escape closes optional commands; conversations remain until answered."
+              "Read the seasonal conversation, then select a household portrait or a place in the homestead to assign work. Each adult has one assignment. End season opens a forecast; confirm to resolve work, then answer the evening conversation.\n\nBuild lets you choose free locations on the isometric map. Drag or scroll to pan, and pinch or Option-scroll to zoom. The map controls also provide pan, zoom and a Home reset. Green placement footprints are free; red footprints are occupied, outside the map or reserved for the house and farmland. Click to place; Escape cancels. Construction starts immediately and runs in real time, independently of seasonal workers. Ten building types produce food and coins every minute at their current level. Select a building to upgrade it (up to level 5), repair it or move its plot. Upgrades cost the base price times the target level and take one minute per target level. Repairs take 20 seconds. Work pauses production and wear. Buildings lose four condition per hour; at zero they lose a level and return to 60 condition. Level 1 becomes inactive at zero until repaired. Reopening catches up at most 24 hours; timers also run after the first-year ending. The starter house keeps its seasonal shelter and repair rules. Debug offers free completion, levels, condition, resources and time jumps.\n\nHarvest needs two adults. Honouring the ox promise reserves Petru in autumn. All choices and draft assignments save on this Mac.\n\nCommand-J opens the journal. The Places menu provides keyboard alternatives to scene targets. Escape closes optional commands; conversations remain until answered."
             ).lineSpacing(5)
           }
         }
@@ -121,6 +122,9 @@ struct ContentView: View {
       }
     } message: {
       Text("Your existing save will be preserved as a recovery copy before a new year begins.")
+    }
+    .onReceive(Timer.publish(every: 1, on: .main, in: .common).autoconnect()) { date in
+      session.tick(now: date.timeIntervalSince1970)
     }
     .onExitCommand { ui.dismissOptional() }
     .onAppear {
@@ -137,6 +141,7 @@ struct ContentView: View {
       scene.onCameraChange = { cameraZoom = $0 }
       scene.onSelection = choose
       scene.onPlacement = place
+      session.tick()
       if state.phase == .work { ui.review = false }
       refreshScene()
     }
@@ -247,7 +252,7 @@ struct ContentView: View {
   }
   private func choose(_ selection: SceneSelection) {
     guard !session.needsRecovery else { return }
-    if mandatory {
+    if mandatory, case .worker = selection {
       ui.review = true
       return
     }
@@ -263,11 +268,11 @@ struct ContentView: View {
     switch tool {
     case .building(let id, let worker, let instant):
       guard session.placeBuilding(id, at: point, instant: instant) else { return }
-      if let worker {
+      if let worker, let task = Construction.definition(id).task {
         session.send(
           .init(
             type: "assign", revision: session.state.revision, worker: worker,
-            task: Construction.definition(id).task))
+            task: task))
       }
       ui.placement = nil
       ui.selection = .building(id)

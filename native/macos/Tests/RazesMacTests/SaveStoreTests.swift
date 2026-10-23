@@ -77,7 +77,7 @@ extension SaveStoreTests {
     try original.write(to: url)
     let store = SaveStore(url: url)
     let migrated = try XCTUnwrap(store.load())
-    XCTAssertEqual(migrated.version, 3)
+    XCTAssertEqual(migrated.version, 4)
     XCTAssertEqual(try Data(contentsOf: url), original)
     let blocked = SaveStore(
       url: url, preserveOriginal: { _, _ in throw CocoaError(.fileWriteNoPermission) })
@@ -85,6 +85,42 @@ extension SaveStoreTests {
     XCTAssertEqual(try Data(contentsOf: url), original)
     try store.save(migrated)
     try store.save(migrated)
+    let backups = try FileManager.default.contentsOfDirectory(
+      at: directory, includingPropertiesForKeys: nil
+    ).filter { $0.lastPathComponent.contains("migration") }
+    XCTAssertEqual(backups.count, 1)
+    XCTAssertEqual(try Data(contentsOf: XCTUnwrap(backups.first)), original)
+  }
+}
+
+extension SaveStoreTests {
+  func testInvalidReplacementDoesNotPoisonAValidSave() throws {
+    let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let url = directory.appendingPathComponent("save.json")
+    let store = SaveStore(url: url)
+    try store.save(Rules.newGame())
+    let bytes = try Data(contentsOf: url)
+    var bad = Rules.newGame()
+    bad.money = 100001
+    XCTAssertThrowsError(try store.save(bad))
+    XCTAssertEqual(try Data(contentsOf: url), bytes)
+  }
+  func testV3MigrationPreservesOriginalBytesOnce() throws {
+    let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let url = directory.appendingPathComponent("save.json")
+    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    var object =
+      try JSONSerialization.jsonObject(with: SaveCodec.encode(Rules.newGame())) as! [String: Any]
+    object["version"] = 3
+    let original = try JSONSerialization.data(withJSONObject: object)
+    try original.write(to: url)
+    let store = SaveStore(url: url)
+    let loaded = try XCTUnwrap(store.load())
+    XCTAssertEqual(loaded.version, 4)
+    try store.save(loaded)
+    try store.save(loaded)
     let backups = try FileManager.default.contentsOfDirectory(
       at: directory, includingPropertiesForKeys: nil
     ).filter { $0.lastPathComponent.contains("migration") }
