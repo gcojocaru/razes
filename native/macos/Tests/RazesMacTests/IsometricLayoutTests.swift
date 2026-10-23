@@ -126,3 +126,38 @@ final class IsometricLayoutTests: XCTestCase {
     XCTAssertEqual(scene.childNode(withName: "//plot-woodshed")?.position, IsometricLayout.woodshed)
   }
 }
+
+extension IsometricLayoutTests {
+  func testAllFourRotationsRoundTripEveryGridCorner() {
+    for rotation in 0..<4 {
+      for column in [-0.5, 0, 7.5, 15, 15.5] {
+        for row in [-0.5, 0, 7.5, 15, 15.5] {
+          let point = IsometricLayout.point(column: column, row: row, rotation: rotation)
+          let grid = IsometricLayout.grid(at: point, rotation: rotation)
+          XCTAssertEqual(grid.x, column, accuracy: 0.00001)
+          XCTAssertEqual(grid.y, row, accuracy: 0.00001)
+        }
+      }
+    }
+  }
+  @MainActor func testRotationMovesGroundBuildingsAndInversePlacementTogether() throws {
+    let scene = HomesteadScene()
+    var s = Rules.newGame()
+    s.layout.buildings = [.init(id: .woodshed, position: .init(x: 1, y: 2), facing: 1)]
+    s.buildings = [.init(id: .woodshed, completedSeason: 0, debugPlaced: true)]
+    for rotation in 0..<4 {
+      s.layout.viewRotation = rotation
+      scene.update(state: s, reducedMotion: true)
+      let building = try XCTUnwrap(scene.childNode(withName: "//plot-woodshed"))
+      let expected = IsometricLayout.center(
+        .init(x: 1, y: 2), width: 2, height: 2, rotation: rotation)
+      XCTAssertEqual(building.position, expected)
+      XCTAssertEqual(
+        scene.placementPosition(at: expected, kind: .building(.woodshed)), .init(x: 1, y: 2))
+      let tile = try XCTUnwrap(scene.childNode(withName: "//tile-0-0"))
+      XCTAssertEqual(
+        tile.position, IsometricLayout.point(column: -0.25, row: -0.25, rotation: rotation))
+      XCTAssertEqual(building.zPosition, 1000 - expected.y)
+    }
+  }
+}

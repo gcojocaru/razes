@@ -1,4 +1,3 @@
-import Combine
 import RazesCore
 import SpriteKit
 import SwiftUI
@@ -64,6 +63,7 @@ struct ContentView: View {
                       } else {
                         BuildPanel(
                           state: state,
+                          infrastructure: { beginPlacement(.infrastructure($0)) },
                           select: { id in
                             if Construction.stage(id, state: state) != .empty {
                               choose(.building(id))
@@ -108,7 +108,7 @@ struct ContentView: View {
             JournalView(state: state)
           } else {
             Text(
-              "Read the seasonal conversation, then select a household portrait or a place in the homestead to assign work. Each adult has one assignment. End season opens a forecast; confirm to resolve work, then answer the evening conversation.\n\nBuild lets you choose free locations on the isometric map. Drag or scroll to pan, and pinch or Option-scroll to zoom. The map controls also provide pan, zoom and a Home reset. Green placement footprints are free; red footprints are occupied, outside the map or reserved for the house and farmland. Click to place; Escape cancels. Construction starts immediately and runs in real time, independently of seasonal workers. Ten building types produce food and coins every minute at their current level. Select a building to upgrade it (up to level 5), repair it or move its plot. Upgrades cost the base price times the target level and take one minute per target level. Repairs take 20 seconds. Work pauses production and wear. Buildings lose four condition per hour; at zero they lose a level and return to 60 condition. Level 1 becomes inactive at zero until repaired. Reopening catches up at most 24 hours; timers also run after the first-year ending. The starter house keeps its seasonal shelter and repair rules. Debug offers free completion, levels, condition, resources and time jumps.\n\nHarvest needs two adults. Honouring the ox promise reserves Petru in autumn. All choices and draft assignments save on this Mac.\n\nCommand-J opens the journal. The Places menu provides keyboard alternatives to scene targets. Escape closes optional commands; conversations remain until answered."
+              "Read the seasonal conversation, then select a household portrait or a place in the homestead to assign work. Each adult has one assignment. End season opens a forecast; confirm to resolve work, then answer the evening conversation.\n\nBuild lets you choose free locations on the isometric map. Drag or scroll to pan, and pinch or Option-scroll to zoom. The map controls also provide pan, zoom and a Home reset. Green placement footprints are free; red footprints are occupied, outside the map or reserved for the house and farmland. Click to place; Escape cancels. Construction completes at season end. Completed buildings produce their level-scaled food/coins once per season and lose 20 condition afterwards. Upgrades and repairs are immediate. At zero condition a building loses a level and returns to 60 condition; level 1 becomes inactive until repaired. No building timers or offline decay run. The year ending offers Next settlement season for ongoing building progress.\n\nRotate the map with the arrow controls; the HUD stays upright. Rotate a building from its inspector or press R while placing. Build also offers pavement and fences (1 coin per tile/edge). Click or drag to paint; the tool stays active. Rotate the fence tool to change its edge. Erase removes placed pavement/fences without a refund. Debug season preview changes the scene only; choose Actual season to restore the story view.\n\nHarvest needs two adults. Honouring the ox promise reserves Petru in autumn. All choices and draft assignments save on this Mac.\n\nCommand-J opens the journal. The Places menu provides keyboard alternatives to scene targets. Escape closes optional commands; conversations remain until answered."
             ).lineSpacing(5)
           }
         }
@@ -122,9 +122,6 @@ struct ContentView: View {
       }
     } message: {
       Text("Your existing save will be preserved as a recovery copy before a new year begins.")
-    }
-    .onReceive(Timer.publish(every: 1, on: .main, in: .common).autoconnect()) { date in
-      session.tick(now: date.timeIntervalSince1970)
     }
     .onExitCommand { ui.dismissOptional() }
     .onAppear {
@@ -141,7 +138,6 @@ struct ContentView: View {
       scene.onCameraChange = { cameraZoom = $0 }
       scene.onSelection = choose
       scene.onPlacement = place
-      session.tick()
       if state.phase == .work { ui.review = false }
       refreshScene()
     }
@@ -158,6 +154,10 @@ struct ContentView: View {
     }
     .onChange(of: ui.selection) { scene.select(ui.selection, buildMode: ui.buildMode) }
     .onChange(of: ui.placement) { scene.setPlacement(ui.placement) }
+    .onChange(of: ui.placementFacing) {
+      scene.placementFacing = ui.placementFacing
+      scene.setPlacement(ui.placement)
+    }
     .onChange(of: ui.buildMode) { scene.select(ui.selection, buildMode: ui.buildMode) }
     .onChange(of: reduced) { refreshScene() }
     .onChange(of: scenePhase) { session.active = scenePhase == .active }
@@ -169,7 +169,9 @@ struct ContentView: View {
   private var topStrip: some View {
     HStack(spacing: 18) {
       Text("Răzeș").font(.system(size: 20, design: .serif)).foregroundStyle(GamePalette.gold)
-      Text("\(Content.seasons[state.season].uppercased()) · 1495").font(
+      Text(
+        "\(Content.seasons[state.displaySeason].uppercased()) · \(String(1495 + state.turn / 4))\(state.debugSeason != nil ? " · PREVIEW":"")"
+      ).font(
         .system(size: 10, weight: .semibold)
       ).tracking(1)
       Divider().frame(height: 18).overlay(GamePalette.gold.opacity(0.4))
@@ -262,12 +264,19 @@ struct ContentView: View {
   }
   private func beginPlacement(_ tool: PlacementTool) {
     ui.dismissOptional()
+    if case .building(let id, _, _) = tool {
+      ui.placementFacing = state.layout.buildings.first { $0.id == id }?.facing ?? 0
+    } else {
+      ui.placementFacing = 0
+    }
+    scene.placementFacing = ui.placementFacing
     ui.placement = tool
   }
   private func place(_ tool: PlacementTool, at point: GridPosition) {
     switch tool {
     case .building(let id, let worker, let instant):
-      guard session.placeBuilding(id, at: point, instant: instant) else { return }
+      guard session.placeBuilding(id, at: point, instant: instant, facing: ui.placementFacing)
+      else { return }
       if let worker, let task = Construction.definition(id).task {
         session.send(
           .init(
@@ -278,7 +287,9 @@ struct ContentView: View {
       ui.selection = .building(id)
       ui.review = false
     case .scenery(let kind):
-      guard session.placeScenery(kind, at: point) else { return }
+      guard session.placeScenery(kind, at: point, facing: ui.placementFacing) else { return }
+    case .infrastructure(let kind):
+      _ = session.placeInfrastructure(kind, at: point, facing: ui.placementFacing)
     }
   }
   private var mapControls: some View {
@@ -286,10 +297,18 @@ struct ContentView: View {
       if let tool = ui.placement {
         Label("Place \(tool.title) · click a green footprint", systemImage: "square.dashed").font(
           .caption)
+        Button("Rotate placement 90°") { ui.placementFacing = (ui.placementFacing + 1) % 4 }
+          .keyboardShortcut("r", modifiers: [])
+        Text("\(ui.placementFacing*90)°").font(.caption.monospacedDigit())
         Button("Cancel placement") { ui.dismissOptional() }
       }
       Spacer()
       HStack(spacing: 6) {
+        Button("Rotate map left", systemImage: "rotate.left") { session.rotateView(-1) }.labelStyle(
+          .iconOnly)
+        Text("\(state.layout.viewRotation*90)°").font(.caption.monospacedDigit()).frame(width: 34)
+        Button("Rotate map right", systemImage: "rotate.right") { session.rotateView(1) }
+          .labelStyle(.iconOnly)
         Menu("Pan") {
           Button("North") { scene.panCamera(x: 0, y: 100) }
           Button("South") { scene.panCamera(x: 0, y: -100) }
@@ -312,6 +331,7 @@ struct ContentView: View {
       state: state, reducedMotion: reduced,
       animateChanges: session.acceptedRevision == state.revision)
     scene.select(ui.selection, buildMode: ui.buildMode)
+    scene.placementFacing = ui.placementFacing
     scene.setPlacement(ui.placement)
     resourceWarning = scene.resourceWarning
   }

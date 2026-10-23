@@ -44,8 +44,9 @@ final class SettlementTests: XCTestCase {
     var object = try JSONSerialization.jsonObject(with: SaveCodec.encode(draft)) as! [String: Any]
     object["version"] = 2
     object.removeValue(forKey: "layout")
+    object.removeValue(forKey: "settlementSeasons")
     let state = try SaveCodec.decode(JSONSerialization.data(withJSONObject: object))
-    XCTAssertEqual(state.version, 4)
+    XCTAssertEqual(state.version, 5)
     XCTAssertEqual(state.assignments, draft.assignments)
     XCTAssertEqual(state.layout.scenery.count, 4)
     XCTAssertNotNil(Settlement.position(for: .woodshed, in: state.layout))

@@ -89,6 +89,9 @@ public enum Rules {
       p.moneyGain += task.moneyGain
       p.houseGain += task.houseGain
     }
+    let buildingYield = Construction.seasonalYield(s)
+    p.foodGain += buildingYield.food
+    p.moneyGain += buildingYield.money
     if s.season == 2 && s.fairShare { p.foodGain += b.fairShareFood }
     let harvesters = assigned.filter { $0 == .harvest }.count
     if harvesters == 1 {
@@ -149,7 +152,7 @@ public enum Rules {
     guard a.revision == state.revision else {
       throw GameError("This choice has already changed. Please use the current controls.")
     }
-    guard state.phase != .ending else {
+    guard state.phase != .ending || a.type == "settlement" else {
       throw GameError("This year is complete. Begin a new household to play again.")
     }
     var s = state
@@ -208,6 +211,7 @@ public enum Rules {
         s.report?.houseAfter = s.house
         s.report?.consumption = consumption
         s.report?.deficit = deficit
+        Construction.resolveSeason(state: &s, produce: false)
         s.phase = .summary
       }
     case "assign":
@@ -258,6 +262,12 @@ public enum Rules {
             season: s.season, tone: "good"))
       }
       s.phase = .consequence
+    case "settlement":
+      guard s.phase == .ending, s.settlementSeasons < 100000 else {
+        throw GameError("Complete the first year before advancing settlement seasons.")
+      }
+      s.settlementSeasons += 1
+      Construction.resolveSeason(state: &s)
     case "continue":
       guard s.phase == .summary else { throw GameError("Finish this season before continuing.") }
       if s.season == 3 {
@@ -275,8 +285,10 @@ public enum Rules {
     return s
   }
   public static func ending(_ s: GameState) -> Ending {
-    let crisis = s.house < b.survivalHouse || s.hardship.contains { $0.kind == "food" }
-    let secure = !crisis && s.hardship.isEmpty && s.food >= b.seed && s.house >= b.coldThreshold
+    let food = s.settlementSeasons > 0 ? (s.report?.foodAfter ?? s.food) : s.food
+    let house = s.settlementSeasons > 0 ? (s.report?.houseAfter ?? s.house) : s.house
+    let crisis = house < b.survivalHouse || s.hardship.contains { $0.kind == "food" }
+    let secure = !crisis && s.hardship.isEmpty && food >= b.seed && house >= b.coldThreshold
     let decisions = [
       s.history.first { $0.event == "autumn-promise" }
         ?? s.history.first { $0.event == "spring-ox" },

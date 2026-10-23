@@ -3,7 +3,50 @@ import RazesCore
 import SpriteKit
 
 extension HomesteadScene {
-  func buildingTexture(_ id: BuildingID, level: Int, planned: Bool, winter: Bool) -> SKTexture? {
+  func mirroredTexture(_ base: SKTexture) -> SKTexture {
+    let key = ObjectIdentifier(base)
+    if let cached = mirroredTextures[key] { return cached }
+    let image = NSImage(size: base.size())
+    image.lockFocus()
+    let transform = AffineTransform(scaleByX: -1, byY: 1)
+    var mirror = transform
+    mirror.translate(x: -base.size().width, y: 0)
+    (mirror as NSAffineTransform).concat()
+    NSImage(cgImage: base.cgImage(), size: base.size()).draw(
+      in: NSRect(origin: .zero, size: base.size()))
+    image.unlockFocus()
+    let result = SKTexture(image: image)
+    mirroredTextures[key] = result
+    return result
+  }
+
+  func rearTexture(index: Int) -> SKTexture? {
+    let frames: [CGRect] = [
+      CGRect(x: 24, y: 51, width: 333, height: 354),
+      CGRect(x: 379, y: 101, width: 333, height: 304),
+      CGRect(x: 732, y: 163, width: 324, height: 241),
+      CGRect(x: 1071, y: 73, width: 356, height: 342),
+      CGRect(x: 40, y: 447, width: 299, height: 315),
+      CGRect(x: 345, y: 423, width: 349, height: 352),
+      CGRect(x: 719, y: 471, width: 359, height: 304),
+      CGRect(x: 1091, y: 429, width: 329, height: 339),
+      CGRect(x: 29, y: 761, width: 317, height: 317),
+      CGRect(x: 357, y: 790, width: 350, height: 291),
+      CGRect(x: 722, y: 847, width: 347, height: 234),
+      CGRect(x: 1093, y: 846, width: 324, height: 229),
+    ]
+    return texture("settlement-rear", rect: frames[index])
+  }
+  func buildingTexture(_ id: BuildingID, level: Int, planned: Bool, winter: Bool, facing: Int = 0)
+    -> SKTexture?
+  {
+    if facing >= 2 {
+      let index: [BuildingID: Int] = [
+        .woodshed: 1, .cellar: 2, .barn: 3, .well: 4, .granary: 5, .workshop: 6, .bakery: 7,
+        .smithy: 8, .stable: 9, .apiary: 10,
+      ]
+      return rearTexture(index: index[id]!)
+    }
     if id == .woodshed || id == .cellar {
       return texture(
         id.rawValue + "-" + (planned ? "construction" : winter ? "winter" : "complete"))
@@ -82,8 +125,8 @@ extension HomesteadScene {
     fill.color = condition < 30 ? .systemOrange : .systemGreen
     fill.isHidden = record == nil
     let progress = node.childNode(withName: "work-progress") as! SKSpriteNode
-    progress.isHidden = record?.work == nil
-    if let work = record?.work { progress.xScale = 1 - work.remaining / work.duration }
+    progress.isHidden = record?.level != 0
+    progress.xScale = 1
     for value in 2...5 { node.childNode(withName: "upgrade-\(value)")?.isHidden = level < value }
     let damage = node.childNode(withName: "wear-marks") as! SKShapeNode
     damage.isHidden = condition >= 60
@@ -95,7 +138,7 @@ extension HomesteadScene {
     damage.path = path
     let hammer = node.childNode(withName: "work-indicator")!
     hammer.position = CGPoint(x: 45, y: node.size.height * 0.65)
-    hammer.isHidden = record?.work == nil
+    hammer.isHidden = record?.level != 0
     if reduced || hammer.isHidden {
       hammer.removeAllActions()
       hammer.alpha = 1

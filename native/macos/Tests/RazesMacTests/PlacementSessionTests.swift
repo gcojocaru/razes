@@ -41,43 +41,7 @@ final class PlacementSessionTests: XCTestCase {
 }
 
 extension PlacementSessionTests {
-  @MainActor func testRealTimePlacementUpgradeAndSavedClockSurviveRelaunch() throws {
-    let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
-    defer { try? FileManager.default.removeItem(at: directory) }
-    let store = SaveStore(url: directory.appendingPathComponent("save.json"))
-    let session = GameSession(store: store)
-    session.tick(now: 1000)
-    XCTAssertTrue(session.placeBuilding(.workshop, at: .init(x: 1, y: 1)))
-    XCTAssertEqual(session.state.money, 7)
-    XCTAssertEqual(session.state.buildings.first?.level, 0)
-    session.tick(now: 1050)
-    XCTAssertEqual(session.state.buildings.first?.level, 1)
-    let resumed = GameSession(store: store)
-    XCTAssertEqual(resumed.state, session.state)
-    resumed.tick(now: 1110)
-    XCTAssertEqual(resumed.state.money, 9)
-    let before = resumed.state
-    resumed.upgradeBuilding(.workshop)
-    XCTAssertNotNil(resumed.error)
-    XCTAssertEqual(resumed.state, before)
-    resumed.debugResources()
-    resumed.upgradeBuilding(.workshop)
-    resumed.tick(now: 1230)
-    XCTAssertEqual(resumed.state.buildings.first?.level, 2)
-    XCTAssertEqual(try store.load(), resumed.state)
-    resumed.debugSetBuilding(.workshop, level: 5, condition: 4)
-    resumed.debugAdvance(3600)
-    XCTAssertEqual(resumed.state.buildings.first?.level, 4)
-    XCTAssertEqual(resumed.state.buildings.first?.condition, 60)
-    resumed.repairBuilding(.workshop)
-    resumed.tick(now: 1250)
-    XCTAssertEqual(resumed.state.buildings.first?.condition, 100)
-    XCTAssertEqual(try store.load(), resumed.state)
-  }
-}
-
-extension PlacementSessionTests {
-  @MainActor func testDebugFinishUsesCurrentCompletionSeason() {
+  @MainActor func testSeasonalFoundationCompletesInSpringWithoutAClock() {
     let session = GameSession(store: nil)
     session.send(.init(type: "choose", revision: 0, event: "spring-ox", choice: "borrow"))
     session.placeBuilding(.cellar, at: .init(x: 1, y: 1))
@@ -88,7 +52,53 @@ extension PlacementSessionTests {
     session.send(.init(type: "continue", revision: session.state.revision))
     XCTAssertEqual(session.state.season, 1)
     session.finishConstruction(.cellar)
-    XCTAssertEqual(session.state.buildings.first?.completedSeason, 1)
-    XCTAssertFalse(Construction.active(.cellar, state: session.state))
+    XCTAssertEqual(session.state.buildings.first?.completedSeason, 0)
+    XCTAssertTrue(Construction.active(.cellar, state: session.state))
+  }
+}
+
+extension PlacementSessionTests {
+  @MainActor func testInfrastructureCostsSharedEdgesEraseAndSeasonPreviewPersist() throws {
+    let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: dir) }
+    let store = SaveStore(url: dir.appendingPathComponent("save.json"))
+    let session = GameSession(store: store)
+    XCTAssertTrue(session.placeInfrastructure(.pavement, at: .init(x: 1, y: 1)))
+    XCTAssertTrue(session.placeInfrastructure(.fence, at: .init(x: 1, y: 1), facing: 0))
+    XCTAssertEqual(session.state.money, 10)
+    let before = session.state
+    XCTAssertFalse(session.placeInfrastructure(.fence, at: .init(x: 1, y: 0), facing: 2))
+    XCTAssertEqual(session.state, before)
+    session.rotateView(1)
+    session.previewSeason(3)
+    XCTAssertEqual(session.state.season, 0)
+    XCTAssertEqual(session.state.displaySeason, 3)
+    XCTAssertEqual(session.state.history, before.history)
+    XCTAssertEqual(session.state.layout.viewRotation, 1)
+    XCTAssertEqual(try store.load(), session.state)
+    XCTAssertTrue(session.placeInfrastructure(.erase, at: .init(x: 1, y: 1)))
+    XCTAssertTrue(session.state.layout.pavement.isEmpty)
+    XCTAssertTrue(session.state.layout.fences.isEmpty)
+    session.placeBuilding(.woodshed, at: .init(x: 2, y: 2), instant: true, facing: 3)
+    session.rotateBuilding(.woodshed)
+    XCTAssertEqual(session.state.layout.buildings[0].facing, 0)
+    XCTAssertEqual(try store.load(), session.state)
+  }
+}
+
+extension PlacementSessionTests {
+  @MainActor func testRotatedSceneryFootprintAgreesWithPreviewAndRejectsOutOfBoundsRotation() {
+    let session = GameSession(store: nil)
+    XCTAssertTrue(session.placeScenery(.fence, at: .init(x: 15, y: 14), facing: 1))
+    let original = session.state
+    session.rotateScenery(session.state.layout.scenery[0].id)
+    XCTAssertEqual(session.state, original)
+    let scene = HomesteadScene()
+    session.rotateView(3)
+    scene.update(state: session.state, reducedMotion: true)
+    scene.placementFacing = 1
+    let center = IsometricLayout.center(
+      .init(x: 15, y: 14), kind: .scenery(.fence), facing: 1, rotation: 3)
+    XCTAssertEqual(scene.placementPosition(at: center, kind: .scenery(.fence)), .init(x: 15, y: 14))
   }
 }

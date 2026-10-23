@@ -97,6 +97,9 @@ struct PhaseOverlay: View {
           }
         }
         HStack {
+          Button("Next settlement season") {
+            session.send(.init(type: "settlement", revision: state.revision))
+          }
           Button("Promise journal", action: journal)
           Button("Begin another household", action: restart).buttonStyle(.borderedProminent)
         }

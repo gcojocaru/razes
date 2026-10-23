@@ -63,6 +63,7 @@ struct SelectionInspector: View {
           Text("Debug scenery · no resource bonus").font(.caption).foregroundStyle(
             GamePalette.muted)
           Text("Position: \(scenery.position.x), \(scenery.position.y)")
+          Button("Rotate scenery 90°") { session.rotateScenery(id) }
           Button("Remove scenery") { session.removeScenery(id) }
         }
       case .hotspot(let spot):

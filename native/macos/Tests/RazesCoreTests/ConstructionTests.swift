@@ -55,7 +55,7 @@ final class ConstructionTests: XCTestCase {
     state.season = 1
     state.assignments = ["ion": .supplies, "ana": .supplies, "petru": .paid]
     state.money = 12
-    XCTAssertEqual(Rules.preview(state).foodGain, 20)
+    XCTAssertEqual(Rules.preview(state).foodGain, 22)
     XCTAssertEqual(Rules.suppliesGain(state), 10)
   }
   func testWoodshedWinterForecastMatchesEveningSettlement() throws {

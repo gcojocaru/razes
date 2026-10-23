@@ -10,7 +10,6 @@ import RazesCore
   var error: String?
   var storageWarning: String?
   private let store: SaveStore?
-  private var lastClockSave: Double = 0
   let audio = Ambience()
   var soundEnabled = false { didSet { audio.setEnabled(soundEnabled && active) } }
   var active = true { didSet { audio.setEnabled(soundEnabled && active) } }
@@ -66,25 +65,12 @@ import RazesCore
     do {
       guard let store else { throw GameError("The save location is unavailable.") }
       try store.save(state)
-      lastClockSave = state.buildingClock ?? 0
       storageWarning = nil
       hasSaved = true
     } catch {
       storageWarning =
         "Your run continues, but changes could not be saved: \(error.localizedDescription)"
     }
-  }
-  func tick(now: Double = Date().timeIntervalSince1970) {
-    guard !needsRecovery else { return }
-    var next = state
-    Construction.catchUp(state: &next, now: now)
-    guard next != state else { return }
-    let completed = zip(state.buildings, next.buildings).contains {
-      $0.work?.kind != $1.work?.kind || $0.level != $1.level
-    }
-    state = next
-    if completed { acceptedRevision = next.revision }
-    if completed || (next.buildingClock ?? 0) - lastClockSave >= 15 { persist() }
   }
   @discardableResult private func editSettlement(_ edit: (inout GameState) throws -> Void) -> Bool {
     guard !needsRecovery else { return false }
@@ -101,31 +87,36 @@ import RazesCore
     }
   }
   @discardableResult func placeBuilding(
-    _ id: BuildingID, at position: GridPosition, instant: Bool = false
+    _ id: BuildingID, at position: GridPosition, instant: Bool = false, facing: Int? = nil
   ) -> Bool {
     editSettlement { next in
       if let problem = Settlement.problem(.building(id), at: position, layout: next.layout) {
         throw GameError(problem)
       }
+      let direction = facing ?? next.layout.buildings.first { $0.id == id }?.facing ?? 0
       next.layout.buildings.removeAll { $0.id == id }
-      next.layout.buildings.append(.init(id: id, position: position))
+      next.layout.buildings.append(.init(id: id, position: position, facing: direction))
       if !next.buildings.contains(where: { $0.id == id }) {
         if instant {
-          next.buildings.append(.init(id: id, completedSeason: next.season, debugPlaced: true))
+          next.buildings.append(
+            .init(id: id, completedSeason: next.turn, debugPlaced: true, legacyAssignment: false))
           clearLegacyBuilder(id, state: &next)
         } else if Construction.stage(id, state: next) == .empty {
           try Construction.start(id, state: &next)
         }
-        if next.buildingClock == nil { next.buildingClock = Date().timeIntervalSince1970 }
       }
     }
   }
-  @discardableResult func placeScenery(_ kind: SceneryKind, at position: GridPosition) -> Bool {
+  @discardableResult func placeScenery(
+    _ kind: SceneryKind, at position: GridPosition, facing: Int = 0
+  ) -> Bool {
     editSettlement { next in
-      if let problem = Settlement.problem(.scenery(kind), at: position, layout: next.layout) {
+      if let problem = Settlement.problem(
+        .scenery(kind), at: position, layout: next.layout, facing: facing)
+      {
         throw GameError(problem)
       }
-      next.layout.scenery.append(.init(kind: kind, position: position))
+      next.layout.scenery.append(.init(kind: kind, position: position, facing: facing))
     }
   }
   private func clearLegacyBuilder(_ id: BuildingID, state: inout GameState) {
@@ -143,7 +134,7 @@ import RazesCore
   func finishConstruction(_ id: BuildingID) {
     if let record = state.buildings.first(where: { $0.id == id }) {
       debugSetBuilding(
-        id, level: record.work?.kind == .upgrade ? record.level + 1 : max(1, record.level),
+        id, level: max(1, record.level),
         condition: 100)
     } else if let position = Settlement.position(for: id, in: state.layout)
       ?? Settlement.firstAvailable(id, in: state.layout)
@@ -156,18 +147,64 @@ import RazesCore
       guard (1...5).contains(level), condition.isFinite, (0...100).contains(condition),
         let index = next.buildings.firstIndex(where: { $0.id == id })
       else { throw GameError("Choose an existing building, level 1–5 and condition 0–100.") }
-      if next.buildings[index].work?.kind == .build {
-        next.buildings[index].completedSeason = next.season
+      if next.buildings[index].level == 0 {
+        next.buildings[index].completedSeason = next.turn
       }
       next.buildings[index].level = level
       next.buildings[index].condition = condition
-      next.buildings[index].work = nil
       next.buildings[index].debugPlaced = true
       clearLegacyBuilder(id, state: &next)
     }
   }
-  func debugAdvance(_ seconds: Double) {
-    editSettlement { try Construction.advance(state: &$0, seconds: seconds) }
+  func rotateView(_ quarterTurns: Int) {
+    editSettlement { $0.layout.viewRotation = ($0.layout.viewRotation + quarterTurns % 4 + 4) % 4 }
+  }
+  func rotateBuilding(_ id: BuildingID) {
+    editSettlement { next in
+      guard let index = next.layout.buildings.firstIndex(where: { $0.id == id }) else {
+        throw GameError("Place a building first.")
+      }
+      next.layout.buildings[index].facing = (next.layout.buildings[index].facing + 1) % 4
+    }
+  }
+  func rotateScenery(_ id: String) {
+    editSettlement { next in
+      guard let index = next.layout.scenery.firstIndex(where: { $0.id == id }) else {
+        throw GameError("Select scenery first.")
+      }
+      next.layout.scenery[index].facing = (next.layout.scenery[index].facing + 1) % 4
+    }
+  }
+  func previewSeason(_ season: Int?) {
+    editSettlement { next in
+      guard season == nil || (0...3).contains(season!) else {
+        throw GameError("Choose a valid visual season.")
+      }
+      next.debugSeason = season
+    }
+  }
+  @discardableResult func placeInfrastructure(
+    _ kind: InfrastructureKind, at point: GridPosition, facing: Int = 0
+  ) -> Bool {
+    editSettlement { next in
+      if let problem = Settlement.problem(
+        .infrastructure(kind), at: point, layout: next.layout, facing: facing)
+      {
+        throw GameError(problem)
+      }
+      if kind == .erase {
+        next.layout.pavement.removeAll { $0 == point }
+        let edges = Set((0..<4).map { FenceSegment(position: point, facing: $0).edgeKey })
+        next.layout.fences.removeAll { edges.contains($0.edgeKey) }
+      } else {
+        try Construction.spend(1, state: &next)
+        if kind == .pavement {
+          next.layout.pavement.append(point)
+        } else {
+          next.layout.fences.append(.init(position: point, facing: facing))
+        }
+      }
+    }
   }
   func debugResources() {
     editSettlement {

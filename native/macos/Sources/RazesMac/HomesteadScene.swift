@@ -12,9 +12,13 @@ import SpriteKit
   private var buildMode = false
   private let artDirectory: URL?
   private var textures: [String: SKTexture] = [:]
+  var mirroredTextures: [ObjectIdentifier: SKTexture] = [:]
   private var sprites: [String: SKSpriteNode] = [:]
   private let backdrop = SKNode(), terrain = SKNode(), world = SKNode()
   private let ground = TerrainLayer()
+  var infrastructureSignature: InfrastructureSignature?
+  var infrastructureNodes: [String: SKNode] = [:]
+  var pavementTexture: SKTexture?
   private let weather = SKNode(), smoke = SKNode(), markers = SKNode(), feedback = SKNode()
   private var weatherSignature = ""
   private var workerPositions: [WorkerID: CGPoint] = [:]
@@ -22,6 +26,8 @@ import SpriteKit
   var cameraState = CameraState()
   var onCameraChange: ((Int) -> Void)?
   var placementTool: PlacementTool?
+  var placementFacing = 0
+  private var lastPainted: GridPosition?
   var onPlacement: ((PlacementTool, GridPosition) -> Void)?
   var dragStart: CGPoint?, dragLast: CGPoint?, dragged = false
   var lastPointer = IsometricLayout.house
@@ -95,10 +101,14 @@ import SpriteKit
     ]
     guard let rect = rect ?? frames[name] else { return base }
     let size = base.size()
-    return SKTexture(
+    let key = "\(name)-crop-\(rect)"
+    if let cached = textures[key] { return cached }
+    let cropped = SKTexture(
       rect: CGRect(
         x: rect.minX / size.width, y: 1 - rect.maxY / size.height, width: rect.width / size.width,
         height: rect.height / size.height), in: base)
+    textures[key] = cropped
+    return cropped
   }
   @discardableResult private func sprite(
     _ id: String, art: String, crop: CGRect? = nil, x: CGFloat, y: CGFloat, w: CGFloat, h: CGFloat,
@@ -120,8 +130,11 @@ import SpriteKit
       art.hasPrefix("woodshed-") || art.hasPrefix("cellar-")
       ? w * (node.texture?.size().height ?? h) / max(1, node.texture?.size().width ?? w) : h
     node.size = CGSize(width: w, height: height)
-    node.position = CGPoint(x: x, y: 760 - y)
-    node.zPosition = z
+    let point = CGPoint(x: x, y: 760 - y)
+    node.position = id == "land" ? point : projected(point)
+    node.zPosition =
+      id == "land"
+      ? z : 1000 - node.position.y + (id.hasPrefix("worker-") || id == "visitor" ? 10 : 0)
     node.isHidden = false
     return node
   }
@@ -139,9 +152,10 @@ import SpriteKit
     previous = s
     reduced = reducedMotion
     let p = Presentation(state: s)
-    let atlas = s.season == 3 ? "props-winter" : "props"
+    let atlas = s.displaySeason == 3 ? "props-winter" : "props"
     let land = sprite(
-      "land", art: Content.seasons[s.season].lowercased(), x: 600, y: 1760, w: 4000, h: 2500, z: 0)
+      "land", art: Content.seasons[s.displaySeason].lowercased(), x: 600, y: 1760, w: 4000, h: 2500,
+      z: 0)
     land.color = NSColor(red: 0.10, green: 0.18, blue: 0.13, alpha: 1)
     land.colorBlendFactor = 0.68
     ground.update(state: s) { texture($0) }
@@ -158,6 +172,14 @@ import SpriteKit
         ? CGRect(x: 0, y: 0, width: 557, height: 503)
         : CGRect(x: 557, y: 0, width: 550, height: 503), point: IsometricLayout.house, width: 240,
       height: 216)
+    let houseNode = sprites["house"]!
+    if s.layout.viewRotation >= 2 {
+      houseNode.texture = rearTexture(index: 0)
+      if let texture = houseNode.texture {
+        houseNode.size.height = houseNode.size.width * texture.size().height / texture.size().width
+      }
+    }
+    houseNode.xScale = s.layout.viewRotation % 2 == 0 ? 1 : -1
     let currentScenery = Set(s.layout.scenery.map { "scenery-" + $0.id })
     for id in Array(sprites.keys) where id.hasPrefix("scenery-") && !currentScenery.contains(id) {
       sprites.removeValue(forKey: id)?.removeFromParent()
@@ -184,10 +206,17 @@ import SpriteKit
         width = 160
         height = 110
       }
-      isoSprite(
+      let sceneryNode = isoSprite(
         "scenery-" + scenery.id, art: atlas, crop: crop,
-        point: IsometricLayout.center(scenery.position, kind: .scenery(scenery.kind)), width: width,
+        point: IsometricLayout.center(
+          scenery.position, kind: .scenery(scenery.kind), facing: scenery.facing), width: width,
         height: height)
+      let facing = (scenery.facing + s.layout.viewRotation) % 4
+      if facing >= 2, scenery.kind != .fence {
+        sceneryNode.texture = rearTexture(
+          index: scenery.kind == .barn ? 3 : scenery.kind == .well ? 4 : 11)
+      }
+      sceneryNode.xScale = facing % 2 == 0 ? 1 : -1
     }
     for id in BuildingID.allCases {
       let stage = Construction.stage(id, state: s)
@@ -206,14 +235,20 @@ import SpriteKit
         world.addChild(node)
       }
       node.texture = buildingTexture(
-        id, level: record?.level ?? 0, planned: stage == .planned, winter: s.season == 3)
+        id, level: record?.level ?? 0, planned: stage == .planned, winter: s.displaySeason == 3,
+        facing: ((s.layout.buildings.first { $0.id == id }?.facing ?? 0) + s.layout.viewRotation)
+          % 4)
       let textureSize = node.texture?.size() ?? size
       node.size = CGSize(
         width: size.width, height: size.width * textureSize.height / max(1, textureSize.width))
-      node.position = CGPoint(x: pos.x, y: 760 - pos.y)
+      node.position = projected(CGPoint(x: pos.x, y: 760 - pos.y))
       node.zPosition = 1000 - node.position.y
       node.color = .brown
       node.colorBlendFactor = record?.condition == 0 ? 0.45 : stage == .planned ? 0.25 : 0
+      let facing =
+        ((s.layout.buildings.first { $0.id == id }?.facing ?? 0) + s.layout.viewRotation) % 4
+      // Texture mirroring keeps labels, condition bars and upgrade layers upright.
+      if facing % 2 == 1, let base = node.texture { node.texture = mirroredTexture(base) }
       updateBuildingLayers(node, record: record, stage: stage)
       node.isHidden =
         stage == .empty && (!buildMode || Settlement.position(for: id, in: s.layout) == nil)
@@ -240,8 +275,9 @@ import SpriteKit
       let pos = IsometricLayout.worker(task, state: s)
       let x = pos.x + (j == 1 ? 26 : j == 2 ? -22 : 0)
       let y = 760 - pos.y + CGFloat(j * 5)
-      let moved = workerPositions[worker] != CGPoint(x: x, y: 760 - y)
-      workerPositions[worker] = CGPoint(x: x, y: 760 - y)
+      let groundPoint = projected(CGPoint(x: x, y: 760 - y))
+      let moved = workerPositions[worker] != groundPoint
+      workerPositions[worker] = groundPoint
       let person = sprite(
         "worker-\(worker.rawValue)", art: "people",
         crop: CGRect(x: j * 307, y: 0, width: 307, height: 590), x: x, y: y, w: 34, h: 65,
@@ -262,7 +298,8 @@ import SpriteKit
         || motionChanged || moved
       {
         updateTool(
-          worker: worker, task: task, point: CGPoint(x: x + 15, y: 760 - y + 28), phase: s.phase,
+          worker: worker, task: task, point: CGPoint(x: groundPoint.x + 15, y: groundPoint.y + 28),
+          phase: s.phase,
           depth: person.zPosition + 1)
       }
     }
@@ -272,6 +309,7 @@ import SpriteKit
       x: IsometricLayout.visitor.x, y: 760 - IsometricLayout.visitor.y, w: 34, h: 65,
       z: 1010 - IsometricLayout.visitor.y)
     visitor.isHidden = p.visitor == nil
+    updateInfrastructure(state: s)
     updateWeather(p.weather)
     if let old, animateChanges && !reduced && old.revision != s.revision {
       let changes = [
@@ -351,7 +389,7 @@ import SpriteKit
     }
   }
   private func updateWeather(_ kind: String) {
-    let signature = "\(kind)-\(reduced)"
+    let signature = "\(kind)-\(reduced)-\(previous?.layout.viewRotation ?? 0)"
     guard signature != weatherSignature else { return }
     weatherSignature = signature
     weather.removeAllChildren()
@@ -380,8 +418,9 @@ import SpriteKit
       node.strokeColor = .clear
       node.alpha = 0.17
       node.position = CGPoint(
-        x: IsometricLayout.house.x + 64 + CGFloat(j * 4),
-        y: IsometricLayout.house.y + 197 + CGFloat(j * 11))
+        x: projected(IsometricLayout.house).x
+          + [CGFloat(64), -64, -64, 64][previous?.layout.viewRotation ?? 0] + CGFloat(j * 4),
+        y: projected(IsometricLayout.house).y + 197 + CGFloat(j * 11))
       smoke.addChild(node)
       node.run(
         .repeatForever(
@@ -411,7 +450,7 @@ import SpriteKit
     path.addLine(to: CGPoint(x: -width / 2, y: 0))
     path.closeSubpath()
     let outline = SKShapeNode(path: path)
-    outline.position = point
+    outline.position = projected(point)
     outline.strokeColor = .init(red: 0.95, green: 0.82, blue: 0.46, alpha: 1)
     outline.lineWidth = 2
     outline.fillColor = .clear
@@ -420,7 +459,7 @@ import SpriteKit
     text.text = label
     text.fontSize = 14
     text.fontColor = .white
-    text.position = CGPoint(x: point.x, y: point.y - width / 4 - 20)
+    text.position = CGPoint(x: projected(point).x, y: projected(point).y - width / 4 - 20)
     markers.addChild(text)
   }
   private func drawSelection() {
@@ -428,7 +467,9 @@ import SpriteKit
     if buildMode {
       for column in 0..<Settlement.size {
         for row in 0..<Settlement.size {
-          let center = IsometricLayout.point(column: CGFloat(column), row: CGFloat(row))
+          let center = IsometricLayout.point(
+            column: CGFloat(column), row: CGFloat(row), rotation: previous?.layout.viewRotation ?? 0
+          )
           let path = CGMutablePath()
           path.move(to: CGPoint(x: 0, y: 33))
           path.addLine(to: CGPoint(x: 66, y: 0))
@@ -458,7 +499,7 @@ import SpriteKit
     switch selection {
     case .worker(let id):
       if let p = workerPositions[id] {
-        marker(at: p, width: 70, label: Content.shared.people[id.rawValue]!.name)
+        marker(at: unprojected(p), width: 70, label: Content.shared.people[id.rawValue]!.name)
       }
     case .building(let id):
       if !buildMode {
@@ -476,7 +517,7 @@ import SpriteKit
     case .scenery(let id):
       if let node = sprites["scenery-" + id] {
         marker(
-          at: node.position, width: 100,
+          at: unprojected(node.position), width: 100,
           label: previous?.layout.scenery.first(where: { $0.id == id })?.kind.rawValue.capitalized
             ?? "Scenery")
       }
@@ -509,9 +550,51 @@ import SpriteKit
     view.window?.acceptsMouseMovedEvents = true
     applyCamera()
   }
-  override func mouseDown(with event: NSEvent) { beginPan(event) }
-  override func mouseDragged(with event: NSEvent) { continuePan(event) }
-  override func mouseUp(with event: NSEvent) { finishPan(event) }
+  override func mouseDown(with event: NSEvent) {
+    if case .infrastructure = placementTool {
+      lastPainted = nil
+      paintInfrastructure(event.location(in: self))
+    } else {
+      beginPan(event)
+    }
+  }
+  override func mouseDragged(with event: NSEvent) {
+    if case .infrastructure = placementTool {
+      paintInfrastructure(event.location(in: self))
+    } else {
+      continuePan(event)
+    }
+  }
+  override func mouseUp(with event: NSEvent) {
+    if case .infrastructure = placementTool { lastPainted = nil } else { finishPan(event) }
+  }
+  func paintInfrastructure(_ point: CGPoint) {
+    guard let tool = placementTool else { return }
+    let position = placementPosition(at: point, kind: tool.kind)
+    guard (0..<Settlement.size).contains(position.x), (0..<Settlement.size).contains(position.y)
+    else {
+      updatePlacement(at: point)
+      return
+    }
+    guard position != lastPainted else { return }
+    var cursor = lastPainted ?? position
+    func place(_ grid: GridPosition) {
+      commitPlacement(
+        at: IsometricLayout.center(
+          grid, kind: tool.kind, facing: placementFacing,
+          rotation: previous?.layout.viewRotation ?? 0))
+    }
+    if lastPainted == nil { place(position) }
+    while cursor.x != position.x {
+      cursor.x += position.x > cursor.x ? 1 : -1
+      place(cursor)
+    }
+    while cursor.y != position.y {
+      cursor.y += position.y > cursor.y ? 1 : -1
+      place(cursor)
+    }
+    lastPainted = position
+  }
   override func rightMouseDown(with event: NSEvent) { beginPan(event, force: true) }
   override func rightMouseDragged(with event: NSEvent) { continuePan(event) }
   override func rightMouseUp(with event: NSEvent) { finishPan(event) }

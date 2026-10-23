@@ -22,13 +22,8 @@ struct BuildingInspector: View {
           r.condition < 30 ? .orange : GamePalette.gold
         )
         .accessibilityLabel("Building condition")
-        if let work = r.work {
-          Text("\(work.kind.rawValue.capitalized) · \(Int(work.remaining.rounded(.up)))s remaining")
-            .monospacedDigit()
-          ProgressView(value: work.duration - work.remaining, total: work.duration)
-            .accessibilityLabel("Construction progress")
-          Text("Production and wear pause while work is underway.").font(.caption).foregroundStyle(
-            GamePalette.muted)
+        if r.level == 0 {
+          Text("Foundation · completes at season end").foregroundStyle(GamePalette.gold)
         } else {
           Text(
             r.condition > 0 ? d.yieldText(level: r.level) : "Inactive · repair to resume production"
@@ -37,24 +32,24 @@ struct BuildingInspector: View {
             Button("Upgrade to level \(r.level + 1) · \(Construction.upgradeCost(r)) coins") {
               session.upgradeBuilding(id)
             }
-            Text("\(60 * (r.level + 1)) seconds · \(d.yieldText(level: r.level + 1))").font(
+            Text("Immediate · \(d.yieldText(level: r.level + 1))").font(
               .caption
             ).foregroundStyle(GamePalette.muted)
           } else {
             Label("Maximum level reached", systemImage: "checkmark.seal").font(.caption)
           }
-          Button("Repair · \(Construction.repairCost(id)) coins · 20s") {
+          Button("Repair · \(Construction.repairCost(id)) coins · immediate") {
             session.repairBuilding(id)
           }.disabled(r.condition >= 100)
         }
         Text(
-          "Wear: 4 condition/hour. At zero: lose one level and return to 60 condition. Level 1 becomes inactive until repaired."
+          "Wear: 20 condition per season. At zero: lose one level and return to 60 condition. Level 1 becomes inactive until repaired."
         ).font(.caption).foregroundStyle(GamePalette.muted)
       } else if Construction.stage(id, state: state) == .planned {
         Text("Legacy seasonal plan · completes when its worker's season resolves.").font(.caption)
         Button("Remove seasonal plan") { session.removePlan(id) }
       } else {
-        Text("\(d.cost) coins · \(Int(d.buildTime)) seconds").foregroundStyle(GamePalette.gold)
+        Text("\(d.cost) coins · completes at season end").foregroundStyle(GamePalette.gold)
         Text(d.yieldText(level: 1)).font(.caption)
         Button("Choose building location") {
           beginPlacement(.building(id, worker: nil, instant: false))
@@ -63,6 +58,7 @@ struct BuildingInspector: View {
       if let position = Settlement.position(for: id, in: state.layout) {
         Divider()
         Text("Plot: \(position.x), \(position.y)").font(.caption).foregroundStyle(GamePalette.muted)
+        Button("Rotate building 90°") { session.rotateBuilding(id) }
         Button("Move building plot") { beginPlacement(.building(id, worker: nil, instant: false)) }
       }
     }.buttonStyle(.bordered)

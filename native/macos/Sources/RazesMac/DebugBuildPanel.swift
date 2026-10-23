@@ -13,8 +13,10 @@ struct DebugBuildPanel: View {
     VStack(alignment: .leading, spacing: 12) {
       Text("Building workshop").font(.system(size: 24, design: .serif))
       Toggle("Complete instantly", isOn: $instant)
-      Text("Instant placement and debug edits cost nothing. Timed placement pays the normal price.")
-        .font(.caption).foregroundStyle(GamePalette.gold)
+      Text(
+        "Instant placement and debug edits cost nothing. Seasonal placement pays the normal price."
+      )
+      .font(.caption).foregroundStyle(GamePalette.gold)
       ForEach(Construction.definitions) { d in
         Button("Place \(d.title.lowercased())") {
           place(.building(d.id, worker: nil, instant: instant))
@@ -22,7 +24,7 @@ struct DebugBuildPanel: View {
         .disabled(Construction.stage(d.id, state: state) != .empty)
       }
       Button("Finish all construction") {
-        for r in state.buildings where r.work != nil { session.finishConstruction(r.id) }
+        for r in state.buildings where r.level == 0 { session.finishConstruction(r.id) }
         for id in BuildingID.allCases where Construction.stage(id, state: state) == .planned {
           session.finishConstruction(id)
         }
@@ -40,12 +42,16 @@ struct DebugBuildPanel: View {
       }
       .disabled(!state.buildings.contains { $0.id == selected })
       Button("Add 100 coins and food") { session.debugResources() }
-      HStack {
-        Button("Advance 1 hour") { session.debugAdvance(3600) }
-        Button("Advance 24 hours") { session.debugAdvance(86400) }
+      Picker(
+        "Season preview",
+        selection: Binding(
+          get: { state.debugSeason ?? -1 }, set: { session.previewSeason($0 == -1 ? nil : $0) })
+      ) {
+        Text("Actual season").tag(-1)
+        ForEach(0..<4, id: \.self) { Text(Content.seasons[$0]).tag($0) }
       }
       Text(
-        "Time jumps affect production, work and decay; the story season stays where it is. Offline catch-up is limited to 24 hours."
+        "Preview changes scenery and weather only. Production and wear run when a season resolves, and upgrades/repairs are immediate."
       ).font(.caption).foregroundStyle(GamePalette.muted)
       Divider()
       Text("SCENERY").font(.caption).foregroundStyle(GamePalette.gold)

@@ -1,7 +1,7 @@
 import Foundation
 
 extension Construction {
-  private static func spend(_ cost: Int, state: inout GameState) throws {
+  public static func spend(_ cost: Int, state: inout GameState) throws {
     let reserved = state.phase == .work ? Rules.preview(state).moneyCost : 0
     guard state.money - reserved >= cost else {
       throw GameError("Needs \(cost) free coins. Money reserved for seasonal work cannot be spent.")
@@ -12,88 +12,56 @@ extension Construction {
     guard stage(id, state: state) == .empty else {
       throw GameError("This building already exists or has a seasonal builder.")
     }
-    let d = definition(id)
-    try spend(d.cost, state: &state)
-    var record = BuildingRecord(id: id, completedSeason: state.season, realtime: true, level: 0)
-    record.work = BuildingWork(kind: .build, duration: d.buildTime)
-    state.buildings.append(record)
+    try spend(definition(id).cost, state: &state)
+    state.buildings.append(
+      .init(id: id, completedSeason: state.turn, legacyAssignment: false, level: 0))
   }
   public static func upgrade(_ id: BuildingID, state: inout GameState) throws {
-    guard let index = state.buildings.firstIndex(where: { $0.id == id }) else {
-      throw GameError("Build this structure first.")
-    }
-    let r = state.buildings[index]
-    guard r.level > 0, r.level < 5, r.work == nil else {
-      throw GameError("An upgrade needs an idle building below level 5.")
-    }
-    try spend(upgradeCost(r), state: &state)
-    state.buildings[index].work = BuildingWork(kind: .upgrade, duration: Double(60 * (r.level + 1)))
+    guard let index = state.buildings.firstIndex(where: { $0.id == id }),
+      (1...4).contains(state.buildings[index].level)
+    else { throw GameError("An upgrade needs a completed building below level 5.") }
+    try spend(upgradeCost(state.buildings[index]), state: &state)
+    state.buildings[index].level += 1
+    state.buildings[index].condition = 100
   }
   public static func repair(_ id: BuildingID, state: inout GameState) throws {
-    guard let index = state.buildings.firstIndex(where: { $0.id == id }) else {
-      throw GameError("Build this structure first.")
-    }
-    let r = state.buildings[index]
-    guard r.level > 0, r.condition < 100, r.work == nil else {
-      throw GameError("Repairs need an idle, worn building.")
-    }
+    guard let index = state.buildings.firstIndex(where: { $0.id == id }),
+      state.buildings[index].level > 0,
+      state.buildings[index].condition < 100
+    else { throw GameError("Repairs need a completed, worn building.") }
     try spend(repairCost(id), state: &state)
-    state.buildings[index].work = BuildingWork(kind: .repair, duration: 20)
+    state.buildings[index].condition = 100
   }
-  public static func advance(state: inout GameState, seconds: Double) throws {
-    guard seconds.isFinite, (0...86400).contains(seconds) else {
-      throw GameError("Advance time by at most 24 hours.")
+  public static func seasonalYield(_ state: GameState) -> (food: Int, money: Int) {
+    var food = 0
+    var money = 0
+    for r in state.buildings where r.level > 0 && r.condition > 0 && r.completedSeason < state.turn
+    {
+      let d = definition(r.id)
+      food += d.food * r.level
+      money += d.coins * r.level
+    }
+    return (food, money)
+  }
+  public static func resolveSeason(state: inout GameState, produce: Bool = true) {
+    if produce {
+      let yield = seasonalYield(state)
+      state.food = min(100000, state.food + yield.food)
+      state.money = min(100000, state.money + yield.money)
     }
     for index in state.buildings.indices {
-      var r = state.buildings[index]
-      var remaining = seconds
-      if var work = r.work {
-        let used = min(remaining, work.remaining)
-        remaining -= used
-        work.remaining -= used
-        if work.remaining > 0 {
-          r.work = work
-        } else {
-          if work.kind == .build {
-            r.level = 1
-            r.completedSeason = state.season
-          }
-          if work.kind == .upgrade { r.level += 1 }
-          r.condition = 100
-          r.work = nil
+      if state.buildings[index].level == 0 {
+        state.buildings[index].level = 1
+        state.buildings[index].completedSeason = state.turn
+      } else if state.buildings[index].completedSeason < state.turn
+        && state.buildings[index].condition > 0
+      {
+        state.buildings[index].condition = max(0, state.buildings[index].condition - 20)
+        if state.buildings[index].condition == 0 && state.buildings[index].level > 1 {
+          state.buildings[index].level -= 1
+          state.buildings[index].condition = 60
         }
       }
-      // Split at downgrade boundaries so a long absence matches many short ticks.
-      while remaining > 0 && r.work == nil && r.level > 0 && r.condition > 0 {
-        let untilExhausted = r.condition * 900
-        let span = min(remaining, untilExhausted)
-        let cycles = (r.production + span) / 60
-        let count = Int((cycles + 0.0000001).rounded(.down))
-        r.production = max(0, r.production + span - Double(count) * 60)
-        let d = definition(r.id)
-        state.food = min(100000, state.food + count * d.food * r.level)
-        state.money = min(100000, state.money + count * d.coins * r.level)
-        r.condition = span == untilExhausted ? 0 : max(0, r.condition - span / 900)
-        remaining -= span
-        if r.condition == 0 {
-          r.condition = 0
-          if r.level > 1 {
-            r.level -= 1
-            r.condition = 60
-          }
-        }
-      }
-      state.buildings[index] = r
     }
-  }
-  public static func catchUp(state: inout GameState, now: Double) {
-    guard now.isFinite, (0...32_503_680_000).contains(now) else { return }
-    guard let previous = state.buildingClock else {
-      state.buildingClock = now
-      return
-    }
-    guard now > previous else { return }
-    try? advance(state: &state, seconds: min(86400, now - previous))
-    state.buildingClock = now
   }
 }

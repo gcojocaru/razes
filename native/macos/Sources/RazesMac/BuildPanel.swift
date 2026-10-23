@@ -3,14 +3,24 @@ import SwiftUI
 
 struct BuildPanel: View {
   let state: GameState
+  let infrastructure: (InfrastructureKind) -> Void
   let select: (BuildingID) -> Void
   var body: some View {
     VStack(alignment: .leading, spacing: 14) {
       Text("Grow the settlement").font(.system(size: 23, design: .serif))
       Text("10 buildings · 5 levels each").font(.caption).foregroundStyle(GamePalette.gold)
       Text(
-        "Choose a building, then place it on free ground. Construction starts immediately; household workers keep their seasonal assignments."
+        "Choose a building, then place it on free ground. Foundations finish at season end; household workers keep their assignments."
       ).font(.caption).foregroundStyle(GamePalette.muted)
+      Text("ROADS & BOUNDARIES").font(.caption).foregroundStyle(GamePalette.gold)
+      HStack {
+        Button("Pavement") { infrastructure(.pavement) }
+        Button("Fence") { infrastructure(.fence) }
+        Button("Erase") { infrastructure(.erase) }
+      }.buttonStyle(.bordered)
+      Text("1 coin per tile or edge. Drag to paint; R rotates the fence edge. Erase has no refund.")
+        .font(.caption).foregroundStyle(GamePalette.muted)
+      Divider()
       ForEach(Construction.definitions) { definition in
         Button {
           select(definition.id)
@@ -29,17 +39,15 @@ struct BuildPanel: View {
         }.buttonStyle(.bordered)
       }
       Text(
-        "Income scales with level. Maintain buildings before they lose a level. Timers continue after the story ends."
+        "Income scales with level. Maintain buildings before they lose a level. Continue settlement seasons after the story ends."
       ).font(.caption).foregroundStyle(GamePalette.muted)
     }
   }
   private func status(_ d: BuildingDefinition) -> String {
     if let r = state.buildings.first(where: { $0.id == d.id }) {
-      if let work = r.work {
-        return "\(work.kind.rawValue.capitalized) · \(Int(work.remaining.rounded(.up)))s remaining"
-      }
+      if r.level == 0 { return "Foundation · completes at season end" }
       return "Level \(r.level)/5 · condition \(Int(r.condition))% · select to manage"
     }
-    return "\(Int(d.buildTime))s to build · click to choose location"
+    return "Completes at season end · click to choose location"
   }
 }

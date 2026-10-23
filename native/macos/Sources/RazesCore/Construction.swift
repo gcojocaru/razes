@@ -3,35 +3,23 @@ import Foundation
 public enum BuildingID: String, Codable, CaseIterable, Sendable {
   case woodshed, cellar, barn, well, granary, workshop, bakery, smithy, stable, apiary
 }
-public enum BuildingWorkKind: String, Codable, Sendable { case build, upgrade, repair }
-public struct BuildingWork: Codable, Equatable, Sendable {
-  public var kind: BuildingWorkKind
-  public var remaining, duration: Double
-  public init(kind: BuildingWorkKind, duration: Double) {
-    self.kind = kind
-    self.remaining = duration
-    self.duration = duration
-  }
-}
 public struct BuildingRecord: Codable, Equatable, Sendable {
   public var id: BuildingID
   public var completedSeason: Int
   public var debugPlaced: Bool?
-  public var realtime: Bool
+  public var legacyAssignment: Bool
   public var level: Int
-  public var condition, production: Double
-  public var work: BuildingWork?
+  public var condition: Double
   public init(
     id: BuildingID, completedSeason: Int, debugPlaced: Bool? = nil,
-    realtime: Bool = false, level: Int = 1, condition: Double = 100
+    legacyAssignment: Bool = true, level: Int = 1, condition: Double = 100
   ) {
     self.id = id
     self.completedSeason = completedSeason
     self.debugPlaced = debugPlaced
-    self.realtime = realtime
+    self.legacyAssignment = legacyAssignment
     self.level = level
     self.condition = condition
-    self.production = 0
   }
 }
 public struct BuildingDefinition: Sendable, Identifiable {
@@ -41,10 +29,9 @@ public struct BuildingDefinition: Sendable, Identifiable {
   public let cost: Int
   public let benefit: String
   public let food, coins: Int
-  public var buildTime: Double { Double(cost * 10) }
   public func yieldText(level: Int) -> String {
     [food > 0 ? "\(food * level) food" : nil, coins > 0 ? "\(coins * level) coins" : nil]
-      .compactMap { $0 }.joined(separator: " + ") + " / minute"
+      .compactMap { $0 }.joined(separator: " + ") + " / season"
   }
 }
 public enum BuildingStage: String, Sendable { case empty, planned, complete }
@@ -99,7 +86,7 @@ public enum Construction {
   }
   public static func active(_ id: BuildingID, state: GameState) -> Bool {
     state.buildings.contains {
-      $0.id == id && $0.level > 0 && $0.condition > 0 && $0.completedSeason < state.season
+      $0.id == id && $0.level > 0 && $0.condition > 0 && $0.completedSeason < state.turn
     }
   }
   // Legacy seasonal assignments remain valid for existing drafts and reference years.
@@ -111,7 +98,7 @@ public enum Construction {
       return "Finish the current conversation before assigning seasonal work."
     }
     if state.season == 3 {
-      return "Seasonal construction is unavailable in winter. Use the real-time builder."
+      return "Legacy worker construction is unavailable in winter. Use the building palette."
     }
     return nil
   }

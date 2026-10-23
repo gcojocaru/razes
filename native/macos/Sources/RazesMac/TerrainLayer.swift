@@ -6,6 +6,7 @@ import SpriteKit
   private var tiles: [SKSpriteNode] = []
   private struct Signature: Equatable {
     var season: Int
+    var rotation: Int
     var construction: [BuildingPlacement]
     var farm: Bool
   }
@@ -60,7 +61,7 @@ import SpriteKit
   required init?(coder: NSCoder) { fatalError("Not used") }
   func update(state: GameState, texture: (String) -> SKTexture?) {
     let next = Signature(
-      season: state.season,
+      season: state.displaySeason, rotation: state.layout.viewRotation,
       construction: state.layout.buildings.filter {
         Construction.stage($0.id, state: state) != .empty
       }, farm: state.planted || state.assignments.values.contains(.plant))
@@ -70,6 +71,9 @@ import SpriteKit
     for column in 0..<32 {
       for row in 0..<32 {
         let tile = tiles[column * 32 + row]
+        tile.position = IsometricLayout.point(
+          column: (CGFloat(column) - 0.5) / 2, row: (CGFloat(row) - 0.5) / 2,
+          rotation: state.layout.viewRotation)
         let path =
           row == 18 && column >= 4 && column <= 29 || column == 18 && row >= 12 && row <= 29
         let logical = GridPosition(x: column / 2, y: row / 2)
@@ -78,7 +82,7 @@ import SpriteKit
           logical.x >= building.position.x && logical.x < building.position.x + 2
             && logical.y >= building.position.y && logical.y < building.position.y + 2
         }
-        let winter = state.season == 3
+        let winter = state.displaySeason == 3
         let earth = path || field || construction
         let material = winter && !path ? "terrain-snow" : earth ? "terrain-earth" : "terrain-grass"
         let key = "\(material)-\(column%4)-\(row%4)"
@@ -94,10 +98,11 @@ import SpriteKit
           ? NSColor(red: 0.83, green: 0.87, blue: 0.9, alpha: 1)
           : earth
             ? NSColor(red: 0.38, green: 0.29, blue: 0.17, alpha: 1)
-            : state.season == 2
+            : state.displaySeason == 2
               ? NSColor(red: 0.63, green: 0.51, blue: 0.25, alpha: 1)
               : NSColor(red: 0.38, green: 0.47, blue: 0.20, alpha: 1)
-        tile.colorBlendFactor = winter && path ? 0.5 : earth ? 0.12 : state.season == 2 ? 0.3 : 0.08
+        tile.colorBlendFactor =
+          winter && path ? 0.5 : earth ? 0.12 : state.displaySeason == 2 ? 0.3 : 0.08
       }
     }
   }

@@ -11,7 +11,7 @@ public enum SaveCodec {
       guard var object = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
         throw GameError("This save could not be read.")
       }
-      guard (1...4).contains(version) else {
+      guard (1...5).contains(version) else {
         throw GameError("This save belongs to an unsupported version.")
       }
       if version == 1 {
@@ -52,6 +52,7 @@ public enum SaveCodec {
         object["buildings"] = records
         object["version"] = 4
       }
+      if version < 5 { try migrateSeasonal(&object) }
       s = try JSONDecoder().decode(
         GameState.self, from: JSONSerialization.data(withJSONObject: object))
       if version < 3 { s.layout = Settlement.legacyLayout(for: s) }
@@ -71,6 +72,8 @@ public enum SaveCodec {
     try ensure(
       integer(s.revision) && integer(s.season, 0, 3) && integer(s.food) && integer(s.money)
         && integer(s.house, 0, 100) && integer(s.trust, -5, 5))
+    try ensure(integer(s.settlementSeasons) && (s.settlementSeasons == 0 || s.phase == .ending))
+    if let season = s.debugSeason { try ensure(integer(season, 0, 3)) }
     try ensure(["none", "borrowed", "paid", "declined", "honoured", "broken"].contains(s.ox))
     try ensure(s.cropBonus == 0 || s.cropBonus == b.oxBonus)
     try ensure(Set(s.assignments.keys) == Set(WorkerID.allCases.map(\.rawValue)))
@@ -165,40 +168,16 @@ public enum SaveCodec {
     }
     try ensure(s.buildings.count <= BuildingID.allCases.count)
     try ensure(Set(s.buildings.map(\.id)).count == s.buildings.count)
-    if let clock = s.buildingClock {
-      try ensure(clock.isFinite && (0...32_503_680_000).contains(clock))
-    }
     for record in s.buildings {
       try ensure(
         integer(record.level, 0, 5) && record.condition.isFinite
-          && (0...100).contains(record.condition)
-          && record.production.isFinite && (0..<60).contains(record.production))
-      try ensure(
-        integer(record.completedSeason, 0, record.debugPlaced == true || record.realtime ? 3 : 2)
-          && record.completedSeason <= s.season)
-      if let work = record.work {
-        let duration: Double
-        switch work.kind {
-        case .build:
-          try ensure(record.level == 0 && record.realtime)
-          duration = Construction.definition(record.id).buildTime
-        case .upgrade:
-          try ensure((1...4).contains(record.level))
-          duration = Double(60 * (record.level + 1))
-        case .repair:
-          try ensure(record.level > 0 && record.condition < 100)
-          duration = 20
-        }
-        try ensure(
-          work.duration == duration && work.remaining.isFinite && work.remaining > 0
-            && work.remaining <= duration)
-      } else {
-        try ensure(record.level > 0)
-      }
-      if !record.realtime && record.debugPlaced != true {
+          && (0...100).contains(record.condition))
+      try ensure(integer(record.completedSeason, 0, s.turn))
+      if record.legacyAssignment && record.debugPlaced != true {
         guard let task = Construction.definition(record.id).task else {
-          throw GameError("Invalid seasonal building.")
+          throw GameError("Invalid seasonal worker building.")
         }
+        try ensure(record.level > 0 && record.completedSeason < 3)
         if record.completedSeason == s.season { try ensure(resolved && assigned.contains(task)) }
       }
     }
@@ -210,11 +189,85 @@ public enum SaveCodec {
         let completion = s.buildings.first { $0.id == definition.id }
         try ensure(
           resolved
-            ? completion?.completedSeason == s.season && completion?.realtime == false
+            ? completion?.completedSeason == s.season && completion?.legacyAssignment == true
             : completion == nil)
       }
     }
     try Settlement.validate(s)
     return s
+  }
+  private static func migrateSeasonal(_ object: inout [String: Any]) throws {
+    struct Work: Decodable {
+      var kind: String
+      var remaining, duration: Double
+    }
+    struct Record: Decodable {
+      var id: BuildingID
+      var level: Int
+      var condition, production: Double
+      var realtime: Bool
+      var work: Work?
+    }
+    struct Clock: Decodable { var buildingClock: Double? }
+    let data = try JSONSerialization.data(withJSONObject: object)
+    let clock = try JSONDecoder().decode(Clock.self, from: data).buildingClock
+    guard clock == nil || clock!.isFinite && (0...32_503_680_000).contains(clock!),
+      object["settlementSeasons"] == nil, object["debugSeason"] == nil,
+      var records = object["buildings"] as? [[String: Any]],
+      var layout = object["layout"] as? [String: Any],
+      ["viewRotation", "pavement", "fences"].allSatisfy({ layout[$0] == nil })
+    else { throw GameError("Invalid legacy clock or placement data.") }
+    let typed = try JSONDecoder().decode(
+      [Record].self, from: JSONSerialization.data(withJSONObject: records))
+    for (index, r) in typed.enumerated() {
+      guard (0...5).contains(r.level), r.condition.isFinite, (0...100).contains(r.condition),
+        r.production.isFinite, (0..<60).contains(r.production),
+        records[index]["legacyAssignment"] == nil
+      else { throw GameError("Invalid legacy building progression.") }
+      if let w = r.work {
+        let expected: Double
+        switch w.kind {
+        case "build":
+          guard r.level == 0, r.realtime else { throw GameError("Invalid legacy foundation.") }
+          expected = Double(Construction.definition(r.id).cost * 10)
+        case "upgrade":
+          guard (1...4).contains(r.level) else { throw GameError("Invalid legacy upgrade.") }
+          expected = Double(60 * (r.level + 1))
+          records[index]["level"] = r.level + 1
+          records[index]["condition"] = 100
+        case "repair":
+          guard r.level > 0, r.condition < 100 else { throw GameError("Invalid legacy repair.") }
+          expected = 20
+          records[index]["condition"] = 100
+        default: throw GameError("Unknown legacy job.")
+        }
+        guard w.duration == expected, w.remaining.isFinite, w.remaining > 0, w.remaining <= expected
+        else { throw GameError("Invalid legacy timer.") }
+      } else if r.level == 0 {
+        throw GameError("Missing legacy construction job.")
+      }
+      records[index]["legacyAssignment"] = !r.realtime
+      for key in ["work", "production", "realtime"] { records[index].removeValue(forKey: key) }
+    }
+    for key in ["buildings", "scenery"] {
+      guard var placements = layout[key] as? [[String: Any]] else {
+        throw GameError("Missing legacy layout.")
+      }
+      for index in placements.indices {
+        guard placements[index]["facing"] == nil else {
+          throw GameError("Unexpected legacy direction.")
+        }
+        placements[index]["facing"] = 0
+      }
+      layout[key] = placements
+    }
+    layout["viewRotation"] = 0
+    layout["pavement"] = []
+    layout["fences"] = []
+    object["layout"] = layout
+    object["buildings"] = records
+    object["settlementSeasons"] = 0
+    object.removeValue(forKey: "buildingClock")
+    object["version"] = 5
   }
 }
