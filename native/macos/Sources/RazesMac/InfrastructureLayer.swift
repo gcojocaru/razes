@@ -5,6 +5,8 @@ import SpriteKit
 struct InfrastructureSignature: Equatable {
   var pavement: [GridPosition]
   var dirtPaths: [GridPosition]
+  var farmland: [GridPosition]
+  var field: String
   var fences: [FenceSegment]
   var rotation, season: Int
 }
@@ -51,6 +53,7 @@ extension HomesteadScene {
   func updateInfrastructure(state: GameState) {
     let signature = InfrastructureSignature(
       pavement: state.layout.pavement, dirtPaths: state.layout.dirtPaths,
+      farmland: state.layout.farmland, field: Presentation(state: state).field,
       fences: state.layout.fences,
       rotation: state.layout.viewRotation, season: state.displaySeason)
     guard infrastructureSignature != signature else { return }
@@ -63,6 +66,7 @@ extension HomesteadScene {
     let keys = Set(
       signature.pavement.map { "p:\($0.x):\($0.y)" }
         + signature.dirtPaths.map { "d:\($0.x):\($0.y)" }
+        + signature.farmland.map { "farm:\($0.x):\($0.y)" }
         + signature.fences.map { "f:" + $0.edgeKey })
     for key in Array(infrastructureNodes.keys) where !keys.contains(key) {
       infrastructureNodes.removeValue(forKey: key)?.removeFromParent()
@@ -95,6 +99,21 @@ extension HomesteadScene {
       node.color = .white
       node.colorBlendFactor = signature.season == 3 ? (dirt ? 0.65 : 0.3) : 0
     }
+    for point in signature.farmland {
+      let key = "farm:\(point.x):\(point.y)"
+      let node: SKNode
+      if let old = infrastructureNodes[key] {
+        node = old
+        if !redraw && old.userData?["field"] as? String == signature.field { continue }
+      } else {
+        node = SKNode()
+        node.name = key
+        node.zPosition = 2
+        childNode(withName: "terrain")!.addChild(node)
+        infrastructureNodes[key] = node
+      }
+      drawFarmland(node, at: point, rotation: signature.rotation, field: signature.field)
+    }
     for fence in signature.fences {
       let key = "f:" + fence.edgeKey
       let node: SKNode
@@ -112,6 +131,65 @@ extension HomesteadScene {
       node.zPosition = 1000 - center.y
       if !node.children.isEmpty && !redraw && oldStyles[fence.edgeKey] == fence.style { continue }
       drawFence(node, fence: fence, rotation: signature.rotation, winter: signature.season == 3)
+    }
+  }
+  private func drawFarmland(_ node: SKNode, at point: GridPosition, rotation: Int, field: String) {
+    node.removeAllChildren()
+    node.userData = ["field": field]
+    node.position = IsometricLayout.point(
+      column: CGFloat(point.x), row: CGFloat(point.y), rotation: rotation)
+    func local(_ x: CGFloat, _ y: CGFloat) -> CGPoint {
+      let p = IsometricLayout.point(
+        column: CGFloat(point.x) + x, row: CGFloat(point.y) + y, rotation: rotation)
+      return CGPoint(x: p.x - node.position.x, y: p.y - node.position.y)
+    }
+    let outline = CGMutablePath()
+    outline.addLines(between: [
+      local(-0.5, -0.5), local(0.5, -0.5), local(0.5, 0.5), local(-0.5, 0.5),
+    ])
+    outline.closeSubpath()
+    let soil = SKShapeNode(path: outline)
+    soil.fillColor =
+      field == "snow"
+      ? .init(white: 0.88, alpha: 1) : .init(red: 0.29, green: 0.19, blue: 0.10, alpha: 1)
+    soil.strokeColor =
+      field == "snow"
+      ? .init(white: 0.72, alpha: 1) : .init(red: 0.40, green: 0.28, blue: 0.14, alpha: 1)
+    soil.lineWidth = 1
+    node.addChild(soil)
+    let furrows = CGMutablePath()
+    let crop = CGMutablePath()
+    for row in 0..<4 {
+      let y = CGFloat(row) * 0.22 - 0.33
+      furrows.move(to: local(-0.42, y))
+      furrows.addLine(to: local(0.42, y))
+      for column in 0..<4 {
+        let p = local(CGFloat(column) * 0.22 - 0.33, y)
+        crop.move(to: p)
+        let height: CGFloat = field == "sown" ? 3 : field == "ripe" ? 13 : 9
+        crop.addLine(to: CGPoint(x: p.x, y: p.y + height))
+        if field != "sown" {
+          crop.move(to: CGPoint(x: p.x - 3, y: p.y + height - 3))
+          crop.addLine(to: CGPoint(x: p.x, y: p.y + height - 6))
+          crop.addLine(to: CGPoint(x: p.x + 3, y: p.y + height - 2))
+        }
+      }
+    }
+    let rows = SKShapeNode(path: furrows)
+    rows.strokeColor =
+      field == "snow"
+      ? .init(white: 0.78, alpha: 1) : .init(red: 0.48, green: 0.32, blue: 0.16, alpha: 1)
+    rows.lineWidth = 2
+    node.addChild(rows)
+    if ["sown", "growing", "ripe"].contains(field) {
+      let stalks = SKShapeNode(path: crop)
+      stalks.name = "crop"
+      stalks.strokeColor =
+        field == "ripe"
+        ? .init(red: 0.91, green: 0.73, blue: 0.28, alpha: 1)
+        : .init(red: 0.43, green: 0.65, blue: 0.23, alpha: 1)
+      stalks.lineWidth = field == "sown" ? 2 : 2.5
+      node.addChild(stalks)
     }
   }
   func drawFence(_ node: SKNode, fence: FenceSegment, rotation: Int, winter: Bool) {

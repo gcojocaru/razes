@@ -8,7 +8,7 @@ import SpriteKit
     var season: Int
     var rotation: Int
     var construction: [BuildingPlacement]
-    var farm: Bool
+    var farmland: [GridPosition]
   }
   private var signature: Signature?
   private var surfaces: [String: SKTexture] = [:]
@@ -64,7 +64,7 @@ import SpriteKit
       season: state.displaySeason, rotation: state.layout.viewRotation,
       construction: state.layout.buildings.filter {
         Construction.stage($0.id, state: state) != .empty
-      }, farm: state.planted || state.assignments.values.contains(.plant))
+      }, farmland: state.layout.farmland)
     guard next != signature else { return }
     signature = next
     for edge in edges { edge.fillTexture = texture("terrain-earth") }
@@ -77,7 +77,7 @@ import SpriteKit
         let path =
           row == 18 && column >= 4 && column <= 29 || column == 18 && row >= 12 && row <= 29
         let logical = GridPosition(x: column / 2, y: row / 2)
-        let field = next.farm && (5...7).contains(logical.x) && (10...12).contains(logical.y)
+        let field = next.farmland.contains(logical)
         let construction = next.construction.contains { building in
           logical.x >= building.position.x && logical.x < building.position.x + 2
             && logical.y >= building.position.y && logical.y < building.position.y + 2

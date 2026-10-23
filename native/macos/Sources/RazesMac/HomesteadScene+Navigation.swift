@@ -53,8 +53,7 @@ extension HomesteadScene {
     guard let tool = placementTool, let state = previous else { return }
     let position = placementPosition(at: point, kind: tool.kind)
     let footprint = Settlement.footprint(tool.kind, facing: placementFacing)
-    let problem = Settlement.problem(
-      tool.kind, at: position, layout: state.layout, facing: placementFacing)
+    let problem = placementProblem(tool, at: position, state: state)
     let path = CGMutablePath()
     path.addLines(between: [
       projected(
@@ -122,14 +121,21 @@ extension HomesteadScene {
       y: center.y - CGFloat(footprint.width + footprint.height) * 16.5 - 24 * cameraState.scale)
     placementOverlay.addChild(label)
   }
+  private func placementProblem(_ tool: PlacementTool, at position: GridPosition, state: GameState)
+    -> String?
+  {
+    if case .infrastructure(let kind) = tool {
+      return Settlement.infrastructureProblem(
+        kind, at: position, state: state, facing: placementFacing)
+    }
+    return Settlement.problem(
+      tool.kind, at: position, layout: state.layout, facing: placementFacing)
+  }
   func commitPlacement(at point: CGPoint) {
     guard let tool = placementTool, let state = previous else { return }
     let position = placementPosition(at: point, kind: tool.kind)
     updatePlacement(at: point)
-    guard
-      Settlement.problem(tool.kind, at: position, layout: state.layout, facing: placementFacing)
-        == nil
-    else { return }
+    guard placementProblem(tool, at: position, state: state) == nil else { return }
     onPlacement?(tool, position)
   }
   func beginPan(_ event: NSEvent, force: Bool = false) {

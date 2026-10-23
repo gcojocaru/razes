@@ -92,13 +92,13 @@ final class IsometricLayoutTests: XCTestCase {
     scene.update(state: state, reducedMotion: true)
     XCTAssertEqual(scene.selection(at: CGPoint(x: 710, y: 300)), .hotspot(.house))
   }
-  @MainActor func testNewSettlementHasOnlyHouseAndPlacementRejectsOccupiedGround() {
+  @MainActor func testNewSettlementHasHouseAndStarterFarmlandAndRejectsOccupiedGround() {
     let scene = HomesteadScene()
     var state = Rules.newGame()
     state.phase = .work
     scene.update(state: state, reducedMotion: true)
     XCTAssertNil(scene.childNode(withName: "//scenery-legacy-barn"))
-    XCTAssertTrue(scene.childNode(withName: "//field")?.isHidden == true)
+    XCTAssertNotNil(scene.childNode(withName: "//farm:5:10"))
     var placed: GridPosition?
     scene.onPlacement = { _, point in placed = point }
     scene.setPlacement(.building(.woodshed, worker: nil, instant: false))
@@ -120,8 +120,10 @@ final class IsometricLayoutTests: XCTestCase {
     XCTAssertTrue(scene.childNode(withName: "world") === world)
     XCTAssertNotNil(scene.childNode(withName: "//isometric-ground"))
     let house = scene.childNode(withName: "//house")!
-    let field = scene.childNode(withName: "//field")!
-    XCTAssertGreaterThan(field.zPosition, house.zPosition)
+    let field = scene.childNode(withName: "//farm:5:10")!
+    XCTAssertTrue(field.parent === terrain)
+    XCTAssertTrue(house.parent === world)
+    XCTAssertLessThan(terrain!.zPosition, world!.zPosition)
     XCTAssertEqual(scene.childNode(withName: "//plot-woodshed")?.position, IsometricLayout.woodshed)
   }
 }

@@ -10,6 +10,25 @@ struct MaterialsPanel: View {
   }
   var body: some View {
     VStack(alignment: .leading, spacing: 16) {
+      Text("Food: \(state.food) · Coins: \(state.money)").font(.headline)
+      Text("FOOD PROVISIONS").font(.headline)
+      Text("\(Rules.suppliesGain(state)) food · 4 coins · arrives at season end")
+      Text(
+        "Ion buys provisions instead of another seasonal job. Food does not use material storage slots."
+      )
+      .font(.caption).foregroundStyle(GamePalette.muted)
+      if state.phase == .work {
+        let target: TaskID = state.assignments["ion"] == .supplies ? .rest : .supplies
+        let reason = Rules.assignmentProblem(state, worker: .ion, task: target)
+        Button(target == .rest ? "Cancel food purchase" : "Assign Ion to buy food") {
+          session.send(
+            .init(type: "assign", revision: session.state.revision, worker: .ion, task: target))
+        }.disabled(reason != nil)
+        if let reason { Text(reason).font(.caption).foregroundStyle(GamePalette.muted) }
+      } else {
+        Text("Continue to seasonal planning to buy food.").font(.caption)
+      }
+      Divider()
       Text("Shared storage: \(state.materials.total) / \(Materials.capacity(state))")
         .font(.title3).accessibilityAddTraits(.isHeader)
       Text("Wood, stone and planks each take one slot. Food and coins are stored separately.")
@@ -121,6 +140,44 @@ struct HouseStorageControls: View {
           session.upgradeHouseStorage()
         }
       }
+    }
+  }
+}
+
+struct HouseStockOverview: View {
+  let state: GameState
+  var body: some View {
+    VStack(alignment: .leading, spacing: 8) {
+      Text("HOUSE STOCKS").font(.caption).foregroundStyle(GamePalette.gold)
+      LabeledContent("Food", value: "\(state.food)")
+        .accessibilityElement(children: .ignore).accessibilityLabel("Food").accessibilityValue(
+          "\(state.food)")
+      LabeledContent("Coins", value: "\(state.money)")
+        .accessibilityElement(children: .ignore).accessibilityLabel("Coins").accessibilityValue(
+          "\(state.money)")
+      ForEach(MaterialID.allCases, id: \.self) { material in
+        LabeledContent(material.title, value: "\(state.materials[material])")
+          .accessibilityElement(children: .ignore).accessibilityLabel(material.title)
+          .accessibilityValue("\(state.materials[material])")
+      }
+      Text("Material storage: \(state.materials.total) / \(Materials.capacity(state))")
+        .font(.caption)
+      ProgressView(
+        value: Double(min(state.materials.total, Materials.capacity(state))),
+        total: Double(Materials.capacity(state))
+      )
+      .accessibilityLabel("Material storage")
+      .accessibilityValue("\(state.materials.total) of \(Materials.capacity(state)) slots")
+      if Materials.reserved(state).total > 0 {
+        Text("Reserved for work: \(Materials.reserved(state).text)").font(.caption)
+          .foregroundStyle(GamePalette.gold)
+      }
+      if state.materials.total > Materials.capacity(state) {
+        Text("Storage is over capacity. Existing stocks are safe; free space before buying more.")
+          .font(.caption).foregroundStyle(.orange)
+      }
+      Text("Seasonal food use: \(Rules.consumption(state, house: state.house))")
+        .font(.caption).foregroundStyle(GamePalette.muted)
     }
   }
 }

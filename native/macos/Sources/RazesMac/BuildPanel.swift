@@ -13,6 +13,14 @@ struct BuildPanel: View {
       Text(
         "Choose a building, then place it on free ground. Foundations finish at season end; Ion keeps his assignment."
       ).font(.caption).foregroundStyle(GamePalette.muted)
+      Text("FARMLAND").font(.caption).foregroundStyle(GamePalette.gold)
+      Button("Paint farmland") { infrastructure(.farmland) }.buttonStyle(.bordered)
+        .disabled(Settlement.farmlandEditingProblem(state) != nil)
+      Text(
+        Settlement.farmlandEditingProblem(state)
+          ?? "1 coin per tile. Click or drag to paint any shape; Erase removes tiles. Farming yields stay the same for any plot size."
+      )
+      .font(.caption).foregroundStyle(GamePalette.muted)
       Text("ROADS & BOUNDARIES").font(.caption).foregroundStyle(GamePalette.gold)
       HStack {
         Button("Stone pavement") { infrastructure(.pavement) }

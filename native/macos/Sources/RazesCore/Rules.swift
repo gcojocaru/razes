@@ -34,7 +34,8 @@ public enum Rules {
   public static func taskOptions(_ s: GameState) -> [Task] {
     let t = Content.shared.tasks
     var tasks: [Task] = []
-    if s.season == 0 && !s.planted { tasks.append(t["plant"]!) }
+    // shortcut: all farmland shares one crop cycle and yield; split crops when area affects production.
+    if s.season == 0 && !s.planted && !s.layout.farmland.isEmpty { tasks.append(t["plant"]!) }
     if s.season == 1 && s.planted && !s.tended { tasks.append(t["tend"]!) }
     if s.season == 2 && s.planted && !s.harvested {
       var harvest = t["harvest"]!
@@ -110,6 +111,9 @@ public enum Rules {
   }
   public static func assignmentProblem(_ s: GameState, worker: WorkerID, task: TaskID) -> String? {
     if s.phase != .work { return "Continue to the next season before assigning work." }
+    if task == .plant && s.layout.farmland.isEmpty {
+      return "Paint farmland in Construction before sowing."
+    }
     if !taskOptions(s).contains(where: { $0.id == task }) {
       return "That task is unavailable this season."
     }

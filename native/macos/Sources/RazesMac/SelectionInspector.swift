@@ -6,6 +6,7 @@ struct SelectionInspector: View {
   let state: GameState
   let selection: SceneSelection
   let beginPlacement: (PlacementTool) -> Void
+  let buySupplies: () -> Void
   var body: some View {
     VStack(alignment: .leading, spacing: 14) {
       switch selection {
@@ -60,6 +61,9 @@ struct SelectionInspector: View {
         Text(spot.rawValue.capitalized).font(.system(size: 25, design: .serif))
         switch spot {
         case .house:
+          HouseStockOverview(state: state)
+          Button("Buy supplies", systemImage: "cart", action: buySupplies)
+          Divider()
           Text("Shelter: \(state.house)/100")
           HouseStorageControls(session: session, state: state)
           Text(
@@ -72,7 +76,16 @@ struct SelectionInspector: View {
             .caption)
           assignmentButtons(.supplies)
         case .field:
+          Text("\(state.layout.farmland.count) farmland tiles").font(.headline)
           Text(Rules.fieldLabel(state)).font(.callout)
+          if state.layout.farmland.isEmpty {
+            Text("Paint farmland in Construction before sowing.").font(.caption)
+          }
+          Button("Paint farmland") { beginPlacement(.infrastructure(.farmland)) }
+            .disabled(Settlement.farmlandEditingProblem(state) != nil)
+          if let reason = Settlement.farmlandEditingProblem(state) {
+            Text(reason).font(.caption).foregroundStyle(GamePalette.muted)
+          }
           if let task = Rules.taskOptions(state).first(where: {
             [TaskID.plant, .tend, .harvest].contains($0.id)
           }) {
