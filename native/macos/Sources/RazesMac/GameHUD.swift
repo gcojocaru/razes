@@ -21,7 +21,7 @@ struct GameHUD: View {
               .overlay(Rectangle().stroke(GamePalette.gold.opacity(0.6)))
             VStack(alignment: .leading, spacing: 4) {
               Text(person.name).font(.system(size: 15, weight: .semibold, design: .serif))
-              Text(state.phase == .work && state.reservedWorker == worker.rawValue ? "Promised to Vasile" : task.name)
+              Text(task.name)
                 .font(.system(size: 11)).lineLimit(2).multilineTextAlignment(.leading)
             }.frame(maxWidth: .infinity, alignment: .leading)
           }.frame(width: 160).padding(5)
@@ -45,19 +45,14 @@ struct GameHUD: View {
   }
   private var phaseLabel: String {
     switch state.phase {
-    case .opening: "A CONVERSATION"
     case .work: "PLAN YOUR WORK"
-    case .consequence: "AS EVENING FALLS"
-    case .summary: "SEASON REMEMBERED"
-    case .ending: "YOUR FIRST YEAR"
+    case .summary: "SEASON REPORT"
     }
   }
   private var primaryLabel: String {
     switch state.phase {
-    case .opening, .consequence: "Conversation"
     case .work: "End season"
     case .summary: "Review season"
-    case .ending: "Review year"
     }
   }
 }

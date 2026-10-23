@@ -38,13 +38,15 @@ public struct BuildingDefinition: Sendable, Identifiable {
 public enum BuildingStage: String, Sendable { case empty, planned, complete }
 public enum Construction {
   public static let definitions: [BuildingDefinition] = [
-    .init(id: .storehouse, title: "Storehouse", cost: 4,
-      benefit: "Shared room for wood, stone and crafted supplies. Adds 40 storage per completed level.",
+    .init(
+      id: .storehouse, title: "Storehouse", cost: 4,
+      benefit:
+        "Shared room for wood, stone and crafted supplies. Adds 40 storage per completed level.",
       food: 0, coins: 0),
     .init(
       id: .woodshed, title: "Woodshed", task: .buildWoodshed, cost: 3,
       benefit:
-        "Firewood sales. From next season: winter base food use 6 and shelter wear 6; cold shelter still needs 3 extra food.",
+        "Firewood sales. From next season: winter base food use 2 and shelter wear 6; cold shelter still needs 1 extra food.",
       food: 0, coins: 1),
     .init(
       id: .cellar, title: "Root cellar", task: .buildCellar, cost: 4,
@@ -93,16 +95,15 @@ public enum Construction {
       $0.id == id && $0.level > 0 && $0.condition > 0 && $0.completedSeason < state.turn
     }
   }
-  // Legacy seasonal assignments remain valid for existing drafts and reference years.
   public static func unavailable(_ id: BuildingID, state: GameState) -> String? {
     if state.buildings.contains(where: { $0.id == id }) {
       return "Already completed or under construction."
     }
     if state.phase != .work {
-      return "Finish the current conversation before assigning seasonal work."
+      return "Continue to the next season before assigning work."
     }
     if state.season == 3 {
-      return "Legacy worker construction is unavailable in winter. Use the building palette."
+      return "Worker construction is unavailable in winter. Use the building palette."
     }
     return nil
   }

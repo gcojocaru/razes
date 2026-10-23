@@ -15,7 +15,6 @@ struct ContentView: View {
   @State private var cameraZoom = 111
   private var state: GameState { session.state }
   private var reduced: Bool { systemReduceMotion || session.reduceMotion }
-  private var mandatory: Bool { state.phase == .opening || state.phase == .consequence }
   var body: some View {
     GeometryReader { geometry in
       ZStack {
@@ -30,12 +29,11 @@ struct ContentView: View {
             mapControls
             Spacer(minLength: 0)
             HStack(alignment: .bottom, spacing: 16) {
-              if mandatory || ui.review {
+              if ui.review {
                 GamePanel {
                   GameScroll(maximumHeight: min(380, geometry.size.height * 0.46)) {
                     PhaseOverlay(
-                      session: session, state: state, close: { ui.review = false },
-                      restart: { restart = true }, journal: { sheet = "journal" })
+                      session: session, state: state, close: { ui.review = false })
                   }
                 }.frame(maxWidth: 760)
               }
@@ -98,19 +96,17 @@ struct ContentView: View {
     .sheet(item: Binding(get: { sheet.map(SheetID.init) }, set: { sheet = $0?.id })) { item in
       VStack(alignment: .leading, spacing: 18) {
         HStack {
-          Text(item.id == "journal" ? "The promise journal" : item.id == "materials" ? "Materials & storage" : "How to play").font(
+          Text(item.id == "materials" ? "Materials & storage" : "How to play").font(
             .system(size: 28, design: .serif))
           Spacer()
           Button("Done") { sheet = nil }.keyboardShortcut(.cancelAction)
         }
         ScrollView {
-          if item.id == "journal" {
-            JournalView(state: state)
-          } else if item.id == "materials" {
+          if item.id == "materials" {
             MaterialsPanel(session: session, state: state)
           } else {
             Text(
-              "Read the seasonal conversation, then select a household portrait or a place in the homestead to assign work. Each adult has one assignment. End season opens a forecast; confirm to resolve work, then answer the evening conversation.\n\nBuild lets you choose free locations on the isometric map. Drag or scroll to pan, and pinch or Option-scroll to zoom. The map controls also provide pan, zoom and a Home reset. Green placement footprints are free; red footprints are occupied, outside the map or reserved for the house and farmland. Click to place; Escape cancels. Construction completes at season end. Completed buildings produce their level-scaled food/coins once per season and lose 20 condition afterwards. Upgrades and repairs are immediate. At zero condition a building loses a level and returns to 60 condition; level 1 becomes inactive until repaired. No building timers or offline decay run. The year ending offers Next settlement season for ongoing building progress.\n\nRotate the map with the arrow controls; the HUD stays upright. Rotate a building from its inspector or press R while placing. Build offers stone pavement, dirt paths, rail fences and woven wattle fences (1 coin per tile/edge). Click or drag to paint; the tool stays active. Press R or Rotate fence edge to choose the north, east, south or west edge. Erase removes placed pavement/fences without a refund. Debug season preview changes the scene only; choose Actual season to restore the story view.\n\nMaterials opens shared wood/stone/plank storage, immediate purchases and crafting (2 wood → 1 plank). Gathering uses a seasonal worker; the forecast shows what fits. House storage upgrades add 10 slots, and completed storehouses add 40 per level. Material costs are shown before construction. Discard unwanted supplies explicitly to free room.\n\nHarvest needs two adults. Honouring the ox promise reserves Petru in autumn. All choices and draft assignments save on this Mac.\n\nCommand-J opens the journal. The Places menu provides keyboard alternatives to scene targets. Escape closes optional commands; conversations remain until answered."
+              "Select Ion’s portrait or a place in the settlement to assign one job each season. End season opens a forecast; confirm to resolve work, food use, shelter wear and construction. Read the report and continue. Winter returns to spring with a fresh field.\n\nSow in spring, optionally tend in summer, and harvest with Ion in autumn. Food use is 3 each season; an active woodshed reduces winter use to 2. Cold winter shelter adds 1 food. Wages, gathering, provisions and repairs compete for Ion’s one assignment. Shortages appear in the report; the settlement continues.\n\nBuild lets you place structures on free ground. Foundations finish at season end and produce from the following season. Completed buildings produce once per season and lose 20 condition afterwards. Upgrades and repairs are immediate. At zero condition a building above level 1 loses a level and returns to 60 condition; level 1 stays inactive until repaired. No timers or offline decay run.\n\nDrag or scroll to pan; pinch or Option-scroll to zoom. Home resets the camera. Rotate the map with the arrow controls. Rotate a building in its inspector, or press R while placing. Paths and fences cost 1 coin per tile or edge; click or drag to paint. R changes the fence edge. Erase removes infrastructure without refund. Escape cancels placement or closes commands.\n\nMaterials opens shared wood, stone and plank storage. Buy and craft immediately (2 wood → 1 plank), or assign Ion to gather at season end. The forecast shows what fits. House storage upgrades add 10 slots; storehouses add 40 per completed level. Discard unwanted supplies to free room.\n\nDraft assignments and settlement changes save on this Mac. The Places menu offers keyboard alternatives to map targets. Debug season preview changes scenery only; Actual season restores the simulation view."
             ).lineSpacing(5)
           }
         }
@@ -173,10 +169,7 @@ struct ContentView: View {
     .onChange(of: ui.buildMode) { scene.select(ui.selection, buildMode: ui.buildMode) }
     .onChange(of: reduced) { refreshScene() }
     .onChange(of: scenePhase) { session.active = scenePhase == .active }
-    .background {
-      Button("Open journal") { sheet = "journal" }.keyboardShortcut("j", modifiers: .command)
-        .hidden()
-    }
+
   }
   private var topStrip: some View {
     HStack(spacing: 18) {
@@ -190,10 +183,13 @@ struct ContentView: View {
       resource("Food", value: "\(state.food)", icon: "leaf")
       resource("Money", value: "\(state.money)", icon: "circle")
       resource("Shelter", value: "\(state.house)", icon: "house")
-      Button("Materials \(state.materials.total)/\(Materials.capacity(state))") { sheet = "materials" }
-        .help("\(state.materials.text). Buy, craft, gather and expand shared storage.")
+      Button("Materials \(state.materials.total)/\(Materials.capacity(state))") {
+        sheet = "materials"
+      }
+      .help("\(state.materials.text). Buy, craft, gather and expand shared storage.")
       resource(
-        "Free", value: "\(Materials.assignments(state).values.filter{$0 == .rest}.count)/3", icon: "person.2")
+        "Free", value: "\(Materials.assignments(state).values.filter{$0 == .rest}.count)/1",
+        icon: "person")
       Spacer(minLength: 0)
       Button("Debug", systemImage: "wrench.and.screwdriver") {
         ui.dismissOptional()
@@ -210,7 +206,6 @@ struct ContentView: View {
         }
       }.menuStyle(.borderlessButton).fixedSize()
       Menu {
-        Button("Promise journal") { sheet = "journal" }
         Button("How to play") { sheet = "help" }
         Divider()
         Toggle("Ambient sound", isOn: $session.soundEnabled)
@@ -268,10 +263,6 @@ struct ContentView: View {
   }
   private func choose(_ selection: SceneSelection) {
     guard !session.needsRecovery else { return }
-    if mandatory, case .worker = selection {
-      ui.review = true
-      return
-    }
     ui.dismissOptional()
     ui.selection = selection
     ui.review = false

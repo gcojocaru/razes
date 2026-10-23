@@ -9,7 +9,6 @@ final class PlacementSessionTests: XCTestCase {
     defer { try? FileManager.default.removeItem(at: directory) }
     let store = SaveStore(url: directory.appendingPathComponent("save.json"))
     let session = GameSession(store: store)
-    session.send(.init(type: "choose", revision: 0, event: "spring-ox", choice: "borrow"))
     session.placeBuilding(.woodshed, at: .init(x: 1, y: 1))
     session.placeScenery(.well, at: .init(x: 12, y: 12))
     let before = session.state
@@ -23,12 +22,11 @@ final class PlacementSessionTests: XCTestCase {
     throws
   {
     let session = GameSession(store: nil)
-    session.send(.init(type: "choose", revision: 0, event: "spring-ox", choice: "borrow"))
-    session.send(.init(type: "assign", revision: 1, worker: .ana, task: .buildWoodshed))
+    session.send(.init(type: "assign", revision: 0, worker: .ion, task: .buildWoodshed))
     session.finishConstruction(.woodshed)
     XCTAssertEqual(session.state.phase, .work)
     XCTAssertEqual(session.state.money, 12)
-    XCTAssertEqual(session.state.assignments["ana"], .rest)
+    XCTAssertEqual(session.state.assignments["ion"], .rest)
     XCTAssertEqual(session.state.buildings.first?.debugPlaced, true)
     XCTAssertFalse(Construction.active(.woodshed, state: session.state))
     XCTAssertEqual(try SaveCodec.decode(SaveCodec.encode(session.state)), session.state)
@@ -43,12 +41,8 @@ final class PlacementSessionTests: XCTestCase {
 extension PlacementSessionTests {
   @MainActor func testSeasonalFoundationCompletesInSpringWithoutAClock() {
     let session = GameSession(store: nil)
-    session.send(.init(type: "choose", revision: 0, event: "spring-ox", choice: "borrow"))
     session.placeBuilding(.cellar, at: .init(x: 1, y: 1))
     session.send(.init(type: "resolve", revision: session.state.revision))
-    session.send(
-      .init(type: "choose", revision: session.state.revision, event: "spring-table", choice: "keep")
-    )
     session.send(.init(type: "continue", revision: session.state.revision))
     XCTAssertEqual(session.state.season, 1)
     session.finishConstruction(.cellar)
@@ -93,7 +87,7 @@ extension PlacementSessionTests {
     session.previewSeason(3)
     XCTAssertEqual(session.state.season, 0)
     XCTAssertEqual(session.state.displaySeason, 3)
-    XCTAssertEqual(session.state.history, before.history)
+    XCTAssertEqual(session.state.assignments, before.assignments)
     XCTAssertEqual(session.state.layout.viewRotation, 1)
     XCTAssertEqual(try store.load(), session.state)
     XCTAssertTrue(session.placeInfrastructure(.erase, at: .init(x: 1, y: 1)))

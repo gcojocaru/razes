@@ -19,41 +19,31 @@ struct SelectionInspector: View {
           }
         }
         Text(person.line).font(.callout).italic()
-        if state.phase == .work || state.phase == .ending {
-          if state.phase == .work && state.reservedWorker == worker.rawValue {
-            Text("Reserved for your promise to Vasile.").foregroundStyle(GamePalette.gold)
-          } else {
-            ForEach(Rules.taskOptions(state).filter { Construction.building(for: $0.id) == nil }) {
-              task in
-              let reason = Rules.assignmentProblem(state, worker: worker, task: task.id)
-              Button {
-                if let id = Construction.building(for: task.id),
-                  Settlement.position(for: id, in: state.layout) == nil
-                {
-                  beginPlacement(.building(id, worker: worker, instant: false))
-                } else {
-                  session.send(
-                    Action(type: "assign", revision: state.revision, worker: worker, task: task.id))
+        if state.phase == .work {
+          ForEach(Rules.taskOptions(state).filter { Construction.building(for: $0.id) == nil }) {
+            task in
+            let reason = Rules.assignmentProblem(state, worker: worker, task: task.id)
+            Button {
+              session.send(
+                Action(type: "assign", revision: state.revision, worker: worker, task: task.id))
+            } label: {
+              HStack {
+                Text(task.name)
+                Spacer()
+                if task.id == Materials.assignments(state)[worker.rawValue] {
+                  Image(systemName: "checkmark")
                 }
-              } label: {
-                HStack {
-                  Text(task.name)
-                  Spacer()
-                  if task.id == Materials.assignments(state)[worker.rawValue] {
-                    Image(systemName: "checkmark")
-                  }
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-              }.disabled(reason != nil).help(reason ?? task.description)
-              if let reason { Text(reason).font(.caption).foregroundStyle(GamePalette.muted) }
-            }
-            let task = Rules.task(Materials.assignments(state)[worker.rawValue]!)
-            Text(task.description).font(.caption).foregroundStyle(GamePalette.muted)
-            Text("Current work cost: \(task.moneyCost) money · \(task.foodCost) food").font(
-              .caption)
+              }
+              .frame(maxWidth: .infinity, alignment: .leading)
+            }.disabled(reason != nil).help(reason ?? task.description)
+            if let reason { Text(reason).font(.caption).foregroundStyle(GamePalette.muted) }
           }
+          let task = Rules.task(Materials.assignments(state)[worker.rawValue]!)
+          Text(task.description).font(.caption).foregroundStyle(GamePalette.muted)
+          Text("Current work cost: \(task.moneyCost) money · \(task.foodCost) food").font(
+            .caption)
         } else {
-          Text("Assign work after the opening conversation.").font(.caption)
+          Text("Continue to the next season to assign work.").font(.caption)
         }
       case .building(let id):
         BuildingInspector(session: session, state: state, id: id, beginPlacement: beginPlacement)
@@ -91,8 +81,6 @@ struct SelectionInspector: View {
           } else {
             Text("No field work is available this season.").font(.caption)
           }
-        case .visitor:
-          Text("Your neighbours remember the work and the promises you share.").font(.callout)
         }
       }
     }.buttonStyle(.bordered).controlSize(.regular)

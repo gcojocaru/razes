@@ -5,8 +5,6 @@ struct PhaseOverlay: View {
   @Bindable var session: GameSession
   let state: GameState
   let close: () -> Void
-  let restart: () -> Void
-  let journal: () -> Void
   @AccessibilityFocusState private var headingFocused: Bool
   var body: some View {
     VStack(alignment: .leading, spacing: 14) {
@@ -16,14 +14,10 @@ struct PhaseOverlay: View {
         )
         .accessibilityAddTraits(.isHeader).accessibilityFocused($headingFocused)
         Spacer()
-        if state.phase != .opening && state.phase != .consequence {
-          Button("Close", systemImage: "xmark", action: close).labelStyle(.iconOnly)
-            .help(
-              "Close review")
-        }
+        Button("Close", systemImage: "xmark", action: close).labelStyle(.iconOnly)
+          .help("Close review")
       }
       switch state.phase {
-      case .opening, .consequence: ConversationView(session: session, state: state)
       case .work:
         let forecast = Rules.preview(state)
         HStack(alignment: .top, spacing: 24) {
@@ -47,8 +41,6 @@ struct PhaseOverlay: View {
             Text(
               "Food \(forecast.foodAfter) · Money \(forecast.moneyAfter) · Shelter \(forecast.houseAfter)"
             ).font(.headline)
-            Text("The evening conversation may change the outcome.").font(.caption).foregroundStyle(
-              GamePalette.muted)
             ForEach(forecast.errors, id: \.self) {
               Text($0).font(.caption).foregroundStyle(.orange)
             }
@@ -61,7 +53,7 @@ struct PhaseOverlay: View {
           }.frame(maxWidth: .infinity, alignment: .leading)
         }
       case .summary:
-        Text("\(Content.seasons[state.season]), remembered").font(.system(size: 27, design: .serif))
+        Text("\(Content.seasons[state.season]) report").font(.system(size: 27, design: .serif))
         if let report = state.report {
           HStack(alignment: .top, spacing: 24) {
             VStack(alignment: .leading, spacing: 6) {
@@ -78,51 +70,23 @@ struct PhaseOverlay: View {
               Text("Consumed \(report.consumption) food · Weathering \(report.wear)").font(.caption)
                 .foregroundStyle(GamePalette.muted)
               if report.deficit > 0 {
-                Text("Food shortfall: \(report.deficit). Recorded as hardship.").foregroundStyle(
+                Text("Food shortfall: \(report.deficit).").foregroundStyle(
                   .orange
                 ).font(.caption)
               }
             }.frame(maxWidth: .infinity, alignment: .leading)
           }
         }
-        Button(
-          state.season == 3
-            ? "See what the year has meant"
-            : "Continue to \(Content.seasons[min(3,state.season+1)])"
-        ) { session.send(Action(type: "continue", revision: state.revision)) }.buttonStyle(
-          .borderedProminent)
-      case .ending:
-        let ending = Rules.ending(state)
-        Text(ending.title).font(.system(size: 27, design: .serif))
-        Text(ending.text).lineSpacing(3)
-        HStack(alignment: .top, spacing: 20) {
-          ForEach(ending.decisions, id: \.event) { decision in
-            VStack(alignment: .leading, spacing: 5) {
-              Text(decision.title).font(.headline)
-              Text(decision.detail).font(.caption).foregroundStyle(GamePalette.muted)
-            }.frame(maxWidth: .infinity, alignment: .leading)
-          }
-        }
-        HStack {
-          Button("Next settlement season") {
-            session.send(.init(type: "settlement", revision: state.revision))
-          }
-          Button("Promise journal", action: journal)
-          Button("Begin another household", action: restart).buttonStyle(.borderedProminent)
-        }
-        ForEach(Materials.forecast(state).lines, id: \.self) { Text($0).font(.caption) }
-        if let haul = state.lastMaterialHaul { Text("Last haul: \(haul.text)").font(.caption) }
-        Text("Use Materials or a portrait to assign gathering for the next settlement season.").font(.caption)
+        Button("Continue to \(Content.seasons[(state.season + 1) % 4])") {
+          session.send(Action(type: "continue", revision: state.revision))
+        }.buttonStyle(.borderedProminent)
       }
     }.onAppear { headingFocused = true }
   }
   private var title: String {
     switch state.phase {
-    case .opening: "A CONVERSATION"
     case .work: "REVIEW & CONFIRM"
-    case .consequence: "AS EVENING FALLS"
-    case .summary: "SEASON REMEMBERED"
-    case .ending: "YOUR FIRST YEAR"
+    case .summary: "SEASON REPORT"
     }
   }
 }

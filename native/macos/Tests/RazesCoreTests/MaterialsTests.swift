@@ -18,14 +18,13 @@ final class MaterialsTests: XCTestCase {
     XCTAssertNotNil(BuildingID(rawValue: "storehouse"))
   }
 
-  func testMixedHaulUsesSharedRoomAndForecastMatchesResolution() throws {
+  func testIonHaulUsesSharedRoomAndForecastMatchesResolution() throws {
     var s = try ConstructionTests().work()
     s.materials = .init(wood: 9, stone: 6)
     s = try ConstructionTests().assign(s, .ion, .gatherWood)
-    s = try ConstructionTests().assign(s, .ana, .gatherStone)
     let haul = Materials.forecast(s)
     XCTAssertEqual(haul.gained, .init(wood: 5))
-    XCTAssertEqual(haul.expected, .init(wood: 6, stone: 4))
+    XCTAssertEqual(haul.expected, .init(wood: 6))
     XCTAssertFalse(Rules.preview(s).warnings.filter { $0.contains("Limited storage") }.isEmpty)
     s = try Rules.dispatch(s, action: .init(type: "resolve", revision: s.revision))
     XCTAssertEqual(s.materials, .init(wood: 14, stone: 6))
@@ -78,15 +77,14 @@ final class MaterialsTests: XCTestCase {
     var s = try ConstructionTests().work()
     s.materials = .init(wood: 4)
     s = try ConstructionTests().assign(s, .ion, .buildWoodshed)
-    s = try ConstructionTests().assign(s, .ana, .gatherStone)
     XCTAssertEqual(Materials.available(s), .init())
-    XCTAssertEqual(Materials.forecast(s).gained, .init(stone: 4))
+    XCTAssertEqual(Materials.forecast(s).gained, .init())
     s = try Rules.dispatch(s, action: .init(type: "resolve", revision: s.revision))
-    XCTAssertEqual(s.materials, .init(stone: 4))
+    XCTAssertEqual(s.materials, .init())
     var future = try ConstructionTests().work()
     future.materials = .init()
     future = try ConstructionTests().assign(future, .ion, .gatherWood)
-    XCTAssertThrowsError(try ConstructionTests().assign(future, .ana, .buildWoodshed))
+    XCTAssertThrowsError(try ConstructionTests().assign(future, .ion, .buildWoodshed))
     XCTAssertThrowsError(try Construction.start(.woodshed, state: &future))
   }
 
@@ -141,34 +139,10 @@ final class MaterialsTests: XCTestCase {
     XCTAssertEqual(s, house)
   }
 
-  func testPostStoryGatheringDoesNotReplayHistoricalWorkOrChangeStory() throws {
-    var s = try XCTUnwrap(Reference.load().runs.first?.steps.last?.state)
-    let history = s.history
-    let report = s.report
-    let assignments = s.assignments
-    let food = s.food
-    s = try ConstructionTests().assign(s, .ion, .gatherWood)
-    s = try ConstructionTests().assign(s, .petru, .gatherStone)
-    s = try Rules.dispatch(s, action: .init(type: "settlement", revision: s.revision))
-    XCTAssertEqual(s.materials, .init(wood: 12, stone: 8))
-    XCTAssertEqual(s.history, history)
-    XCTAssertEqual(s.report, report)
-    XCTAssertEqual(s.assignments, assignments)
-    XCTAssertEqual(s.food, food)
-    XCTAssertEqual(try SaveCodec.decode(SaveCodec.encode(s)), s)
-  }
-
-  func testV6MigrationAndCurrentSchemaValidation() throws {
+  func testCurrentMaterialSchemaValidation() throws {
     var s = try ConstructionTests().work()
     s = try ConstructionTests().assign(s, .ion, .buildWoodshed)
     var object = try JSONSerialization.jsonObject(with: SaveCodec.encode(s)) as! [String: Any]
-    object["version"] = 6
-    for key in ["materials", "houseLevel", "gatheringAssignments", "lastMaterialHaul"] {
-      object.removeValue(forKey: key)
-    }
-    let migrated = try SaveCodec.decode(JSONSerialization.data(withJSONObject: object))
-    XCTAssertEqual(migrated, s)
-    object = try JSONSerialization.jsonObject(with: SaveCodec.encode(s)) as! [String: Any]
     for value: Any in [-1, 100001, true, "2", 1.5] {
       object["materials"] = ["wood": value, "stone": 0, "planks": 0]
       XCTAssertThrowsError(try SaveCodec.decode(JSONSerialization.data(withJSONObject: object)))

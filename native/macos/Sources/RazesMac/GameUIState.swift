@@ -1,6 +1,6 @@
 import RazesCore
 
-enum Hotspot: String, CaseIterable, Hashable { case field, house, visitor, stores }
+enum Hotspot: String, CaseIterable, Hashable { case field, house, stores }
 enum SceneSelection: Equatable {
   case worker(WorkerID)
   case hotspot(Hotspot)

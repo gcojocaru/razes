@@ -24,7 +24,7 @@ final class SettlementTests: XCTestCase {
     state.layout.scenery[0].position = .init(x: Int.min, y: Int.min)
     XCTAssertThrowsError(try SaveCodec.decode(SaveCodec.encode(state)))
   }
-  func testLayoutAndDebugCompletionRoundTripWithoutChangingHistory() throws {
+  func testLayoutAndDebugCompletionRoundTrip() throws {
     var state = Rules.newGame()
     XCTAssertTrue(state.layout.scenery.isEmpty)
     state.layout.buildings = [.init(id: .woodshed, position: .init(x: 1, y: 1))]
@@ -38,22 +38,10 @@ final class SettlementTests: XCTestCase {
     invalid.layout.buildings = []
     XCTAssertThrowsError(try SaveCodec.decode(SaveCodec.encode(invalid)))
   }
-  func testV2MigrationPreservesBuildingsAndAddsLegacyPositions() throws {
-    let helper = ConstructionTests()
-    let draft = try helper.assign(helper.work(), .ion, .buildWoodshed)
-    var object = try JSONSerialization.jsonObject(with: SaveCodec.encode(draft)) as! [String: Any]
-    object["version"] = 2
-    object.removeValue(forKey: "layout")
-    object.removeValue(forKey: "settlementSeasons")
-    let state = try SaveCodec.decode(JSONSerialization.data(withJSONObject: object))
-    XCTAssertEqual(state.version, 7)
-    XCTAssertEqual(state.assignments, draft.assignments)
-    XCTAssertEqual(state.layout.scenery.count, 4)
-    XCTAssertNotNil(Settlement.position(for: .woodshed, in: state.layout))
-    XCTAssertEqual(try SaveCodec.decode(SaveCodec.encode(state)), state)
-  }
+
   func testWinterDebugCompletionDoesNotRewritePastConsumption() throws {
-    var state = try XCTUnwrap(Reference.load().runs.first?.steps.last?.state)
+    var state = Rules.newGame()
+    state.season = 3
     XCTAssertEqual(state.season, 3)
     state.layout.buildings = [.init(id: .woodshed, position: .init(x: 1, y: 1))]
     state.buildings = [.init(id: .woodshed, completedSeason: 3, debugPlaced: true)]

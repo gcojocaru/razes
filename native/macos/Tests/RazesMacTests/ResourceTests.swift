@@ -25,10 +25,23 @@ final class ResourceTests: XCTestCase {
       XCTAssertFalse(node.hasActions(), node.name ?? "unnamed node")
     }
   }
+  @MainActor func testOnlyIonAndNoVisitorAppearInAnySeason() throws {
+    let scene = HomesteadScene()
+    for season in 0..<4 {
+      var s = Rules.newGame()
+      s.season = season
+      scene.update(state: s, reducedMotion: true)
+      XCTAssertNotNil(scene.childNode(withName: "//worker-ion"))
+      for name in ["worker-ana", "worker-petru", "visitor"] {
+        XCTAssertNil(scene.childNode(withName: "//" + name))
+      }
+    }
+    XCTAssertEqual(Set(Content.shared.people.keys), ["ion"])
+  }
   @MainActor func testMissingArtReportsWarningWithoutBlockingRules() {
     let scene = HomesteadScene(artDirectory: URL(fileURLWithPath: "/missing-razes-test-art"))
     scene.update(state: Rules.newGame(), reducedMotion: true)
     XCTAssertNotNil(scene.resourceWarning)
-    XCTAssertEqual(Rules.newGame().phase, .opening)
+    XCTAssertEqual(Rules.newGame().phase, .work)
   }
 }

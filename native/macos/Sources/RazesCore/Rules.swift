@@ -9,23 +9,6 @@ public enum Rules {
     s.house = b.initial.house
     return s
   }
-  public static func currentEvent(_ s: GameState) -> GameEvent {
-    precondition(s.phase == .opening || s.phase == .consequence)
-    let opening = s.phase == .opening
-    let id: String
-    switch s.season {
-    case 0: id = opening ? "spring-ox" : "spring-table"
-    case 1: id = opening ? "summer-brother" : (s.tended ? "summer-tended" : "summer-dry")
-    case 2:
-      id = opening ? (s.ox == "borrowed" ? "autumn-promise" : "autumn-free") : "autumn-dispute"
-    default:
-      id =
-        opening
-        ? (s.ox == "broken" ? "winter-isolation" : "winter-friend")
-        : (s.house < b.coldThreshold ? "winter-cold" : "winter-hearth")
-    }
-    return Content.shared.events[id]!
-  }
   public static func task(_ id: TaskID) -> Task {
     if let gathering = Materials.gatheringTask(id) { return gathering }
     if let building = Construction.building(for: id) {
@@ -39,7 +22,7 @@ public enum Rules {
   }
   public static func consumption(_ state: GameState, house: Int) -> Int {
     let winter = state.season == 3
-    let base = winter && Construction.active(.woodshed, state: state) ? 6 : b.consumption
+    let base = winter && Construction.active(.woodshed, state: state) ? 2 : b.consumption
     return base + (winter && house < b.coldThreshold ? b.coldFood : 0)
   }
   public static func weathering(_ state: GameState) -> Int {
@@ -49,34 +32,24 @@ public enum Rules {
     Construction.active(.cellar, state: state) ? 10 : b.supplyGain
   }
   public static func taskOptions(_ s: GameState) -> [Task] {
-    if s.phase == .ending { return [TaskID.gatherWood, .gatherStone, .rest].map(task) }
     let t = Content.shared.tasks
     var tasks: [Task] = []
     if s.season == 0 && !s.planted { tasks.append(t["plant"]!) }
     if s.season == 1 && s.planted && !s.tended { tasks.append(t["tend"]!) }
     if s.season == 2 && s.planted && !s.harvested {
       var harvest = t["harvest"]!
-      harvest.foodGain = b.harvest + s.cropBonus + (s.tended ? b.tendedBonus : 0)
+      harvest.foodGain = b.harvest + (s.tended ? b.tendedBonus : 0)
       tasks.append(harvest)
     }
     let construction = Construction.definitions.filter {
       Construction.unavailable($0.id, state: s) == nil
     }.compactMap { $0.task.map(task) }
     return tasks
-      + [TaskID.repair, .paid, .help, .supplies, .gatherWood, .gatherStone, .rest].map { id in
+      + [TaskID.repair, .paid, .supplies, .gatherWood, .gatherStone, .rest].map { id in
         var value = task(id)
         if id == .supplies { value.foodGain = suppliesGain(s) }
         return value
       } + construction
-  }
-  public static func choiceProblem(_ s: GameState, choice c: Choice) -> String? {
-    if s.money + (c.effect.money ?? 0) < 0 {
-      return "Needs \(-(c.effect.money ?? 0)) money; you have \(s.money)."
-    }
-    if s.food + (c.effect.food ?? 0) < 0 {
-      return "Needs \(-(c.effect.food ?? 0)) food; you have \(s.food)."
-    }
-    return nil
   }
   public static func preview(_ s: GameState) -> Projection {
     var p = Projection()
@@ -94,15 +67,8 @@ public enum Rules {
     let buildingYield = Construction.seasonalYield(s)
     p.foodGain += buildingYield.food
     p.moneyGain += buildingYield.money
-    if s.season == 2 && s.fairShare { p.foodGain += b.fairShareFood }
     let harvesters = assigned.filter { $0 == .harvest }.count
-    if harvesters == 1 {
-      p.errors.append("Harvest needs two adults. Assign one more, or choose different work.")
-    }
-    if harvesters > 2 {
-      p.errors.append("Harvest needs only two adults. Give the third adult different work.")
-    }
-    if harvesters == 2 { p.foodGain += b.harvest + s.cropBonus + (s.tended ? b.tendedBonus : 0) }
+    if harvesters == 1 { p.foodGain += b.harvest + (s.tended ? b.tendedBonus : 0) }
     if p.moneyCost > s.money {
       p.errors.append("Work costs \(p.moneyCost) money; only \(s.money) is available now.")
     }
@@ -115,7 +81,8 @@ public enum Rules {
     }
     let haul = Materials.forecast(s)
     if haul.gained != haul.expected {
-      p.warnings.append("Limited storage: bring home \(haul.gained.text). Gathering fills space in Ion, Ana, Petru order.")
+      p.warnings.append(
+        "Limited storage: bring home \(haul.gained.text). Free storage limits Ion’s haul.")
     }
     let repaired = min(100, s.house + p.houseGain)
     p.consumption = consumption(s, house: repaired)
@@ -124,7 +91,7 @@ public enum Rules {
     p.houseAfter = max(0, repaired - p.wear)
     if p.foodAfter < 0 {
       p.warnings.append(
-        "Expected food shortfall: \(-p.foodAfter). This will be recorded as hardship unless the evening event provides relief."
+        "Expected food shortfall: \(-p.foodAfter). Food will fall to zero; the shortfall appears in the season report."
       )
     } else if p.foodAfter < b.seed {
       p.warnings.append(
@@ -142,101 +109,25 @@ public enum Rules {
     return p
   }
   public static func assignmentProblem(_ s: GameState, worker: WorkerID, task: TaskID) -> String? {
-    if s.phase == .ending {
-      return [TaskID.gatherWood, .gatherStone, .rest].contains(task)
-        ? nil : "Only gathering or rest is available after the first year."
-    }
-    if s.phase != .work { return "Choose the seasonal event before assigning work." }
-    if s.reservedWorker == worker.rawValue {
-      return "This adult is reserved for your promise to Vasile."
-    }
+    if s.phase != .work { return "Continue to the next season before assigning work." }
     if !taskOptions(s).contains(where: { $0.id == task }) {
       return "That task is unavailable this season."
     }
     var candidate = s
     candidate.assignments[worker.rawValue] = task
-    for exclusive in [TaskID.plant, .tend, .buildWoodshed, .buildCellar] {
-      if candidate.assignments.values.filter({ $0 == exclusive }).count > 1 {
-        return "Only one adult is needed for that task."
-      }
-    }
-    return preview(candidate).errors.first { !$0.hasPrefix("Harvest needs two") }
+    return preview(candidate).errors.first
   }
   public static func dispatch(_ state: GameState, action a: Action) throws -> GameState {
     guard a.revision == state.revision else {
       throw GameError("This choice has already changed. Please use the current controls.")
     }
-    guard state.phase != .ending || a.type == "settlement" || a.type == "assign" else {
-      throw GameError("This year is complete. Begin a new household to play again.")
-    }
     var s = state
     switch a.type {
-    case "choose":
-      guard s.phase == .opening || s.phase == .consequence else {
-        throw GameError("There is no event to choose right now.")
-      }
-      let event = currentEvent(s)
-      guard a.event == event.id, !s.history.contains(where: { $0.event == event.id }) else {
-        throw GameError("This event is no longer available.")
-      }
-      guard let c = event.choices.first(where: { $0.id == a.choice }) else {
-        throw GameError("That choice is not available.")
-      }
-      if let problem = choiceProblem(s, choice: c) { throw GameError(problem) }
-      let e = c.effect
-      s.food = min(100000, s.food + (e.food ?? 0))
-      s.money = min(100000, s.money + (e.money ?? 0))
-      s.house = max(0, min(100, s.house + (e.house ?? 0)))
-      s.trust = max(-5, min(5, s.trust + (e.trust ?? 0)))
-      if let ox = e.ox { s.ox = ox }
-      if let share = e.fairShare { s.fairShare = share }
-      if e.reserve == true {
-        s.reservedWorker = "petru"
-        s.assignments["petru"] = .help
-      }
-      if let m = c.memory {
-        s.memories.append(
-          Memory(
-            id: "\(event.id):\(c.id)", title: m.title, detail: m.detail, season: s.season,
-            tone: m.tone))
-      }
-      s.history.append(
-        HistoryEntry(
-          event: event.id, choice: c.id, title: c.label, detail: c.memory?.detail ?? c.detail,
-          season: s.season))
-      if s.phase == .opening {
-        s.phase = .work
-      } else {
-        let consumption = consumption(s, house: s.house)
-        let deficit = max(0, consumption - s.food)
-        s.food = max(0, s.food - consumption)
-        let appliedWear = weathering(s)
-        s.house = max(0, s.house - appliedWear)
-        s.report?.wear = appliedWear
-        if deficit > 0 {
-          s.hardship.append(Hardship(season: s.season, kind: "food", amount: deficit))
-        }
-        if s.house < b.survivalHouse {
-          s.hardship.append(
-            Hardship(season: s.season, kind: "shelter", amount: b.survivalHouse - s.house))
-        }
-        s.report?.foodAfter = s.food
-        s.report?.moneyAfter = s.money
-        s.report?.houseAfter = s.house
-        s.report?.consumption = consumption
-        s.report?.deficit = deficit
-        Construction.resolveSeason(state: &s, produce: false)
-        s.phase = .summary
-      }
     case "assign":
       guard let worker = a.worker, let task = a.task else {
         throw GameError("Unknown work assignment.")
       }
       if let problem = assignmentProblem(s, worker: worker, task: task) { throw GameError(problem) }
-      if s.phase == .ending {
-        s.gatheringAssignments[worker.rawValue] = task
-        break
-      }
       if let id = Construction.building(for: task),
         Settlement.position(for: id, in: s.layout) == nil
       {
@@ -262,76 +153,42 @@ public enum Rules {
       Materials.collect(state: &s)
       let tasks = Array(s.assignments.values)
       for definition in Construction.definitions where definition.task.map(tasks.contains) == true {
-        s.buildings.append(BuildingRecord(id: definition.id, completedSeason: s.season))
+        s.buildings.append(BuildingRecord(id: definition.id, completedSeason: s.turn))
       }
-      if tasks.contains(.plant) {
-        s.planted = true
-        s.cropBonus = ["borrowed", "paid"].contains(s.ox) ? b.oxBonus : 0
-      }
+      if tasks.contains(.plant) { s.planted = true }
       if tasks.contains(.tend) { s.tended = true }
       if tasks.contains(.harvest) { s.harvested = true }
-      if tasks.contains(.help) {
-        s.trust = min(5, s.trust + 1)
-        s.memories.append(
-          Memory(
-            id: "help-\(s.season)", title: "A hand across the fence",
-            detail: s.reservedWorker != nil
-              ? "Petru spent his assignment fulfilling the autumn promise. Vasile shared a meal in thanks."
-              : "Your household made time for Vasile’s work. A shared meal and a warmer friendship came home with you.",
-            season: s.season, tone: "good"))
-      }
-      s.phase = .consequence
-    case "settlement":
-      guard s.phase == .ending, s.settlementSeasons < 100000 else {
-        throw GameError("Complete the first year before advancing settlement seasons.")
-      }
-      Materials.collect(state: &s)
-      s.settlementSeasons += 1
-      Construction.resolveSeason(state: &s)
+      let deficit = max(0, p.consumption - s.food)
+      s.food = max(0, s.food - p.consumption)
+      s.house = max(0, s.house - p.wear)
+      s.report?.foodAfter = s.food
+      s.report?.moneyAfter = s.money
+      s.report?.houseAfter = s.house
+      s.report?.deficit = deficit
+      Construction.resolveSeason(state: &s, produce: false)
+      s.phase = .summary
     case "continue":
       guard s.phase == .summary else { throw GameError("Finish this season before continuing.") }
+      guard s.turn < 400003 else {
+        throw GameError("This settlement has reached its season limit.")
+      }
       if s.season == 3 {
-        s.phase = .ending
+        s.year += 1
+        s.season = 0
+        s.planted = false
+        s.tended = false
+        s.harvested = false
       } else {
         s.season += 1
-        s.phase = .opening
-        s.assignments = newGame().assignments
-        s.reservedWorker = nil
-        s.report = nil
       }
+      s.phase = .work
+      s.assignments = newGame().assignments
+      s.report = nil
+      s.lastMaterialHaul = nil
     default: throw GameError("Unknown action.")
     }
     s.revision += 1
     return s
-  }
-  public static func ending(_ s: GameState) -> Ending {
-    let food = s.settlementSeasons > 0 ? (s.report?.foodAfter ?? s.food) : s.food
-    let house = s.settlementSeasons > 0 ? (s.report?.houseAfter ?? s.house) : s.house
-    let crisis = house < b.survivalHouse || s.hardship.contains { $0.kind == "food" }
-    let secure = !crisis && s.hardship.isEmpty && food >= b.seed && house >= b.coldThreshold
-    let decisions = [
-      s.history.first { $0.event == "autumn-promise" }
-        ?? s.history.first { $0.event == "spring-ox" },
-      s.history.first { $0.event == "summer-brother" },
-      s.history.first { $0.event == "autumn-dispute" },
-    ].compactMap { $0 }
-    return Ending(
-      category: crisis ? "crisis" : secure ? "secure" : "cost",
-      title: crisis
-        ? "A home in need of help"
-        : secure ? "A home worth keeping" : "Through the winter, together",
-      text: crisis
-        ? "You reached the end of the year, but hunger or unsafe shelter has left the household needing outside support. The story is not a failure of care. It is a measure of what three people could carry."
-        : secure
-          ? "There is grain for the next sowing, a roof against the rain, and room to think beyond tomorrow. The year asked much of you. You have given this home another spring."
-          : "You have made it through, though the year has left its mark. Before the next sowing, seed or shelter will need attention. What you have kept together is worth the work ahead.",
-      decisions: decisions)
-  }
-  public static func seasonSubtitle(_ s: GameState) -> String {
-    [
-      "The earth wakes. So does possibility.", "Long days. More work than hands.",
-      "What we planted. What we promised.", "A little warmth against the world.",
-    ][s.season]
   }
   public static func fieldLabel(_ s: GameState) -> String {
     if s.season == 3 { return "Resting beneath the snow" }
@@ -339,7 +196,7 @@ public enum Rules {
     if s.planted {
       return s.season == 0
         ? "Sown for the seasons ahead"
-        : s.season == 1 ? "Growing through the summer" : "Ready for two pairs of hands"
+        : s.season == 1 ? "Growing through the summer" : "Ready for harvest"
     }
     return "Waiting to be sown"
   }

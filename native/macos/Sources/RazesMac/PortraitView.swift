@@ -6,7 +6,7 @@ struct PortraitView: View {
   @MainActor private static var portraits: [String: NSImage] = [:]
   @MainActor private var portrait: NSImage? {
     if let cached = Self.portraits[person] { return cached }
-    guard let column = ["ion", "ana", "petru", "vasile", "dumitru"].firstIndex(of: person),
+    guard let column = ["ion"].firstIndex(of: person),
       let url = Bundle.module.url(
         forResource: "people", withExtension: "png", subdirectory: "Resources/Art"),
       let image = NSImage(contentsOf: url),

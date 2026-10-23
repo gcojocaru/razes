@@ -41,90 +41,7 @@ final class SaveStoreTests: XCTestCase {
 }
 
 extension SaveStoreTests {
-  func testV2PlacementMigrationPreservesOriginalBackup() throws {
-    let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
-    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-    defer { try? FileManager.default.removeItem(at: directory) }
-    let url = directory.appendingPathComponent("save.json")
-    var object =
-      try JSONSerialization.jsonObject(with: SaveCodec.encode(Rules.newGame())) as! [String: Any]
-    object["version"] = 2
-    object.removeValue(forKey: "layout")
-    object.removeValue(forKey: "settlementSeasons")
-    let bytes = try JSONSerialization.data(withJSONObject: object)
-    try bytes.write(to: url)
-    let store = SaveStore(url: url)
-    let migrated = try XCTUnwrap(store.load())
-    XCTAssertEqual(migrated.layout.scenery.count, 4)
-    try store.save(migrated)
-    try store.save(migrated)
-    let backups = try FileManager.default.contentsOfDirectory(
-      at: directory, includingPropertiesForKeys: nil
-    ).filter { $0.lastPathComponent.contains("migration") }
-    XCTAssertEqual(backups.count, 1)
-    XCTAssertEqual(try Data(contentsOf: XCTUnwrap(backups.first)), bytes)
-  }
-  func testMigrationBacksUpOriginalOnceAndFailedPreservationRetainsBytes() throws {
-    let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
-    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-    defer { try? FileManager.default.removeItem(at: directory) }
-    let url = directory.appendingPathComponent("save.json")
-    var object =
-      try JSONSerialization.jsonObject(with: SaveCodec.encode(Rules.newGame())) as! [String: Any]
-    object["version"] = 1
-    object.removeValue(forKey: "buildings")
-    object.removeValue(forKey: "layout")
-    object.removeValue(forKey: "settlementSeasons")
-    let original = try JSONSerialization.data(withJSONObject: object)
-    try original.write(to: url)
-    let store = SaveStore(url: url)
-    let migrated = try XCTUnwrap(store.load())
-    XCTAssertEqual(migrated.version, 7)
-    XCTAssertEqual(try Data(contentsOf: url), original)
-    let blocked = SaveStore(
-      url: url, preserveOriginal: { _, _ in throw CocoaError(.fileWriteNoPermission) })
-    XCTAssertThrowsError(try blocked.save(migrated))
-    XCTAssertEqual(try Data(contentsOf: url), original)
-    try store.save(migrated)
-    try store.save(migrated)
-    let backups = try FileManager.default.contentsOfDirectory(
-      at: directory, includingPropertiesForKeys: nil
-    ).filter { $0.lastPathComponent.contains("migration") }
-    XCTAssertEqual(backups.count, 1)
-    XCTAssertEqual(try Data(contentsOf: XCTUnwrap(backups.first)), original)
-  }
-}
 
-extension SaveStoreTests {
-  func testV5InfrastructureMigrationPreservesOriginalBeforeSavingNewStyles() throws {
-    let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
-    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-    defer { try? FileManager.default.removeItem(at: directory) }
-    let url = directory.appendingPathComponent("save.json")
-    var state = Rules.newGame()
-    state.layout.pavement = [.init(x: 1, y: 1)]
-    state.layout.fences = [.init(position: .init(x: 1, y: 1), facing: 3)]
-    var object = try JSONSerialization.jsonObject(with: SaveCodec.encode(state)) as! [String: Any]
-    object["version"] = 5
-    var layout = object["layout"] as! [String: Any]
-    layout.removeValue(forKey: "dirtPaths")
-    var fences = layout["fences"] as! [[String: Any]]
-    fences[0].removeValue(forKey: "style")
-    layout["fences"] = fences
-    object["layout"] = layout
-    let bytes = try JSONSerialization.data(withJSONObject: object)
-    try bytes.write(to: url)
-    let store = SaveStore(url: url)
-    let loaded = try XCTUnwrap(store.load())
-    XCTAssertEqual(loaded.version, 7)
-    XCTAssertEqual(loaded.layout, state.layout)
-    try store.save(loaded)
-    let backups = try FileManager.default.contentsOfDirectory(
-      at: directory, includingPropertiesForKeys: nil
-    ).filter { $0.lastPathComponent.contains("migration") }
-    XCTAssertEqual(backups.count, 1)
-    XCTAssertEqual(try Data(contentsOf: XCTUnwrap(backups.first)), bytes)
-  }
   func testInvalidReplacementDoesNotPoisonAValidSave() throws {
     let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     defer { try? FileManager.default.removeItem(at: directory) }
@@ -137,30 +54,23 @@ extension SaveStoreTests {
     XCTAssertThrowsError(try store.save(bad))
     XCTAssertEqual(try Data(contentsOf: url), bytes)
   }
-  func testV3MigrationPreservesOriginalBytesOnce() throws {
+
+}
+
+extension SaveStoreTests {
+  func testFreshFilenameLeavesLegacyHouseholdUntouched() throws {
     let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
-    defer { try? FileManager.default.removeItem(at: directory) }
-    let url = directory.appendingPathComponent("save.json")
     try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-    var object =
-      try JSONSerialization.jsonObject(with: SaveCodec.encode(Rules.newGame())) as! [String: Any]
-    object["version"] = 3
-    object.removeValue(forKey: "settlementSeasons")
-    if var layout = object["layout"] as? [String: Any] {
-      for key in ["viewRotation", "pavement", "fences"] { layout.removeValue(forKey: key) }
-      object["layout"] = layout
-    }
-    let original = try JSONSerialization.data(withJSONObject: object)
-    try original.write(to: url)
-    let store = SaveStore(url: url)
-    let loaded = try XCTUnwrap(store.load())
-    XCTAssertEqual(loaded.version, 7)
-    try store.save(loaded)
-    try store.save(loaded)
-    let backups = try FileManager.default.contentsOfDirectory(
-      at: directory, includingPropertiesForKeys: nil
-    ).filter { $0.lastPathComponent.contains("migration") }
-    XCTAssertEqual(backups.count, 1)
-    XCTAssertEqual(try Data(contentsOf: XCTUnwrap(backups.first)), original)
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let legacy = directory.appendingPathComponent("household-v1.json")
+    let bytes = Data("original story save".utf8)
+    try bytes.write(to: legacy)
+    XCTAssertEqual(try SaveStore.applicationStore().url.lastPathComponent, SaveStore.filename)
+    XCTAssertNotEqual(SaveStore.filename, legacy.lastPathComponent)
+    let store = SaveStore(url: directory.appendingPathComponent(SaveStore.filename))
+    XCTAssertNil(try store.load())
+    try store.save(Rules.newGame())
+    XCTAssertEqual(try store.load(), Rules.newGame())
+    XCTAssertEqual(try Data(contentsOf: legacy), bytes)
   }
 }

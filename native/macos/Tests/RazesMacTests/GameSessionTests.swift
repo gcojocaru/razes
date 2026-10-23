@@ -9,8 +9,7 @@ final class GameSessionTests: XCTestCase {
     defer { try? FileManager.default.removeItem(at: dir) }
     let store = SaveStore(url: dir.appendingPathComponent("save.json"))
     let session = GameSession(store: SaveStore(url: dir.appendingPathComponent("save.json")))
-    session.send(Action(type: "choose", revision: 0, event: "spring-ox", choice: "borrow"))
-    session.send(Action(type: "assign", revision: 1, worker: .ion, task: .plant))
+    session.send(Action(type: "assign", revision: 0, worker: .ion, task: .plant))
     XCTAssertEqual(try store.load(), session.state)
     let bytes = try Data(contentsOf: store.url)
     session.send(Action(type: "resolve", revision: 0))
@@ -27,7 +26,8 @@ final class GameSessionTests: XCTestCase {
     try bad.write(to: url)
     let session = GameSession(store: SaveStore(url: url))
     XCTAssertTrue(session.needsRecovery)
-    session.send(Action(type: "choose", revision: 0, event: "spring-ox", choice: "borrow"))
+    session.send(.init(type: "assign", revision: 0, worker: .ion, task: .plant))
+    XCTAssertEqual(session.state, Rules.newGame())
     XCTAssertEqual(try Data(contentsOf: url), bad)
     try SaveCodec.encode(Rules.newGame()).write(to: url)
     session.retryLoad()
@@ -42,7 +42,7 @@ final class GameSessionTests: XCTestCase {
     try Data("blocker".utf8).write(to: dir.appendingPathComponent("block"))
     try FileManager.default.removeItem(at: dir)
     try Data("blocker".utf8).write(to: dir)
-    session.send(Action(type: "choose", revision: 0, event: "spring-ox", choice: "borrow"))
+    session.send(Action(type: "assign", revision: 0, worker: .ion, task: .rest))
     XCTAssertEqual(session.state.phase, .work)
     XCTAssertNotNil(session.storageWarning)
     let badStore = SaveStore(
@@ -64,7 +64,7 @@ final class GameSessionTests: XCTestCase {
       let session = GameSession.applicationSession(arguments: [
         "RazesValidation", "--validation-save", url.path,
       ])
-      session.send(Action(type: "choose", revision: 0, event: "spring-ox", choice: "borrow"))
+      session.send(Action(type: "assign", revision: 0, worker: .ion, task: .rest))
       XCTAssertEqual(try SaveStore(url: url).load()?.phase, .work)
     }
   }

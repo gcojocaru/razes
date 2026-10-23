@@ -54,7 +54,7 @@ struct MaterialsPanel: View {
       .font(.caption).foregroundStyle(GamePalette.muted)
       Divider()
       Text("SEASONAL GATHERING").font(.headline)
-      if state.phase == .work || state.phase == .ending {
+      if state.phase == .work {
         ForEach(WorkerID.allCases, id: \.self) { worker in
           HStack {
             Text(Content.shared.people[worker.rawValue]!.name).frame(width: 55, alignment: .leading)
@@ -76,19 +76,18 @@ struct MaterialsPanel: View {
               Text("Rest").tag(TaskID.rest)
               Text("Gather timber · up to 6 wood").tag(TaskID.gatherWood)
               Text("Gather stone · up to 4 stone").tag(TaskID.gatherStone)
-            }.labelsHidden().disabled(
-              state.phase == .work && state.reservedWorker == worker.rawValue)
+            }.labelsHidden()
           }
         }
         let haul = Materials.forecast(state)
         ForEach(haul.lines, id: \.self) { Text($0).font(.caption) }
         Text(
-          "Arrives when seasonal work resolves. Shared space fills in Ion, Ana, Petru order; shortages reduce the haul shown above."
+          "Arrives when seasonal work resolves. Free storage limits Ion’s haul."
         )
         .font(.caption).foregroundStyle(GamePalette.muted)
       } else {
         Text(
-          "Assign gathering during seasonal planning. Each adult can gather instead of another job."
+          "Assign gathering during seasonal planning. Ion can gather instead of another job."
         )
         .font(.caption)
       }
