@@ -1,0 +1,1062 @@
+{
+  "date": "2026-10-22",
+  "method": "See 2026-10-22-ox-balance.md and ox-balance.mjs. Counts refer to unique nondominated secure food/money/house triples, not player win rates.",
+  "runs": [
+    {
+      "profile": "gift-listen-defer",
+      "oxPrice": 6,
+      "sourceHashes": {
+        "balance": "89e384ca229e1758059aac7588586389d2384a8b5a5c84fe5e68591264218576",
+        "content": "49684afc1c291ad872c723ce4520230e907d0f461fae5cc23e0c91ccc57741fe",
+        "rules": "918ebeb47f5add9caa93c34e75a7c57936cdd514acc20842ad2ec2995bb788b7"
+      },
+      "evaluatedWorkPlans": 31666,
+      "paths": {
+        "honour": {
+          "globalFrontierCount": 31,
+          "maxMoneySecure": 49,
+          "maxFoodSecure": 55,
+          "maxMoneyWitness": {
+            "food": 7,
+            "money": 49,
+            "house": 42,
+            "category": "secure",
+            "hardship": [],
+            "planted": false,
+            "tended": false,
+            "harvested": false,
+            "plan": [
+              {
+                "season": 0,
+                "assignments": {
+                  "ion": "paid",
+                  "ana": "paid",
+                  "petru": "paid"
+                },
+                "after": {
+                  "food": 12,
+                  "money": 30,
+                  "house": 49
+                },
+                "hardship": []
+              },
+              {
+                "season": 1,
+                "assignments": {
+                  "ion": "paid",
+                  "ana": "paid",
+                  "petru": "paid"
+                },
+                "after": {
+                  "food": 3,
+                  "money": 48,
+                  "house": 44
+                },
+                "hardship": []
+              },
+              {
+                "season": 2,
+                "assignments": {
+                  "ion": "paid",
+                  "ana": "supplies",
+                  "petru": "help"
+                },
+                "after": {
+                  "food": 3,
+                  "money": 50,
+                  "house": 36
+                },
+                "hardship": []
+              },
+              {
+                "season": 3,
+                "assignments": {
+                  "ion": "paid",
+                  "ana": "repair",
+                  "petru": "supplies"
+                },
+                "after": {
+                  "food": 7,
+                  "money": 49,
+                  "house": 42
+                },
+                "hardship": []
+              }
+            ]
+          }
+        },
+        "break": {
+          "globalFrontierCount": 16,
+          "maxMoneySecure": 51,
+          "maxFoodSecure": 54,
+          "maxMoneyWitness": {
+            "food": 13,
+            "money": 51,
+            "house": 42,
+            "category": "secure",
+            "hardship": [],
+            "planted": true,
+            "tended": false,
+            "harvested": true,
+            "plan": [
+              {
+                "season": 0,
+                "assignments": {
+                  "ion": "help",
+                  "ana": "paid",
+                  "petru": "plant"
+                },
+                "after": {
+                  "food": 10,
+                  "money": 18,
+                  "house": 49
+                },
+                "hardship": []
+              },
+              {
+                "season": 1,
+                "assignments": {
+                  "ion": "paid",
+                  "ana": "paid",
+                  "petru": "paid"
+                },
+                "after": {
+                  "food": 1,
+                  "money": 36,
+                  "house": 44
+                },
+                "hardship": []
+              },
+              {
+                "season": 2,
+                "assignments": {
+                  "ion": "harvest",
+                  "ana": "harvest",
+                  "petru": "paid"
+                },
+                "after": {
+                  "food": 22,
+                  "money": 42,
+                  "house": 36
+                },
+                "hardship": []
+              },
+              {
+                "season": 3,
+                "assignments": {
+                  "ion": "paid",
+                  "ana": "paid",
+                  "petru": "repair"
+                },
+                "after": {
+                  "food": 13,
+                  "money": 51,
+                  "house": 42
+                },
+                "hardship": []
+              }
+            ]
+          }
+        },
+        "pay": {
+          "globalFrontierCount": 0,
+          "maxMoneySecure": 49,
+          "maxFoodSecure": 53,
+          "maxMoneyWitness": {
+            "food": 5,
+            "money": 49,
+            "house": 42,
+            "category": "secure",
+            "hardship": [],
+            "planted": false,
+            "tended": false,
+            "harvested": false,
+            "plan": [
+              {
+                "season": 0,
+                "assignments": {
+                  "ion": "paid",
+                  "ana": "paid",
+                  "petru": "paid"
+                },
+                "after": {
+                  "food": 12,
+                  "money": 24,
+                  "house": 49
+                },
+                "hardship": []
+              },
+              {
+                "season": 1,
+                "assignments": {
+                  "ion": "paid",
+                  "ana": "paid",
+                  "petru": "paid"
+                },
+                "after": {
+                  "food": 3,
+                  "money": 42,
+                  "house": 44
+                },
+                "hardship": []
+              },
+              {
+                "season": 2,
+                "assignments": {
+                  "ion": "paid",
+                  "ana": "paid",
+                  "petru": "supplies"
+                },
+                "after": {
+                  "food": 1,
+                  "money": 50,
+                  "house": 36
+                },
+                "hardship": []
+              },
+              {
+                "season": 3,
+                "assignments": {
+                  "ion": "paid",
+                  "ana": "repair",
+                  "petru": "supplies"
+                },
+                "after": {
+                  "food": 5,
+                  "money": 49,
+                  "house": 42
+                },
+                "hardship": []
+              }
+            ]
+          }
+        },
+        "decline": {
+          "globalFrontierCount": 4,
+          "maxMoneySecure": 55,
+          "maxFoodSecure": 50,
+          "maxMoneyWitness": {
+            "food": 5,
+            "money": 55,
+            "house": 42,
+            "category": "secure",
+            "hardship": [],
+            "planted": false,
+            "tended": false,
+            "harvested": false,
+            "plan": [
+              {
+                "season": 0,
+                "assignments": {
+                  "ion": "paid",
+                  "ana": "paid",
+                  "petru": "paid"
+                },
+                "after": {
+                  "food": 12,
+                  "money": 30,
+                  "house": 49
+                },
+                "hardship": []
+              },
+              {
+                "season": 1,
+                "assignments": {
+                  "ion": "paid",
+                  "ana": "paid",
+                  "petru": "paid"
+                },
+                "after": {
+                  "food": 3,
+                  "money": 48,
+                  "house": 44
+                },
+                "hardship": []
+              },
+              {
+                "season": 2,
+                "assignments": {
+                  "ion": "paid",
+                  "ana": "paid",
+                  "petru": "supplies"
+                },
+                "after": {
+                  "food": 1,
+                  "money": 56,
+                  "house": 36
+                },
+                "hardship": []
+              },
+              {
+                "season": 3,
+                "assignments": {
+                  "ion": "paid",
+                  "ana": "repair",
+                  "petru": "supplies"
+                },
+                "after": {
+                  "food": 5,
+                  "money": 55,
+                  "house": 42
+                },
+                "hardship": []
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "profile": "gift-listen-defer",
+      "oxPrice": 5,
+      "sourceHashes": {
+        "balance": "89e384ca229e1758059aac7588586389d2384a8b5a5c84fe5e68591264218576",
+        "content": "49684afc1c291ad872c723ce4520230e907d0f461fae5cc23e0c91ccc57741fe",
+        "rules": "918ebeb47f5add9caa93c34e75a7c57936cdd514acc20842ad2ec2995bb788b7"
+      },
+      "evaluatedWorkPlans": 31993,
+      "paths": {
+        "honour": {
+          "globalFrontierCount": 31,
+          "maxMoneySecure": 49,
+          "maxFoodSecure": 55,
+          "maxMoneyWitness": {
+            "food": 7,
+            "money": 49,
+            "house": 42,
+            "category": "secure",
+            "hardship": [],
+            "planted": false,
+            "tended": false,
+            "harvested": false,
+            "plan": [
+              {
+                "season": 0,
+                "assignments": {
+                  "ion": "paid",
+                  "ana": "paid",
+                  "petru": "paid"
+                },
+                "after": {
+                  "food": 12,
+                  "money": 30,
+                  "house": 49
+                },
+                "hardship": []
+              },
+              {
+                "season": 1,
+                "assignments": {
+                  "ion": "paid",
+                  "ana": "paid",
+                  "petru": "paid"
+                },
+                "after": {
+                  "food": 3,
+                  "money": 48,
+                  "house": 44
+                },
+                "hardship": []
+              },
+              {
+                "season": 2,
+                "assignments": {
+                  "ion": "paid",
+                  "ana": "supplies",
+                  "petru": "help"
+                },
+                "after": {
+                  "food": 3,
+                  "money": 50,
+                  "house": 36
+                },
+                "hardship": []
+              },
+              {
+                "season": 3,
+                "assignments": {
+                  "ion": "paid",
+                  "ana": "repair",
+                  "petru": "supplies"
+                },
+                "after": {
+                  "food": 7,
+                  "money": 49,
+                  "house": 42
+                },
+                "hardship": []
+              }
+            ]
+          }
+        },
+        "break": {
+          "globalFrontierCount": 16,
+          "maxMoneySecure": 51,
+          "maxFoodSecure": 54,
+          "maxMoneyWitness": {
+            "food": 13,
+            "money": 51,
+            "house": 42,
+            "category": "secure",
+            "hardship": [],
+            "planted": true,
+            "tended": false,
+            "harvested": true,
+            "plan": [
+              {
+                "season": 0,
+                "assignments": {
+                  "ion": "help",
+                  "ana": "paid",
+                  "petru": "plant"
+                },
+                "after": {
+                  "food": 10,
+                  "money": 18,
+                  "house": 49
+                },
+                "hardship": []
+              },
+              {
+                "season": 1,
+                "assignments": {
+                  "ion": "paid",
+                  "ana": "paid",
+                  "petru": "paid"
+                },
+                "after": {
+                  "food": 1,
+                  "money": 36,
+                  "house": 44
+                },
+                "hardship": []
+              },
+              {
+                "season": 2,
+                "assignments": {
+                  "ion": "harvest",
+                  "ana": "harvest",
+                  "petru": "paid"
+                },
+                "after": {
+                  "food": 22,
+                  "money": 42,
+                  "house": 36
+                },
+                "hardship": []
+              },
+              {
+                "season": 3,
+                "assignments": {
+                  "ion": "paid",
+                  "ana": "paid",
+                  "petru": "repair"
+                },
+                "after": {
+                  "food": 13,
+                  "money": 51,
+                  "house": 42
+                },
+                "hardship": []
+              }
+            ]
+          }
+        },
+        "pay": {
+          "globalFrontierCount": 22,
+          "maxMoneySecure": 50,
+          "maxFoodSecure": 55,
+          "maxMoneyWitness": {
+            "food": 5,
+            "money": 50,
+            "house": 42,
+            "category": "secure",
+            "hardship": [],
+            "planted": false,
+            "tended": false,
+            "harvested": false,
+            "plan": [
+              {
+                "season": 0,
+                "assignments": {
+                  "ion": "paid",
+                  "ana": "paid",
+                  "petru": "paid"
+                },
+                "after": {
+                  "food": 12,
+                  "money": 25,
+                  "house": 49
+                },
+                "hardship": []
+              },
+              {
+                "season": 1,
+                "assignments": {
+                  "ion": "paid",
+                  "ana": "paid",
+                  "petru": "paid"
+                },
+                "after": {
+                  "food": 3,
+                  "money": 43,
+                  "house": 44
+                },
+                "hardship": []
+              },
+              {
+                "season": 2,
+                "assignments": {
+                  "ion": "paid",
+                  "ana": "paid",
+                  "petru": "supplies"
+                },
+                "after": {
+                  "food": 1,
+                  "money": 51,
+                  "house": 36
+                },
+                "hardship": []
+              },
+              {
+                "season": 3,
+                "assignments": {
+                  "ion": "paid",
+                  "ana": "repair",
+                  "petru": "supplies"
+                },
+                "after": {
+                  "food": 5,
+                  "money": 50,
+                  "house": 42
+                },
+                "hardship": []
+              }
+            ]
+          }
+        },
+        "decline": {
+          "globalFrontierCount": 4,
+          "maxMoneySecure": 55,
+          "maxFoodSecure": 50,
+          "maxMoneyWitness": {
+            "food": 5,
+            "money": 55,
+            "house": 42,
+            "category": "secure",
+            "hardship": [],
+            "planted": false,
+            "tended": false,
+            "harvested": false,
+            "plan": [
+              {
+                "season": 0,
+                "assignments": {
+                  "ion": "paid",
+                  "ana": "paid",
+                  "petru": "paid"
+                },
+                "after": {
+                  "food": 12,
+                  "money": 30,
+                  "house": 49
+                },
+                "hardship": []
+              },
+              {
+                "season": 1,
+                "assignments": {
+                  "ion": "paid",
+                  "ana": "paid",
+                  "petru": "paid"
+                },
+                "after": {
+                  "food": 3,
+                  "money": 48,
+                  "house": 44
+                },
+                "hardship": []
+              },
+              {
+                "season": 2,
+                "assignments": {
+                  "ion": "paid",
+                  "ana": "paid",
+                  "petru": "supplies"
+                },
+                "after": {
+                  "food": 1,
+                  "money": 56,
+                  "house": 36
+                },
+                "hardship": []
+              },
+              {
+                "season": 3,
+                "assignments": {
+                  "ion": "paid",
+                  "ana": "repair",
+                  "petru": "supplies"
+                },
+                "after": {
+                  "food": 5,
+                  "money": 55,
+                  "house": 42
+                },
+                "hardship": []
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "profile": "gift-share-defer",
+      "oxPrice": 6,
+      "sourceHashes": {
+        "balance": "89e384ca229e1758059aac7588586389d2384a8b5a5c84fe5e68591264218576",
+        "content": "49684afc1c291ad872c723ce4520230e907d0f461fae5cc23e0c91ccc57741fe",
+        "rules": "918ebeb47f5add9caa93c34e75a7c57936cdd514acc20842ad2ec2995bb788b7"
+      },
+      "evaluatedWorkPlans": 30550,
+      "paths": {
+        "honour": {
+          "globalFrontierCount": 28,
+          "maxMoneySecure": 50,
+          "maxFoodSecure": 57
+        },
+        "break": {
+          "globalFrontierCount": 16,
+          "maxMoneySecure": 48,
+          "maxFoodSecure": 51
+        },
+        "pay": {
+          "globalFrontierCount": 0,
+          "maxMoneySecure": 46,
+          "maxFoodSecure": 55
+        },
+        "decline": {
+          "globalFrontierCount": 4,
+          "maxMoneySecure": 52,
+          "maxFoodSecure": 47
+        }
+      }
+    },
+    {
+      "profile": "gift-share-defer",
+      "oxPrice": 5,
+      "sourceHashes": {
+        "balance": "89e384ca229e1758059aac7588586389d2384a8b5a5c84fe5e68591264218576",
+        "content": "49684afc1c291ad872c723ce4520230e907d0f461fae5cc23e0c91ccc57741fe",
+        "rules": "918ebeb47f5add9caa93c34e75a7c57936cdd514acc20842ad2ec2995bb788b7"
+      },
+      "evaluatedWorkPlans": 30879,
+      "paths": {
+        "honour": {
+          "globalFrontierCount": 28,
+          "maxMoneySecure": 50,
+          "maxFoodSecure": 57
+        },
+        "break": {
+          "globalFrontierCount": 16,
+          "maxMoneySecure": 48,
+          "maxFoodSecure": 51
+        },
+        "pay": {
+          "globalFrontierCount": 22,
+          "maxMoneySecure": 47,
+          "maxFoodSecure": 55
+        },
+        "decline": {
+          "globalFrontierCount": 4,
+          "maxMoneySecure": 52,
+          "maxFoodSecure": 47
+        }
+      }
+    },
+    {
+      "profile": "gift-listen-settle",
+      "oxPrice": 6,
+      "sourceHashes": {
+        "balance": "89e384ca229e1758059aac7588586389d2384a8b5a5c84fe5e68591264218576",
+        "content": "49684afc1c291ad872c723ce4520230e907d0f461fae5cc23e0c91ccc57741fe",
+        "rules": "918ebeb47f5add9caa93c34e75a7c57936cdd514acc20842ad2ec2995bb788b7"
+      },
+      "evaluatedWorkPlans": 29052,
+      "paths": {
+        "honour": {
+          "globalFrontierCount": 28,
+          "maxMoneySecure": 45,
+          "maxFoodSecure": 55
+        },
+        "break": {
+          "globalFrontierCount": 16,
+          "maxMoneySecure": 47,
+          "maxFoodSecure": 49
+        },
+        "pay": {
+          "globalFrontierCount": 0,
+          "maxMoneySecure": 45,
+          "maxFoodSecure": 53
+        },
+        "decline": {
+          "globalFrontierCount": 4,
+          "maxMoneySecure": 51,
+          "maxFoodSecure": 45
+        }
+      }
+    },
+    {
+      "profile": "gift-listen-settle",
+      "oxPrice": 5,
+      "sourceHashes": {
+        "balance": "89e384ca229e1758059aac7588586389d2384a8b5a5c84fe5e68591264218576",
+        "content": "49684afc1c291ad872c723ce4520230e907d0f461fae5cc23e0c91ccc57741fe",
+        "rules": "918ebeb47f5add9caa93c34e75a7c57936cdd514acc20842ad2ec2995bb788b7"
+      },
+      "evaluatedWorkPlans": 29383,
+      "paths": {
+        "honour": {
+          "globalFrontierCount": 28,
+          "maxMoneySecure": 45,
+          "maxFoodSecure": 55
+        },
+        "break": {
+          "globalFrontierCount": 16,
+          "maxMoneySecure": 47,
+          "maxFoodSecure": 49
+        },
+        "pay": {
+          "globalFrontierCount": 22,
+          "maxMoneySecure": 46,
+          "maxFoodSecure": 53
+        },
+        "decline": {
+          "globalFrontierCount": 4,
+          "maxMoneySecure": 51,
+          "maxFoodSecure": 45
+        }
+      }
+    },
+    {
+      "profile": "gift-share-settle",
+      "oxPrice": 6,
+      "sourceHashes": {
+        "balance": "89e384ca229e1758059aac7588586389d2384a8b5a5c84fe5e68591264218576",
+        "content": "49684afc1c291ad872c723ce4520230e907d0f461fae5cc23e0c91ccc57741fe",
+        "rules": "918ebeb47f5add9caa93c34e75a7c57936cdd514acc20842ad2ec2995bb788b7"
+      },
+      "evaluatedWorkPlans": 27810,
+      "paths": {
+        "honour": {
+          "globalFrontierCount": 26,
+          "maxMoneySecure": 46,
+          "maxFoodSecure": 52
+        },
+        "break": {
+          "globalFrontierCount": 16,
+          "maxMoneySecure": 44,
+          "maxFoodSecure": 49
+        },
+        "pay": {
+          "globalFrontierCount": 0,
+          "maxMoneySecure": 42,
+          "maxFoodSecure": 50
+        },
+        "decline": {
+          "globalFrontierCount": 4,
+          "maxMoneySecure": 48,
+          "maxFoodSecure": 45
+        }
+      }
+    },
+    {
+      "profile": "gift-share-settle",
+      "oxPrice": 5,
+      "sourceHashes": {
+        "balance": "89e384ca229e1758059aac7588586389d2384a8b5a5c84fe5e68591264218576",
+        "content": "49684afc1c291ad872c723ce4520230e907d0f461fae5cc23e0c91ccc57741fe",
+        "rules": "918ebeb47f5add9caa93c34e75a7c57936cdd514acc20842ad2ec2995bb788b7"
+      },
+      "evaluatedWorkPlans": 28149,
+      "paths": {
+        "honour": {
+          "globalFrontierCount": 26,
+          "maxMoneySecure": 46,
+          "maxFoodSecure": 52
+        },
+        "break": {
+          "globalFrontierCount": 16,
+          "maxMoneySecure": 44,
+          "maxFoodSecure": 49
+        },
+        "pay": {
+          "globalFrontierCount": 21,
+          "maxMoneySecure": 43,
+          "maxFoodSecure": 50
+        },
+        "decline": {
+          "globalFrontierCount": 4,
+          "maxMoneySecure": 48,
+          "maxFoodSecure": 45
+        }
+      }
+    },
+    {
+      "profile": "independent-listen-defer",
+      "oxPrice": 6,
+      "sourceHashes": {
+        "balance": "89e384ca229e1758059aac7588586389d2384a8b5a5c84fe5e68591264218576",
+        "content": "49684afc1c291ad872c723ce4520230e907d0f461fae5cc23e0c91ccc57741fe",
+        "rules": "918ebeb47f5add9caa93c34e75a7c57936cdd514acc20842ad2ec2995bb788b7"
+      },
+      "evaluatedWorkPlans": 28944,
+      "paths": {
+        "honour": {
+          "globalFrontierCount": 27,
+          "maxMoneySecure": 49,
+          "maxFoodSecure": 52
+        },
+        "break": {
+          "globalFrontierCount": 8,
+          "maxMoneySecure": 47,
+          "maxFoodSecure": 51
+        },
+        "pay": {
+          "globalFrontierCount": 0,
+          "maxMoneySecure": 43,
+          "maxFoodSecure": 50
+        },
+        "decline": {
+          "globalFrontierCount": 4,
+          "maxMoneySecure": 49,
+          "maxFoodSecure": 47
+        }
+      }
+    },
+    {
+      "profile": "independent-listen-defer",
+      "oxPrice": 5,
+      "sourceHashes": {
+        "balance": "89e384ca229e1758059aac7588586389d2384a8b5a5c84fe5e68591264218576",
+        "content": "49684afc1c291ad872c723ce4520230e907d0f461fae5cc23e0c91ccc57741fe",
+        "rules": "918ebeb47f5add9caa93c34e75a7c57936cdd514acc20842ad2ec2995bb788b7"
+      },
+      "evaluatedWorkPlans": 29254,
+      "paths": {
+        "honour": {
+          "globalFrontierCount": 27,
+          "maxMoneySecure": 49,
+          "maxFoodSecure": 52
+        },
+        "break": {
+          "globalFrontierCount": 8,
+          "maxMoneySecure": 47,
+          "maxFoodSecure": 51
+        },
+        "pay": {
+          "globalFrontierCount": 14,
+          "maxMoneySecure": 44,
+          "maxFoodSecure": 52
+        },
+        "decline": {
+          "globalFrontierCount": 4,
+          "maxMoneySecure": 49,
+          "maxFoodSecure": 47
+        }
+      }
+    },
+    {
+      "profile": "independent-share-defer",
+      "oxPrice": 6,
+      "sourceHashes": {
+        "balance": "89e384ca229e1758059aac7588586389d2384a8b5a5c84fe5e68591264218576",
+        "content": "49684afc1c291ad872c723ce4520230e907d0f461fae5cc23e0c91ccc57741fe",
+        "rules": "918ebeb47f5add9caa93c34e75a7c57936cdd514acc20842ad2ec2995bb788b7"
+      },
+      "evaluatedWorkPlans": 27401,
+      "paths": {
+        "honour": {
+          "globalFrontierCount": 24,
+          "maxMoneySecure": 46,
+          "maxFoodSecure": 54
+        },
+        "break": {
+          "globalFrontierCount": 8,
+          "maxMoneySecure": 44,
+          "maxFoodSecure": 48
+        },
+        "pay": {
+          "globalFrontierCount": 0,
+          "maxMoneySecure": 46,
+          "maxFoodSecure": 52
+        },
+        "decline": {
+          "globalFrontierCount": 8,
+          "maxMoneySecure": 52,
+          "maxFoodSecure": 44
+        }
+      }
+    },
+    {
+      "profile": "independent-share-defer",
+      "oxPrice": 5,
+      "sourceHashes": {
+        "balance": "89e384ca229e1758059aac7588586389d2384a8b5a5c84fe5e68591264218576",
+        "content": "49684afc1c291ad872c723ce4520230e907d0f461fae5cc23e0c91ccc57741fe",
+        "rules": "918ebeb47f5add9caa93c34e75a7c57936cdd514acc20842ad2ec2995bb788b7"
+      },
+      "evaluatedWorkPlans": 27710,
+      "paths": {
+        "honour": {
+          "globalFrontierCount": 24,
+          "maxMoneySecure": 46,
+          "maxFoodSecure": 54
+        },
+        "break": {
+          "globalFrontierCount": 8,
+          "maxMoneySecure": 44,
+          "maxFoodSecure": 48
+        },
+        "pay": {
+          "globalFrontierCount": 14,
+          "maxMoneySecure": 47,
+          "maxFoodSecure": 52
+        },
+        "decline": {
+          "globalFrontierCount": 8,
+          "maxMoneySecure": 52,
+          "maxFoodSecure": 44
+        }
+      }
+    },
+    {
+      "profile": "independent-listen-settle",
+      "oxPrice": 6,
+      "sourceHashes": {
+        "balance": "89e384ca229e1758059aac7588586389d2384a8b5a5c84fe5e68591264218576",
+        "content": "49684afc1c291ad872c723ce4520230e907d0f461fae5cc23e0c91ccc57741fe",
+        "rules": "918ebeb47f5add9caa93c34e75a7c57936cdd514acc20842ad2ec2995bb788b7"
+      },
+      "evaluatedWorkPlans": 26432,
+      "paths": {
+        "honour": {
+          "globalFrontierCount": 24,
+          "maxMoneySecure": 45,
+          "maxFoodSecure": 52
+        },
+        "break": {
+          "globalFrontierCount": 8,
+          "maxMoneySecure": 43,
+          "maxFoodSecure": 46
+        },
+        "pay": {
+          "globalFrontierCount": 0,
+          "maxMoneySecure": 39,
+          "maxFoodSecure": 50
+        },
+        "decline": {
+          "globalFrontierCount": 4,
+          "maxMoneySecure": 45,
+          "maxFoodSecure": 42
+        }
+      }
+    },
+    {
+      "profile": "independent-listen-settle",
+      "oxPrice": 5,
+      "sourceHashes": {
+        "balance": "89e384ca229e1758059aac7588586389d2384a8b5a5c84fe5e68591264218576",
+        "content": "49684afc1c291ad872c723ce4520230e907d0f461fae5cc23e0c91ccc57741fe",
+        "rules": "918ebeb47f5add9caa93c34e75a7c57936cdd514acc20842ad2ec2995bb788b7"
+      },
+      "evaluatedWorkPlans": 26739,
+      "paths": {
+        "honour": {
+          "globalFrontierCount": 24,
+          "maxMoneySecure": 45,
+          "maxFoodSecure": 52
+        },
+        "break": {
+          "globalFrontierCount": 8,
+          "maxMoneySecure": 43,
+          "maxFoodSecure": 46
+        },
+        "pay": {
+          "globalFrontierCount": 14,
+          "maxMoneySecure": 40,
+          "maxFoodSecure": 50
+        },
+        "decline": {
+          "globalFrontierCount": 4,
+          "maxMoneySecure": 45,
+          "maxFoodSecure": 42
+        }
+      }
+    },
+    {
+      "profile": "independent-share-settle",
+      "oxPrice": 6,
+      "sourceHashes": {
+        "balance": "89e384ca229e1758059aac7588586389d2384a8b5a5c84fe5e68591264218576",
+        "content": "49684afc1c291ad872c723ce4520230e907d0f461fae5cc23e0c91ccc57741fe",
+        "rules": "918ebeb47f5add9caa93c34e75a7c57936cdd514acc20842ad2ec2995bb788b7"
+      },
+      "evaluatedWorkPlans": 24831,
+      "paths": {
+        "honour": {
+          "globalFrontierCount": 22,
+          "maxMoneySecure": 42,
+          "maxFoodSecure": 49
+        },
+        "break": {
+          "globalFrontierCount": 8,
+          "maxMoneySecure": 40,
+          "maxFoodSecure": 46
+        },
+        "pay": {
+          "globalFrontierCount": 0,
+          "maxMoneySecure": 42,
+          "maxFoodSecure": 47
+        },
+        "decline": {
+          "globalFrontierCount": 8,
+          "maxMoneySecure": 48,
+          "maxFoodSecure": 42
+        }
+      }
+    },
+    {
+      "profile": "independent-share-settle",
+      "oxPrice": 5,
+      "sourceHashes": {
+        "balance": "89e384ca229e1758059aac7588586389d2384a8b5a5c84fe5e68591264218576",
+        "content": "49684afc1c291ad872c723ce4520230e907d0f461fae5cc23e0c91ccc57741fe",
+        "rules": "918ebeb47f5add9caa93c34e75a7c57936cdd514acc20842ad2ec2995bb788b7"
+      },
+      "evaluatedWorkPlans": 25149,
+      "paths": {
+        "honour": {
+          "globalFrontierCount": 22,
+          "maxMoneySecure": 42,
+          "maxFoodSecure": 49
+        },
+        "break": {
+          "globalFrontierCount": 8,
+          "maxMoneySecure": 40,
+          "maxFoodSecure": 46
+        },
+        "pay": {
+          "globalFrontierCount": 13,
+          "maxMoneySecure": 43,
+          "maxFoodSecure": 47
+        },
+        "decline": {
+          "globalFrontierCount": 8,
+          "maxMoneySecure": 48,
+          "maxFoodSecure": 42
+        }
+      }
+    }
+  ]
+}

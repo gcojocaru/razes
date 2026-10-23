@@ -1,0 +1,11 @@
+# Directional buildings — 2026-10-23
+
+Final asset: `native/macos/Sources/RazesMac/Resources/Art/settlement-rear.png` (1448×1086 RGBA), generated with the built-in image-generation tool from the existing props, woodshed and settlement sprite atlases as style/identity references. No existing painted assets were replaced. The first generated layout was superseded by a spaced layout; 12 separate opaque components were verified by alpha analysis, and SpriteKit uses their bounds as crop frames.
+
+Order: cottage, woodshed, cellar, barn; well, granary, workshop, bakery; smithy, stable, apiary, stores. Original front art, this opposite-corner art and runtime horizontal mirrors supply four directional facades. The final painted images are a 2D approximation of quarter-turn orientation, not exact 3D reconstruction. Independent status/level layers stay upright. Winter rear art shares the base facade; ground, weather, existing front snow art and fence highlights provide seasonal changes.
+
+Generation prompt: Create one transparent directional sprite atlas, showing the opposite rear-left corner of the same 15th-century Moldavian buildings around their vertical axes, keeping the elevated isometric camera and walls upright. Preserve richly painted aged timber, straw/shingles, plaster and mossy stone under warm upper-left light. Arrange 12 fully isolated sprites, four columns by three rows, ordered cottage/woodshed/cellar/barn, well/granary/workshop/bakery, smithy/stable/apiary/cart+sacks. No people, text, labels, grid, UI, terrain, checkerboard or watermark.
+
+Final reflow prompt: Preserve the 12 painted buildings and identities; reflow into four columns and three rows with broad transparent margins and gutters, each sprite entirely inside its cell. Keep chimneys, shadows and bases separated and uncut, genuine transparent alpha, same camera/material style. No grid, text or outlines. The generator's delivered dimensions/layout were inspected rather than assumed to match requested pixel geometry.
+
+Pavement material and fence rails/posts are native AppKit/SpriteKit composition. They use the shared rotated grid projection and persistent scene nodes; no extra raster derivatives were written.
