@@ -1,20 +1,25 @@
 import Foundation
 
 extension Construction {
+  static func freeCoins(_ state: GameState) -> Int {
+    let reserved =
+      state.phase == .work
+      ? state.assignments.values.reduce(0) { $0 + Rules.task($1, in: state).moneyCost } : 0
+    return state.money - reserved
+  }
   public static func spend(_ cost: Int, state: inout GameState) throws {
-    let reserved = state.phase == .work ? Rules.preview(state).moneyCost : 0
-    guard state.money - reserved >= cost else {
-      throw GameError("Needs \(cost) free coins. Money reserved for seasonal work cannot be spent.")
+    guard freeCoins(state) >= cost else {
+      throw GameError(
+        "Needs \(cost) free Galbeni. Galbeni reserved for weekly work cannot be spent.")
     }
     state.money -= cost
   }
   public static func start(_ id: BuildingID, state: inout GameState) throws {
-    guard stage(id, state: state) == .empty else {
-      throw GameError("This building already exists or has a seasonal builder.")
-    }
+    let requirements = requirements(id, state: state)
+    guard requirements.isMet else { throw GameError(requirements.problems.joined(separator: " ")) }
     var next = state
-    try Materials.spend(materialCost(id), state: &next)
-    try spend(definition(id).cost, state: &next)
+    try Materials.spend(requirements.materials, state: &next)
+    try spend(requirements.coins, state: &next)
     state = next
     state.buildings.append(
       .init(id: id, completedSeason: state.turn, legacyAssignment: false, level: 0))
@@ -23,9 +28,11 @@ extension Construction {
     guard let index = state.buildings.firstIndex(where: { $0.id == id }),
       (1...4).contains(state.buildings[index].level)
     else { throw GameError("An upgrade needs a completed building below level 5.") }
+    let requirements = requirements(id, state: state, level: state.buildings[index].level + 1)
+    guard requirements.isMet else { throw GameError(requirements.problems.joined(separator: " ")) }
     var next = state
-    try Materials.spend(materialCost(id).scaled(state.buildings[index].level + 1), state: &next)
-    try spend(upgradeCost(state.buildings[index]), state: &next)
+    try Materials.spend(requirements.materials, state: &next)
+    try spend(requirements.coins, state: &next)
     state = next
     state.buildings[index].level += 1
     state.buildings[index].condition = 100
@@ -35,9 +42,11 @@ extension Construction {
       state.buildings[index].level > 0,
       state.buildings[index].condition < 100
     else { throw GameError("Repairs need a completed, worn building.") }
+    let requirements = repairRequirements(id, state: state)
+    guard requirements.isMet else { throw GameError(requirements.problems.joined(separator: " ")) }
     var next = state
-    try Materials.spend(repairMaterials(id), state: &next)
-    try spend(repairCost(id), state: &next)
+    try Materials.spend(requirements.materials, state: &next)
+    try spend(requirements.coins, state: &next)
     state = next
     state.buildings[index].condition = 100
   }

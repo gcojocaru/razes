@@ -39,5 +39,13 @@ test -f "$APP/Contents/Resources/Razes_RazesMac.bundle/Contents/Resources/Resour
 for art in settlement-rear-v2 settlement-rear-winter settlement-buildings settlement-buildings-winter terrain-grass terrain-earth terrain-snow woodshed-construction woodshed-complete woodshed-winter cellar-construction cellar-complete cellar-winter; do
     test -f "$APP/Contents/Resources/Razes_RazesMac.bundle/Contents/Resources/Resources/Art/$art.png" || test -f "$APP/Contents/Resources/Razes_RazesMac.bundle/Resources/Art/$art.png"
 done
+for facing in front rear; do
+    for season in summer winter; do
+        for condition in intact damaged; do
+            art="house-upgraded-$facing-$season-$condition"
+            test -f "$APP/Contents/Resources/Razes_RazesMac.bundle/Contents/Resources/Resources/Art/$art.png" || test -f "$APP/Contents/Resources/Razes_RazesMac.bundle/Resources/Art/$art.png"
+        done
+    done
+done
 codesign --verify --deep --strict "$APP"
 echo "$APP"

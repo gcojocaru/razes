@@ -23,7 +23,7 @@ public enum Rules {
   public static func consumption(_ state: GameState, house: Int) -> Int {
     guard state.season == 3 && state.isMonthEnd else { return b.consumption }
     return b.consumption + (house < b.coldThreshold ? b.coldFood : 0)
-      - (Construction.active(.woodshed, state: state) ? 1 : 0)
+      - (Construction.operationalLevel(.woodshed, state: state) > 0 ? 1 : 0)
   }
   public static func task(_ id: TaskID, in state: GameState) -> Task {
     var value = task(id)
@@ -34,7 +34,17 @@ public enum Rules {
         "Gather ripe grain before winter: \(value.foodGain) food and \(Farming.seedYield(state)) seeds."
     case .repair:
       value.houseGain = b.repairGain + 5 * (state.character.level(.building) - 1)
-      value.description = "Restore up to \(value.houseGain) shelter for \(value.moneyCost) coins."
+      value.description = "Restore up to \(value.houseGain) shelter for \(value.moneyCost) Galbeni."
+    case .paid:
+      value.moneyGain =
+        state.character.level(.strength)
+        + (Construction.operationalLevel(.stable, state: state) > 0 ? 1 : 0)
+      value.description =
+        "Earn \(value.moneyGain) Galbeni from village work. Strength improves pay."
+    case .rest:
+      let exposed = state.season == 3 && state.house < b.coldThreshold
+      value.description =
+        "Recover \(CharacterSimulation.restEnergy(character: state.character, exposed: exposed)) energy. Safe rest also heals 10 health."
     case .supplies:
       value.foodGain = suppliesGain(state)
       value.description = "Bring home \(value.foodGain) food before this week’s meal."
@@ -48,11 +58,12 @@ public enum Rules {
   }
   public static func weathering(_ state: GameState) -> Int {
     guard state.isSeasonEnd else { return 0 }
-    return state.season == 3 && Construction.active(.woodshed, state: state)
+    return state.season == 3 && Construction.operationalLevel(.woodshed, state: state) > 0
       ? 6 : b.wear[state.season]
   }
   public static func suppliesGain(_ state: GameState) -> Int {
-    Construction.active(.cellar, state: state) ? 10 : b.supplyGain
+    (Construction.operationalLevel(.cellar, state: state) > 0 ? 10 : b.supplyGain)
+      + Construction.operationalLevel(.bakery, state: state)
   }
   public static func taskOptions(_ s: GameState) -> [Task] {
     guard s.phase == .work else { return [] }
@@ -94,7 +105,7 @@ public enum Rules {
     }
     p.seedsAfter = min(100000, s.seeds - p.seedCost + p.seedGain)
     if p.moneyCost > s.money {
-      p.errors.append("Work costs \(p.moneyCost) money; only \(s.money) is available now.")
+      p.errors.append("Work costs \(p.moneyCost) Galbeni; only \(s.money) is available now.")
     }
     if p.seedCost > s.seeds {
       p.errors.append(
@@ -160,6 +171,11 @@ public enum Rules {
     if s.phase == .dead { return "Ion has died. Start a fresh household to play again." }
     if task == .plant, let reason = Farming.plantingProblem(s) { return reason }
     if s.phase != .work { return "Continue to the next week before assigning work." }
+    if let id = Construction.building(for: task),
+      let problem = Construction.unlockProblems(id, state: s).first
+    {
+      return problem
+    }
     if !taskOptions(s).contains(where: { $0.id == task }) {
       return "That task is unavailable this week."
     }
@@ -204,7 +220,8 @@ public enum Rules {
         houseAfter: 0, consumption: p.consumption, wear: p.wear, deficit: 0,
         tasks: WorkerID.allCases.map {
           "\(Content.shared.people[$0.rawValue]!.name): \(task(s.assignments[$0.rawValue]!).name)"
-        }, seedsBefore: s.seeds, seedsAfter: p.seedsAfter, character: p.character)
+        }, seedsBefore: s.seeds, seedsAfter: p.seedsAfter, character: p.character,
+        buildingsBefore: s.buildings)
       s.food = min(100000, s.food - p.foodCost + p.foodGain)
       s.money = min(100000, s.money - p.moneyCost + p.moneyGain)
       s.house = min(100, s.house + p.houseGain)
@@ -251,9 +268,10 @@ public enum Rules {
         s.week += 1
       }
       s.phase = .work
-      s.assignments = newGame().assignments
       s.report = nil
       s.lastMaterialHaul = nil
+      let previous = s.assignments["ion"] ?? .rest
+      if assignmentProblem(s, worker: .ion, task: previous) != nil { s.assignments["ion"] = .rest }
     default: throw GameError("Unknown action.")
     }
     s.revision += 1
@@ -261,5 +279,43 @@ public enum Rules {
   }
   public static func fieldLabel(_ s: GameState) -> String {
     Farming.label(s)
+  }
+
+  public static func buildingContributions(_ state: GameState) -> [String] {
+    var lines: [String] = []
+    let work = state.assignments["ion"] ?? .rest
+    for d in Construction.definitions {
+      let level = Construction.operationalLevel(d.id, state: state)
+      guard level > 0 else { continue }
+      if state.isSeasonEnd,
+        let r = state.buildings.first(where: { $0.id == d.id }), r.completedSeason < state.turn,
+        d.food > 0 || d.coins > 0
+      {
+        lines.append("\(d.title): \(d.yieldText(level: level))")
+      }
+      switch d.id {
+      case .woodshed:
+        if state.season == 3 && state.isMonthEnd {
+          lines.append("Woodshed: saves 1 food this week.")
+        }
+        if state.season == 3 && state.isSeasonEnd {
+          lines.append("Woodshed: shelter wear reduced to 6.")
+        }
+      case .cellar where work == .supplies: lines.append("Root cellar: +3 provision food.")
+      case .bakery where work == .supplies: lines.append("Bakery: +\(level) provision food.")
+      case .well where work == .harvest: lines.append("Well: +\(2 * level) harvest food.")
+      case .granary where work == .harvest: lines.append("Granary: +\(level) harvest seeds.")
+      case .stable where work == .paid: lines.append("Stable: +1 Galbeni from transport.")
+      default: break
+      }
+    }
+    return lines
+  }
+
+  public static func reportBuildingContributions(_ state: GameState) -> [String] {
+    guard let report = state.report else { return [] }
+    var before = state
+    before.buildings = report.buildingsBefore
+    return buildingContributions(before)
   }
 }

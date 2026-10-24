@@ -20,7 +20,7 @@ extension HomesteadScene {
     return result
   }
 
-  func rearTexture(index: Int, winter: Bool = false) -> SKTexture? {
+  private static func rearArtwork(index: Int, winter: Bool) -> (String, CGRect?) {
     // Shared seasonal crops keep snow, anchors and scale consistent.
     let frames: [CGRect] = [
       CGRect(x: 18, y: 49, width: 329, height: 343),
@@ -36,31 +36,32 @@ extension HomesteadScene {
       CGRect(x: 729, y: 826, width: 345, height: 226),
       CGRect(x: 1094, y: 834, width: 334, height: 209),
     ]
-    return texture(winter ? "settlement-rear-winter" : "settlement-rear-v2", rect: frames[index])
+    return (winter ? "settlement-rear-winter" : "settlement-rear-v2", frames[index])
   }
-  func buildingTexture(_ id: BuildingID, level: Int, planned: Bool, winter: Bool, facing: Int = 0)
-    -> SKTexture?
+  private static func buildingArtwork(_ id: BuildingID, planned: Bool, winter: Bool, facing: Int)
+    -> (String, CGRect?)
   {
     if id == .storehouse {
-      return buildingTexture(.granary, level: level, planned: planned, winter: winter, facing: facing)
+      return buildingArtwork(.granary, planned: planned, winter: winter, facing: facing)
     }
     if facing >= 2 && !planned {
       let index: [BuildingID: Int] = [
         .woodshed: 1, .cellar: 2, .barn: 3, .well: 4, .granary: 5, .workshop: 6, .bakery: 7,
         .smithy: 8, .stable: 9, .apiary: 10,
       ]
-      return rearTexture(index: index[id]!, winter: winter)
+      return rearArtwork(index: index[id]!, winter: winter)
     }
     if id == .woodshed || id == .cellar {
-      return texture(
-        id.rawValue + "-" + (planned ? "construction" : winter ? "winter" : "complete"))
+      let name = id.rawValue + "-" + (planned ? "construction" : winter ? "winter" : "complete")
+      return (name, individualArtworkFrames[name])
     }
     if id == .barn || id == .well {
-      return texture(
+      return (
         winter ? "props-winter" : "props",
-        rect: id == .barn
+        id == .barn
           ? CGRect(x: 1107, y: 0, width: 429, height: 503)
-          : CGRect(x: 0, y: 503, width: 426, height: 521))
+          : CGRect(x: 0, y: 503, width: 426, height: 521)
+      )
     }
     let frames: [BuildingID: CGRect] = [
       .granary: CGRect(x: 32, y: 78, width: 455, height: 410),
@@ -70,8 +71,100 @@ extension HomesteadScene {
       .stable: CGRect(x: 509, y: 567, width: 532, height: 381),
       .apiary: CGRect(x: 1053, y: 590, width: 462, height: 350),
     ]
-    return texture(
-      winter ? "settlement-buildings-winter" : "settlement-buildings", rect: frames[id])
+    return (winter ? "settlement-buildings-winter" : "settlement-buildings", frames[id])
+  }
+
+  static let individualArtworkFrames: [String: CGRect] = [
+    "woodshed-complete": CGRect(x: 32, y: 194, width: 1209, height: 903),
+    "woodshed-construction": CGRect(x: 54, y: 192, width: 1163, height: 871),
+    "woodshed-winter": CGRect(x: 12, y: 230, width: 1229, height: 873),
+    "cellar-complete": CGRect(x: 10, y: 282, width: 1237, height: 744),
+    "cellar-construction": CGRect(x: 17, y: 313, width: 1226, height: 646),
+    "cellar-winter": CGRect(x: 6, y: 253, width: 1242, height: 845),
+  ]
+
+  func rearTexture(index: Int, winter: Bool = false) -> SKTexture? {
+    let (name, crop) = Self.rearArtwork(index: index, winter: winter)
+    return texture(name, rect: crop)
+  }
+
+  func buildingTexture(_ id: BuildingID, level: Int, planned: Bool, winter: Bool, facing: Int = 0)
+    -> SKTexture?
+  {
+    let (name, crop) = Self.buildingArtwork(id, planned: planned, winter: winter, facing: facing)
+    return texture(name, rect: crop)
+  }
+
+  private static func houseArtwork(level: Int, damaged: Bool, winter: Bool, facing: Int)
+    -> (String, CGRect?)
+  {
+    if level >= 2 {
+      let view = facing >= 2 ? "rear" : "front"
+      let season = winter ? "winter" : "summer"
+      return ("house-upgraded-\(view)-\(season)-\(damaged ? "damaged" : "intact")", nil)
+    }
+    if facing >= 2 { return rearArtwork(index: 0, winter: winter) }
+    return (
+      winter ? "props-winter" : "props",
+      damaged
+        ? CGRect(x: 557, y: 0, width: 550, height: 503)
+        : CGRect(x: 0, y: 0, width: 557, height: 503)
+    )
+  }
+
+  func houseTexture(level: Int, damaged: Bool, winter: Bool, facing: Int = 0) -> SKTexture? {
+    let (name, crop) = Self.houseArtwork(
+      level: level, damaged: damaged, winter: winter, facing: facing)
+    return texture(name, rect: crop)
+  }
+
+  static func houseArtworkImage(level: Int, damaged: Bool, winter: Bool, facing: Int = 0)
+    -> NSImage?
+  {
+    let (name, crop) = houseArtwork(level: level, damaged: damaged, winter: winter, facing: facing)
+    return artworkImage(name, crop: crop, mirrored: facing % 2 == 1)
+  }
+
+  static func buildingArtworkImage(
+    _ id: BuildingID, level: Int, planned: Bool, winter: Bool, facing: Int = 0
+  ) -> NSImage? {
+    let (name, crop) = buildingArtwork(id, planned: planned, winter: winter, facing: facing)
+    return artworkImage(name, crop: crop, mirrored: facing % 2 == 1)
+  }
+
+  private static var catalogueImages: [String: NSImage] = [:]
+
+  private static func artworkImage(_ name: String, crop: CGRect?, mirrored: Bool) -> NSImage? {
+    let key = "\(name)-\(String(describing: crop))-\(mirrored)"
+    if let cached = catalogueImages[key] { return cached }
+    guard
+      let directory = Bundle.module.url(
+        forResource: "Art", withExtension: nil, subdirectory: "Resources"),
+      let image = NSImage(contentsOf: directory.appendingPathComponent(name + ".png")),
+      let original = image.cgImage(forProposedRect: nil, context: nil, hints: nil)
+    else { return nil }
+    let cgImage: CGImage
+    if let crop {
+      guard let cropped = original.cropping(to: crop) else { return nil }
+      cgImage = cropped
+    } else {
+      cgImage = original
+    }
+    let size = CGSize(width: cgImage.width, height: cgImage.height)
+    let result = NSImage(cgImage: cgImage, size: size)
+    if mirrored {
+      let flipped = NSImage(size: size)
+      flipped.lockFocus()
+      var transform = AffineTransform(scaleByX: -1, byY: 1)
+      transform.translate(x: -size.width, y: 0)
+      (transform as NSAffineTransform).concat()
+      result.draw(in: NSRect(origin: .zero, size: size))
+      flipped.unlockFocus()
+      catalogueImages[key] = flipped
+      return flipped
+    }
+    catalogueImages[key] = result
+    return result
   }
 
   func updateBuildingLayers(_ node: SKSpriteNode, record: BuildingRecord?, stage: BuildingStage) {

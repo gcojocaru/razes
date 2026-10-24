@@ -8,11 +8,17 @@ final class BuildingProgressionTests: XCTestCase {
     XCTAssertEqual(BuildingID.allCases.count, 11)
     var s = Rules.newGame()
     s.money = 10000
+    s.houseLevel = 5
+    s.character.buildingXP = 12
     s.materials = .init(wood: 1000, stone: 1000, planks: 1000)
-    for id in BuildingID.allCases {
+    for id in [
+      .woodshed, .cellar, .well, .workshop, .barn, .granary, .apiary,
+      .storehouse, .bakery, .smithy, .stable,
+    ] as [BuildingID] {
       s.layout.buildings.append(
         .init(id: id, position: try XCTUnwrap(Settlement.firstAvailable(id, in: s.layout))))
       try Construction.start(id, state: &s)
+      Construction.resolveSeason(state: &s, produce: false)
     }
     XCTAssertEqual(try SaveCodec.decode(SaveCodec.encode(s)), s)
     Construction.resolveSeason(state: &s)

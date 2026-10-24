@@ -54,6 +54,7 @@ final class MaterialsTests: XCTestCase {
 
   func testCraftingConsumesIngredientsFirstAndProtectsReservations() throws {
     var s = try ConstructionTests().work()
+    s.buildings = [.init(id: .workshop, completedSeason: 0)]
     s.materials = .init(wood: 20)
     try Materials.craftPlanks(quantity: 2, state: &s)
     XCTAssertEqual(s.materials, .init(wood: 16, planks: 2))
@@ -90,30 +91,33 @@ final class MaterialsTests: XCTestCase {
 
   func testHouseAndStorehouseExpandStorageAndDowngradeNeverDestroysStock() throws {
     var s = Rules.newGame()
+    s.houseLevel = 2
+    s.character.buildingXP = 3
+    s.buildings = [.init(id: .workshop, completedSeason: 0)]
     s.money = 100
     s.materials = .init(wood: 6, stone: 2, planks: 2)
     XCTAssertLessThanOrEqual(Construction.materialCost(.storehouse).total, Materials.capacity(s))
     try Construction.start(.storehouse, state: &s)
     XCTAssertEqual(s.materials, .init())
-    XCTAssertEqual(Materials.capacity(s), 20)
+    XCTAssertEqual(Materials.capacity(s), 30)
     Construction.resolveSeason(state: &s)
-    XCTAssertEqual(Materials.capacity(s), 60)
+    XCTAssertEqual(Materials.capacity(s), 70)
     s.materials = .init(wood: 4, stone: 4, planks: 2)
     try Materials.upgradeHouse(state: &s)
-    XCTAssertEqual(s.houseLevel, 2)
+    XCTAssertEqual(s.houseLevel, 3)
     XCTAssertEqual(s.house, 55)
-    XCTAssertEqual(Materials.capacity(s), 70)
-    s.buildings[0].level = 2
-    s.buildings[0].condition = 1
+    XCTAssertEqual(Materials.capacity(s), 80)
+    s.buildings[1].level = 2
+    s.buildings[1].condition = 1
     s.materials = .init(stone: 100)
     s.season = 1
     Construction.resolveSeason(state: &s)
-    XCTAssertEqual(Materials.capacity(s), 70)
+    XCTAssertEqual(Materials.capacity(s), 80)
     XCTAssertEqual(s.materials.stone, 100)
     XCTAssertThrowsError(try Materials.buy(.wood, quantity: 1, state: &s))
     XCTAssertEqual(Materials.forecast(s).gained, .init())
-    s.buildings[0].condition = 0
-    XCTAssertEqual(Materials.capacity(s), 70)
+    s.buildings[1].condition = 0
+    XCTAssertEqual(Materials.capacity(s), 80)
   }
 
   func testConstructionFailuresLeaveCoinsAndMaterialsUntouched() throws {

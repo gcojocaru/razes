@@ -1,13 +1,14 @@
 import Foundation
 
 public enum SkillID: String, Codable, CaseIterable, Sendable {
-  case farming, gathering, building
+  case farming, gathering, building, strength, endurance
   public var title: String { rawValue.capitalized }
 }
 
 public struct CharacterState: Codable, Equatable, Sendable {
   public var health = 100, energy = 100, hunger = 0
   public var farmingXP = 0, gatheringXP = 0, buildingXP = 0
+  public var strengthXP = 0, enduranceXP = 0
   public init() {}
 
   public subscript(_ skill: SkillID) -> Int {
@@ -16,6 +17,8 @@ public struct CharacterState: Codable, Equatable, Sendable {
       case .farming: farmingXP
       case .gathering: gatheringXP
       case .building: buildingXP
+      case .strength: strengthXP
+      case .endurance: enduranceXP
       }
     }
     set {
@@ -23,6 +26,8 @@ public struct CharacterState: Codable, Equatable, Sendable {
       case .farming: farmingXP = newValue
       case .gathering: gatheringXP = newValue
       case .building: buildingXP = newValue
+      case .strength: strengthXP = newValue
+      case .endurance: enduranceXP = newValue
       }
     }
   }
@@ -43,7 +48,13 @@ public struct CharacterWeek: Codable, Equatable, Sendable {
 public enum CharacterSimulation {
   public static func energyCost(_ task: TaskID, character: CharacterState) -> Int {
     guard task != .rest else { return 0 }
-    return (task == .paid || task == .supplies ? 10 : 20) + (character.health < 25 ? 10 : 0)
+    let base = task == .paid || task == .supplies ? 10 : 20
+    return max(5, base - 2 * (character.level(.endurance) - 1))
+      + (character.health < 25 ? 10 : 0)
+  }
+
+  public static func restEnergy(character: CharacterState, exposed: Bool) -> Int {
+    (exposed ? 25 : 35) + 2 * (character.level(.endurance) - 1)
   }
 
   public static func week(
@@ -54,7 +65,11 @@ public enum CharacterSimulation {
     result.energyCost = energyCost(task, character: state.character)
     result.after.energy = min(
       100,
-      max(0, state.character.energy + (task == .rest ? (exposed ? 25 : 35) : -result.energyCost)))
+      max(
+        0,
+        state.character.energy
+          + (task == .rest
+            ? restEnergy(character: state.character, exposed: exposed) : -result.energyCost)))
     result.after.hunger = min(
       100, max(0, state.character.hunger + (deficit > 0 ? 25 * deficit : -25)))
     result.starvationDamage = result.after.hunger >= 75 ? 15 : 0
@@ -67,10 +82,20 @@ public enum CharacterSimulation {
     case .plant, .tend, .harvest: skill = .farming
     case .gatherWood, .gatherStone: skill = haul.total > 0 ? .gathering : nil
     case .repair: skill = shelter > state.house ? .building : nil
-    case .buildWoodshed, .buildCellar: skill = .building
     default: skill = nil
     }
     if let skill { result.after[skill] = min(12, result.after[skill] + 1) }
+    let gathering = (task == .gatherWood || task == .gatherStone) && haul.total > 0
+    if task == .paid || gathering { result.after.strengthXP = min(12, result.after.strengthXP + 1) }
+    if skill != nil || task == .paid || Construction.building(for: task) != nil {
+      result.after.enduranceXP = min(12, result.after.enduranceXP + 1)
+    }
+    if state.isSeasonEnd {
+      let foundations =
+        state.buildings.filter { $0.level == 0 && $0.debugPlaced != true }.count
+        + (Construction.building(for: task) == nil ? 0 : 1)
+      result.after.buildingXP = min(12, result.after.buildingXP + foundations)
+    }
     return result
   }
 }

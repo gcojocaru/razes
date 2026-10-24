@@ -17,6 +17,8 @@ final class SeasonalSettlementTests: XCTestCase {
     Construction.resolveSeason(state: &s)
     XCTAssertEqual(s.money, 98)
     XCTAssertEqual(s.buildings[0].condition, 80)
+    s.houseLevel = 2
+    s.character.buildingXP = 3
     try Construction.upgrade(.woodshed, state: &s)
     XCTAssertEqual(s.buildings[0].level, 2)
     XCTAssertEqual(s.buildings[0].condition, 100)

@@ -12,9 +12,10 @@ public struct SeasonReport: Codable, Equatable, Sendable {
   public var tasks: [String]
   public var seedsBefore = 0, seedsAfter = 0
   public var character = CharacterWeek()
+  public var buildingsBefore: [BuildingRecord] = []
 }
 public struct GameState: Codable, Equatable, Sendable {
-  public var version = 10, revision = 0, season = 0, year = 0, week = 0
+  public var version = 11, revision = 0, season = 0, year = 0, week = 0
   public var phase: Phase = .work
   public var character = CharacterState()
   public var food = 18, money = 12, house = 55

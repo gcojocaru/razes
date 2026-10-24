@@ -29,6 +29,9 @@ final class MaterialsSessionTests: XCTestCase {
     defer { try? FileManager.default.removeItem(at: dir) }
     let store = SaveStore(url: dir.appendingPathComponent("save.json"))
     let session = GameSession(store: store)
+    let workshopPosition = try XCTUnwrap(
+      Settlement.firstAvailable(.workshop, in: session.state.layout))
+    XCTAssertTrue(session.placeBuilding(.workshop, at: workshopPosition, instant: true))
     let assignments = session.state.assignments
     session.buyMaterials(.wood, quantity: 1)
     XCTAssertNil(session.error)

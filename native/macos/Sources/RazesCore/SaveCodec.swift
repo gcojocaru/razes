@@ -7,7 +7,7 @@ public enum SaveCodec {
     let s: GameState
     do {
       struct Header: Decodable { let version: Int }
-      guard try JSONDecoder().decode(Header.self, from: data).version == 10 else {
+      guard try JSONDecoder().decode(Header.self, from: data).version == 11 else {
         throw GameError("This save belongs to an unsupported version. Start a fresh settlement.")
       }
       s = try JSONDecoder().decode(GameState.self, from: data)
@@ -25,6 +25,13 @@ public enum SaveCodec {
     func characterValid(_ c: CharacterState) -> Bool {
       [c.health, c.energy, c.hunger].allSatisfy { integer($0, 0, 100) }
         && SkillID.allCases.allSatisfy { integer(c[$0], 0, 12) }
+    }
+    func buildingsValid(_ records: [BuildingRecord]) -> Bool {
+      records.count <= BuildingID.allCases.count && Set(records.map(\.id)).count == records.count
+        && records.allSatisfy {
+          integer($0.level, 0, 5) && $0.condition.isFinite && (0...100).contains($0.condition)
+            && integer($0.completedSeason, 0, s.turn)
+        }
     }
     try ensure(characterValid(s.character))
     try ensure((s.phase == .dead) == (s.character.health == 0))
@@ -66,11 +73,14 @@ public enum SaveCodec {
       try ensure(integer(r.houseBefore, 0, 100) && integer(r.houseAfter, 0, 100))
       try ensure(r.tasks == ["Ion: \(Rules.task(task).name)"])
       try ensure(characterValid(r.character.before) && characterValid(r.character.after))
+      try ensure(buildingsValid(r.buildingsBefore))
       try ensure(r.character.before.health > 0 && r.character.after == s.character)
       try ensure(integer(r.consumption, 0, 2) && integer(r.deficit, 0, r.consumption))
       var before = s
       before.character = r.character.before
       before.house = r.houseBefore
+      before.buildings = r.buildingsBefore
+      before.phase = .work
       let shelter = min(100, before.house + Rules.task(task, in: before).houseGain)
       let expected = CharacterSimulation.week(
         before, task: task, deficit: r.deficit, shelter: shelter,
@@ -87,13 +97,8 @@ public enum SaveCodec {
     } else {
       try ensure(s.report == nil)
     }
-    try ensure(s.buildings.count <= BuildingID.allCases.count)
-    try ensure(Set(s.buildings.map(\.id)).count == s.buildings.count)
+    try ensure(buildingsValid(s.buildings))
     for record in s.buildings {
-      try ensure(
-        integer(record.level, 0, 5) && record.condition.isFinite
-          && (0...100).contains(record.condition))
-      try ensure(integer(record.completedSeason, 0, s.turn))
       if record.legacyAssignment && record.debugPlaced != true {
         guard Construction.definition(record.id).task != nil else {
           throw GameError("Invalid worker building.")

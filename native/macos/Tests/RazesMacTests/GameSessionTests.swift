@@ -4,14 +4,27 @@ import XCTest
 @testable import RazesMac
 
 final class GameSessionTests: XCTestCase {
-  @MainActor func testInstantActionsDoNotGrantExperienceOrAdvanceNeeds() {
-    let session = GameSession(store: nil)
+  @MainActor func testInstantActionsDoNotGrantExperienceOrAdvanceNeeds() throws {
+    let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let store = SaveStore(url: directory.appendingPathComponent("save.json"))
+    var state = Rules.newGame()
+    state.houseLevel = 5
+    state.character[.building] = 3
+    state.materials = .init(wood: 15, stone: 10, planks: 10)
+    try store.save(state)
+    let session = GameSession(store: store)
     let original = session.state.character
+    let workshopPosition = try XCTUnwrap(
+      Settlement.firstAvailable(.workshop, in: session.state.layout))
+    XCTAssertTrue(session.placeBuilding(.workshop, at: workshopPosition, instant: true))
     session.debugResources()
     session.buyMaterials(.wood, quantity: 4)
     session.craftPlanks(quantity: 1)
     session.discardMaterials(.stone, quantity: 1)
-    XCTAssertTrue(session.placeBuilding(.woodshed, at: .init(x: 1, y: 1), instant: true))
+    let woodshedPosition = try XCTUnwrap(
+      Settlement.firstAvailable(.woodshed, in: session.state.layout))
+    XCTAssertTrue(session.placeBuilding(.woodshed, at: woodshedPosition, instant: true))
     session.upgradeBuilding(.woodshed)
     session.debugSetBuilding(.woodshed, level: 2, condition: 50)
     session.repairBuilding(.woodshed)
@@ -19,6 +32,21 @@ final class GameSessionTests: XCTestCase {
     XCTAssertNil(session.error)
     XCTAssertEqual(session.state.character, original)
     XCTAssertEqual(session.state.week, 0)
+  }
+
+  @MainActor func testContinueExplainsFallbackAndKeepsCompletedAssignmentInReport() {
+    let session = GameSession(store: nil)
+    session.send(
+      .init(type: "assign", revision: session.state.revision, worker: .ion, task: .plant))
+    session.send(.init(type: "resolve", revision: session.state.revision))
+    XCTAssertEqual(session.state.assignments["ion"], .plant)
+    XCTAssertNil(session.assignmentNotice)
+    session.send(.init(type: "continue", revision: session.state.revision))
+    XCTAssertEqual(session.state.assignments["ion"], .rest)
+    XCTAssertTrue(session.assignmentNotice?.contains("Ion rests instead of repeating") == true)
+    XCTAssertTrue(session.assignmentNotice?.contains("already") == true)
+    session.send(.init(type: "assign", revision: session.state.revision, worker: .ion, task: .rest))
+    XCTAssertNil(session.assignmentNotice)
   }
 
   @MainActor func testDeadRunBlocksEditsButAllowsCameraAndSafeRestart() throws {

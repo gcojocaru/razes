@@ -4,15 +4,16 @@ import SwiftUI
 struct MaterialsPanel: View {
   @Bindable var session: GameSession
   let state: GameState
+  let openWorkshop: () -> Void
   @State private var quantity = 1
-  private var freeCoins: Int {
+  private var freeGalbeni: Int {
     state.money - (state.phase == .work ? Rules.preview(state).moneyCost : 0)
   }
   var body: some View {
     VStack(alignment: .leading, spacing: 16) {
-      Text("Food: \(state.food) · Coins: \(state.money)").font(.headline)
+      Text("Food: \(state.food) · Galbeni: \(state.money)").font(.headline)
       Text("FOOD PROVISIONS").font(.headline)
-      Text("\(Rules.suppliesGain(state)) food · 4 coins · arrives at week end")
+      Text("\(Rules.suppliesGain(state)) food · 4 Galbeni · arrives at week end")
       Text(
         "Ion buys provisions instead of another weekly job. Food does not use material storage slots."
       )
@@ -32,7 +33,7 @@ struct MaterialsPanel: View {
       Text("Shared storage: \(state.materials.total) / \(Materials.capacity(state))")
         .font(.title3).accessibilityAddTraits(.isHeader)
       Text(
-        "Wood, stone and planks each take one slot. Food, seeds and coins are stored separately."
+        "Wood, stone and planks each take one slot. Food, seeds and Galbeni are stored separately."
       )
       .font(.caption).foregroundStyle(GamePalette.muted)
       if state.materials.total > Materials.capacity(state) {
@@ -48,9 +49,9 @@ struct MaterialsPanel: View {
       Stepper("Quantity: \(quantity)", value: $quantity, in: 1...100)
       HStack {
         Text("Grain seeds: \(state.seeds)").frame(maxWidth: .infinity, alignment: .leading)
-        Button("Buy \(quantity) grain seeds · \(quantity) coins") {
+        Button("Buy \(quantity) grain seeds · \(quantity) Galbeni") {
           session.buySeeds(quantity: quantity)
-        }.disabled(freeCoins < quantity || state.seeds > 100000 - quantity)
+        }.disabled(freeGalbeni < quantity || state.seeds > 100000 - quantity)
       }
       Text(
         "Planting window: Spring only — all 12 weeks, once per year. Plant 4 seeds through Places → Field. Grain ripens after 24 weeks."
@@ -60,29 +61,27 @@ struct MaterialsPanel: View {
         HStack {
           Text("\(id.title): \(state.materials[id])").frame(
             maxWidth: .infinity, alignment: .leading)
-          Button("Buy \(quantity) \(id.rawValue) · \(quantity * id.price) coins") {
+          Button("Buy \(quantity) \(id.rawValue) · \(quantity * id.price) Galbeni") {
             session.buyMaterials(id, quantity: quantity)
           }.disabled(
-            freeCoins < quantity * id.price
+            freeGalbeni < quantity * id.price
               || state.materials.total + quantity > Materials.capacity(state))
           Button("Discard \(quantity) \(id.rawValue)", role: .destructive) {
             session.discardMaterials(id, quantity: quantity)
           }.disabled(Materials.available(state)[id] < quantity)
         }
       }
-      Text("Buying is immediate. \(freeCoins) coins are free to spend. Discarding has no refund.")
-        .font(.caption).foregroundStyle(GamePalette.muted)
-      Divider()
-      Text("CRAFTING").font(.headline)
-      Button("Craft \(quantity) planks · uses \(quantity * 2) wood") {
-        session.craftPlanks(quantity: quantity)
-      }.disabled(
-        Materials.available(state).wood < quantity * 2
-          || state.materials.total - quantity > Materials.capacity(state))
       Text(
-        "Immediate · no worker needed · 2 wood → 1 plank. Ingredients free their storage space first."
+        "Buying is immediate. \(freeGalbeni) Galbeni are free to spend. Discarding has no refund."
       )
       .font(.caption).foregroundStyle(GamePalette.muted)
+      Divider()
+      Text("CRAFTING").font(.headline)
+      Text(
+        "Craft planks in an operational Workshop. Each plank uses \(Materials.plankWoodCost(state: state)) wood; no worker or XP is involved."
+      )
+      .font(.system(size: 13)).foregroundStyle(GamePalette.muted)
+      Button("Open Workshop · crafting", action: openWorkshop)
       Divider()
       Text("WEEKLY GATHERING").font(.headline)
       if state.phase == .work {
@@ -154,9 +153,12 @@ struct HouseStorageControls: View {
       .font(.headline)
       if state.houseLevel < 5 {
         Text("+10 slots · \(Materials.houseUpgradeMaterials.text)").font(.caption)
-        Button("Upgrade house storage · \(4 * (state.houseLevel + 1)) coins") {
+        ConstructionRequirementTable(
+          requirements: Materials.houseUpgradeRequirements(state: state), state: state,
+          progression: false)
+        Button("Upgrade house storage · \(4 * (state.houseLevel + 1)) Galbeni") {
           session.upgradeHouseStorage()
-        }
+        }.disabled(!Materials.houseUpgradeRequirements(state: state).isMet)
       }
     }
   }
@@ -170,8 +172,8 @@ struct HouseStockOverview: View {
       LabeledContent("Food", value: "\(state.food)")
         .accessibilityElement(children: .ignore).accessibilityLabel("Food").accessibilityValue(
           "\(state.food)")
-      LabeledContent("Coins", value: "\(state.money)")
-        .accessibilityElement(children: .ignore).accessibilityLabel("Coins").accessibilityValue(
+      LabeledContent("Galbeni", value: "\(state.money)")
+        .accessibilityElement(children: .ignore).accessibilityLabel("Galbeni").accessibilityValue(
           "\(state.money)")
       LabeledContent("Grain seeds", value: "\(state.seeds)")
         .accessibilityElement(children: .ignore).accessibilityLabel("Grain seeds")

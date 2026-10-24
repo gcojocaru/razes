@@ -1,4 +1,16 @@
-# Native macOS validation — 2026-10-23
+# Native macOS validation
+
+## Construction, progression and personal skills — 2026-10-24
+
+- Full native suite: **142 tests passed** (80 core, 62 macOS), zero failures. Coverage includes all blueprint/upgrade gates and prerequisites; reserved resources and atomic failures; Workshop/Smithy recipes and storage; immediate practical bonuses and delayed income; Strength/Endurance starting-level rewards, energy and recovery; foundation completion XP; repeated work and Rest fallback; and strict schema-11 reports after seasonal wear and summary edits.
+- A complete progression test reaches all eleven buildings through foundation XP, then reaches Building level 5 and upgrades every building to level 5. The existing deterministic three-year survival routine still passes.
+- Eight offscreen native UI screenshots were inspected: catalogue House/Bakery/operational Workshop at 1000×700 and 1280×850, plus locked Granary and damaged Workshop map inspectors at 300 pixels wide. Requirements, blockers, crafting recipe/free supplies/storage and artwork remain readable. Local ignored artifacts: `build/validation/construction/`.
+- Eight generated house sprites cover front/rear, summer/winter and intact/damaged states; scene tests exercise four rotations, levels 1–5, source image visibility, footprint/anchor/node reuse and load warnings. See `../../docs/art/2026-10-24-house-upgrade.md` for assets and exact built-in generation prompts.
+- Fresh independent review found no material core/UI or art integration issues. Corrected the upgrade's next-level income display and the worn Storehouse's no-payout wording during review. Strict recursive Swift formatting and `git diff --check` pass.
+- Debug and Release packaging passed, including all eight new bundled resources and strict local ad-hoc signature verification. Release required sandbox escalation for Apple's `dsymutil`; no distribution signing or notarization was attempted. Packaged app: `build/Razes.app`. Test and release logs are copied into `build/validation/`.
+- **Unverified live interaction:** Computer Use could not start its macOS screen-capture stream (ScreenCaptureKit error −3811). A sandbox launch also aborted before producing application output. Live app startup/rendering, keyboard navigation and end-to-end VoiceOver remain unverified in this pass; offscreen SwiftUI rendering and scene tests passed. Intel/macOS 14 hardware and economic balance remain untested.
+- Schema 11 uses `settlement-v11.json` and starts fresh without modifying earlier save files. No migration was added, as directed by `AGENTS.md`. Browser code was not changed or retested. Pre-existing `package-lock.json` and `.DS_Store` changes were preserved.
+
 
 ## Planting clarity follow-up — 2026-10-23
 
