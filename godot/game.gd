@@ -20,6 +20,21 @@ var _day_time := 0.0
 var _time_hud: PanelContainer
 var _debug_panel: PanelContainer
 
+## Sky colour and sunlight strength per weather condition.
+const SKIES := {
+	"Clear": [Color(0.55, 0.68, 0.78), 1.0],
+	"Cloudy": [Color(0.6, 0.64, 0.68), 0.6],
+	"Rain": [Color(0.45, 0.5, 0.55), 0.4],
+	"Storm": [Color(0.3, 0.33, 0.38), 0.25],
+	"Snow": [Color(0.78, 0.8, 0.84), 0.5],
+}
+var weather := Weather.new(randi())
+var today := {}
+## 0–1 snow lying on the field: snow days cover it, warm days melt it.
+var snow_cover := 0.0
+var _sun: DirectionalLight3D
+var _environment: Environment
+
 var hovered_cell := Vector2i(-1, -1)
 var selected_cell := Vector2i(-1, -1)
 
@@ -28,19 +43,18 @@ var _field: ShaderMaterial
 var _zoom := 24.0
 
 func _ready() -> void:
-	var sun := DirectionalLight3D.new()
-	sun.rotation_degrees = Vector3(-55, -35, 0)
-	sun.shadow_enabled = true
-	add_child(sun)
+	_sun = DirectionalLight3D.new()
+	_sun.rotation_degrees = Vector3(-55, -35, 0)
+	_sun.shadow_enabled = true
+	add_child(_sun)
 
-	var environment := Environment.new()
-	environment.background_mode = Environment.BG_COLOR
-	environment.background_color = Color(0.55, 0.68, 0.78)
-	environment.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	environment.ambient_light_color = Color(0.75, 0.78, 0.8)
-	environment.ambient_light_energy = 0.6
+	_environment = Environment.new()
+	_environment.background_mode = Environment.BG_COLOR
+	_environment.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
+	_environment.ambient_light_color = Color(0.75, 0.78, 0.8)
+	_environment.ambient_light_energy = 0.6
 	var world := WorldEnvironment.new()
-	world.environment = environment
+	world.environment = _environment
 	add_child(world)
 
 	_field = ShaderMaterial.new()
@@ -68,10 +82,23 @@ func _ready() -> void:
 		_debug_panel = preload("res://debug_panel.gd").new(seconds_per_day)
 		_debug_panel.day_length_changed.connect(func(seconds: float) -> void: seconds_per_day = seconds)
 		hud.add_child(_debug_panel)
-	_show_date()
+	_start_day()
 
 func _show_date() -> void:
-	_time_hud.show_time(day, speed)
+	_time_hud.show_time(day, speed, today)
+
+## Rolls the weather for the current day and applies it to the sky and field.
+func _start_day() -> void:
+	today = weather.on(day)
+	if today.condition == "Snow":
+		snow_cover = 1.0
+	elif today.temperature > 2:
+		snow_cover = maxf(snow_cover - 0.02 * today.temperature, 0.0)
+	var sky: Array = SKIES[today.condition]
+	_environment.background_color = sky[0]
+	_sun.light_energy = sky[1]
+	_field.set_shader_parameter("snow", snow_cover)
+	_show_date()
 
 func set_speed(new_speed: int) -> void:
 	if new_speed > 0:
@@ -85,6 +112,7 @@ func advance_time(seconds: float) -> void:
 	while _day_time >= seconds_per_day:
 		_day_time -= seconds_per_day
 		day += 1
+		_start_day()
 	_show_date()
 
 func _process(delta: float) -> void:

@@ -1,5 +1,5 @@
 extends PanelContainer
-## Top-centre time panel: season emblem, date, week pips, year progress and speed buttons.
+## Top-centre time panel: season emblem, date, week pips, weather, year progress and speed buttons.
 
 signal speed_selected(speed: int)
 
@@ -17,6 +17,10 @@ var _icon := Control.new()
 var _pips := Control.new()
 var _year_bar := Control.new()
 var _buttons: Array[Button] = []
+var _condition := "Clear"
+var _weather_icon := Control.new()
+var _temperature_label := Label.new()
+var _condition_label := Label.new()
 
 func _init() -> void:
 	name = "TimeHud"
@@ -58,6 +62,24 @@ func _init() -> void:
 	row.add_child(_pips)
 
 	row.add_child(VSeparator.new())
+	_weather_icon.custom_minimum_size = Vector2(40, 44)
+	_weather_icon.draw.connect(_draw_weather)
+	row.add_child(_weather_icon)
+	var weather_text := VBoxContainer.new()
+	weather_text.add_theme_constant_override("separation", -2)
+	weather_text.custom_minimum_size.x = 64
+	weather_text.alignment = BoxContainer.ALIGNMENT_CENTER
+	_temperature_label.add_theme_font_override("font", serif)
+	_temperature_label.add_theme_font_size_override("font_size", 22)
+	_temperature_label.add_theme_color_override("font_color", PARCHMENT)
+	_condition_label.add_theme_font_override("font", serif)
+	_condition_label.add_theme_font_size_override("font_size", 13)
+	_condition_label.add_theme_color_override("font_color", GOLD)
+	weather_text.add_child(_temperature_label)
+	weather_text.add_child(_condition_label)
+	row.add_child(weather_text)
+
+	row.add_child(VSeparator.new())
 	var group := ButtonGroup.new()
 	for i in SPEEDS.size():
 		var button := Button.new()
@@ -87,8 +109,11 @@ func _init() -> void:
 	_year_bar.draw.connect(_draw_year_bar)
 	column.add_child(_year_bar)
 
-func show_time(day: int, speed: int) -> void:
+func show_time(day: int, speed: int, weather: Dictionary) -> void:
 	_day = day
+	_condition = weather.condition
+	_temperature_label.text = "%d°C" % weather.temperature
+	_condition_label.text = weather.condition
 	var d := Calendar.date(day)
 	_season_label.text = Calendar.SEASONS[d.season]
 	_detail_label.text = "Month %d  ·  Week %d  ·  Year %d" % [d.month, d.week, d.year]
@@ -97,6 +122,33 @@ func show_time(day: int, speed: int) -> void:
 	_icon.queue_redraw()
 	_pips.queue_redraw()
 	_year_bar.queue_redraw()
+	_weather_icon.queue_redraw()
+
+func _draw_weather() -> void:
+	var c := _weather_icon.size / 2.0
+	var sun := Color(0.96, 0.77, 0.3)
+	var cloud := Color(0.8, 0.8, 0.78) if _condition == "Cloudy" else Color(0.55, 0.57, 0.6)
+	if _condition == "Clear":
+		for i in 8:
+			var dir := Vector2.from_angle(i * TAU / 8)
+			_weather_icon.draw_line(c + dir * 10, c + dir * 15, sun, 2, true)
+		_weather_icon.draw_circle(c, 7, sun)
+		return
+	if _condition == "Cloudy":
+		_weather_icon.draw_circle(c + Vector2(7, -6), 6, sun)
+	var top := c + Vector2(0, -4)
+	for blob in [[Vector2(-8, 3), 6.0], [Vector2(0, -1), 8.0], [Vector2(8, 3), 6.0]]:
+		_weather_icon.draw_circle(top + blob[0], blob[1], cloud)
+	_weather_icon.draw_rect(Rect2(top + Vector2(-8, 3), Vector2(16, 6)), cloud)
+	match _condition:
+		"Rain", "Storm":
+			for x in [-7, 0, 7]:
+				_weather_icon.draw_line(c + Vector2(x, 9), c + Vector2(x - 3, 16), Color(0.55, 0.75, 0.95), 2, true)
+			if _condition == "Storm":
+				_weather_icon.draw_polyline(PackedVector2Array([c + Vector2(2, 6), c + Vector2(-2, 12), c + Vector2(3, 12), c + Vector2(-1, 19)]), sun, 2, true)
+		"Snow":
+			for x in [-7, 0, 7]:
+				_weather_icon.draw_circle(c + Vector2(x, 12 + absf(x) * 0.4), 2, Color(0.92, 0.95, 1))
 
 func _draw_icon() -> void:
 	var season: int = Calendar.date(_day).season
