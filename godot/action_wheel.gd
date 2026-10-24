@@ -228,7 +228,7 @@ func _label(entry: Dictionary) -> String:
 	return "Sow " + entry.crop if entry.action == "Sow" else entry.action
 
 func _effect(entry: Dictionary) -> String:
-	return "%d plot%s" % [entry.plots, "s" if entry.plots != 1 else ""] + ("\n%+d %s" % [entry.grain, entry.crop.to_lower() + " seed" if entry.action == "Sow" else "grain"] if entry.grain != 0 else "\nPrepare for sowing")
+	return "%d plot%s" % [entry.plots, "s" if entry.plots != 1 else ""] + ("\n%+d kg %s" % [entry.grain, entry.crop.to_lower() + " seed" if entry.action == "Sow" else "grain"] if entry.grain != 0 else "\nPrepare for sowing")
 
 func _draw() -> void:
 	draw_circle(_origin + Vector2(0, 5), (RADIUS if not entries.is_empty() else HUB) + 5, Color(0, 0, 0, 0.25))
@@ -252,7 +252,7 @@ func _draw() -> void:
 		_text(at + Vector2(0, 20), _label(entries[i]), 17, TimeHud.PARCHMENT)
 		var cost := "%d plot%s" % [entries[i].plots, "s" if entries[i].plots != 1 else ""]
 		if entries[i].grain != 0:
-			cost += " · %+d" % entries[i].grain
+			cost += " · %+d kg" % entries[i].grain
 		_text(at + Vector2(0, 37), cost, 12, TimeHud.GOLD)
 	draw_arc(_origin, HUB, 0, TAU, 96, TimeHud.GOLD, 1.5, true)
 
