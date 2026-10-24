@@ -33,7 +33,7 @@ final class RulesTests: XCTestCase {
       if s.phase == .dead { break }
       s = try Rules.dispatch(s, action: .init(type: "continue", revision: s.revision))
       XCTAssertEqual(s.turn, (week + 1) / 12)
-      XCTAssertEqual(s.assignments, ["ion": .rest])
+      XCTAssertNil(Rules.assignmentProblem(s, worker: .ion, task: s.assignments["ion"]!))
       XCTAssertEqual(try SaveCodec.decode(SaveCodec.encode(s)), s)
     }
     XCTAssertEqual(s.phase, .dead)

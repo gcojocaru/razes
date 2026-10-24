@@ -29,7 +29,7 @@ struct PhaseOverlay: View {
                 "\(Content.shared.people[worker.rawValue]!.name): \(Rules.task(state.assignments[worker.rawValue]!).name)"
               ).font(.callout)
             }
-            Text("Work costs: \(forecast.moneyCost) money · \(forecast.foodCost) food").font(
+            Text("Work costs: \(forecast.moneyCost) Galbeni · \(forecast.foodCost) food").font(
               .caption
             ).foregroundStyle(GamePalette.gold)
             Text(
@@ -41,6 +41,9 @@ struct PhaseOverlay: View {
               Text("Building supplies: \(Materials.reserved(state).text)").font(.caption)
             }
             ForEach(Materials.forecast(state).lines, id: \.self) { Text($0).font(.caption) }
+            ForEach(Rules.buildingContributions(state), id: \.self) {
+              Text($0).font(.caption).foregroundStyle(GamePalette.gold)
+            }
             Divider()
             CharacterWeekView(week: forecast.character)
           }.frame(maxWidth: .infinity, alignment: .leading)
@@ -51,7 +54,7 @@ struct PhaseOverlay: View {
             .font(.caption).foregroundStyle(GamePalette.muted)
             Text("AFTER WORK & CONSUMPTION").font(.system(size: 10, weight: .semibold)).tracking(1)
             Text(
-              "Food \(forecast.foodAfter) · Money \(forecast.moneyAfter) · Shelter \(forecast.houseAfter)"
+              "Food \(forecast.foodAfter) · Galbeni \(forecast.moneyAfter) · Shelter \(forecast.houseAfter)"
             ).font(.headline)
             ForEach(forecast.errors, id: \.self) {
               Text($0).font(.caption).foregroundStyle(.orange)
@@ -77,10 +80,13 @@ struct PhaseOverlay: View {
             VStack(alignment: .leading, spacing: 6) {
               ForEach(report.tasks, id: \.self) { Text($0).font(.callout) }
               CharacterWeekView(week: report.character)
+              ForEach(Rules.reportBuildingContributions(state), id: \.self) {
+                Text($0).font(.caption).foregroundStyle(GamePalette.gold)
+              }
             }.frame(maxWidth: .infinity, alignment: .leading)
             VStack(alignment: .leading, spacing: 6) {
               Text(
-                "Food \(report.foodBefore) → \(report.foodAfter) · Money \(report.moneyBefore) → \(report.moneyAfter)"
+                "Food \(report.foodBefore) → \(report.foodAfter) · Galbeni \(report.moneyBefore) → \(report.moneyAfter)"
               )
               Text("Seeds \(report.seedsBefore) → \(report.seedsAfter)")
               Text("Shelter \(report.houseBefore) → \(report.houseAfter)")

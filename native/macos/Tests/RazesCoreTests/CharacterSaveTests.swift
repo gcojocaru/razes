@@ -6,8 +6,11 @@ final class CharacterSaveTests: XCTestCase {
   func testCharacterFieldsAreRequiredAndBoundedBeforeForecasting() throws {
     let original =
       try JSONSerialization.jsonObject(with: SaveCodec.encode(Rules.newGame())) as! [String: Any]
-    XCTAssertEqual(original["version"] as? Int, 10)
-    for key in ["health", "energy", "hunger", "farmingXP", "gatheringXP", "buildingXP"] {
+    XCTAssertEqual(original["version"] as? Int, 11)
+    for key in [
+      "health", "energy", "hunger", "farmingXP", "gatheringXP", "buildingXP", "strengthXP",
+      "enduranceXP",
+    ] {
       for value in [-1, key.hasSuffix("XP") ? 13 : 101, Int.max, Int.min] {
         var object = original
         var character = object["character"] as! [String: Any]

@@ -43,8 +43,11 @@ public enum Farming {
   public static func foodYield(_ s: GameState) -> Int {
     Content.shared.balance.harvest + (s.tended ? Content.shared.balance.tendedBonus : 0)
       + 2 * (s.character.level(.farming) - 1)
+      + 2 * Construction.operationalLevel(.well, state: s)
   }
-  public static func seedYield(_ s: GameState) -> Int { s.tended ? 6 : 4 }
+  public static func seedYield(_ s: GameState) -> Int {
+    (s.tended ? 6 : 4) + Construction.operationalLevel(.granary, state: s)
+  }
   public static func buySeeds(quantity: Int, state: inout GameState) throws {
     guard (1...100000).contains(quantity), state.seeds <= 100000 - quantity else {
       throw GameError("Choose a positive seed quantity that fits in seed storage (100000 maximum).")

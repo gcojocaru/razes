@@ -31,11 +31,46 @@ public struct BuildingDefinition: Sendable, Identifiable {
   public let food, coins: Int
   public func yieldText(level: Int) -> String {
     if id == .storehouse { return "+\(40 * level) shared storage" }
-    return [food > 0 ? "\(food * level) food" : nil, coins > 0 ? "\(coins * level) coins" : nil]
+    return [food > 0 ? "\(food * level) food" : nil, coins > 0 ? "\(coins * level) Galbeni" : nil]
       .compactMap { $0 }.joined(separator: " + ") + " / season"
   }
 }
 public enum BuildingStage: String, Sendable { case empty, planned, complete }
+public struct ConstructionRequirements: Equatable, Sendable {
+  public let houseLevel, buildingLevel: Int
+  public let prerequisite: BuildingID?
+  public let coins, freeCoins: Int
+  public let materials, freeMaterials: MaterialStock
+  public let locks, shortages: [String]
+  public var problems: [String] { locks + shortages }
+  public var isMet: Bool { problems.isEmpty }
+
+  init(
+    houseLevel: Int = 0, buildingLevel: Int = 0, prerequisite: BuildingID? = nil,
+    coins: Int, materials: MaterialStock, state: GameState, locks: [String] = []
+  ) {
+    self.houseLevel = houseLevel
+    self.buildingLevel = buildingLevel
+    self.prerequisite = prerequisite
+    self.coins = coins
+    self.materials = materials
+    self.freeCoins = Construction.freeCoins(state)
+    self.freeMaterials = Materials.available(state)
+    self.locks = locks
+    var shortages: [String] = []
+    if freeCoins < coins {
+      shortages.append(
+        "Needs \(coins) free Galbeni; \(max(0, freeCoins)) available, \(coins - freeCoins) missing."
+      )
+    }
+    for id in MaterialID.allCases where freeMaterials[id] < materials[id] {
+      shortages.append(
+        "Needs \(materials[id]) free \(id.rawValue); \(max(0, freeMaterials[id])) available, \(materials[id] - freeMaterials[id]) missing."
+      )
+    }
+    self.shortages = shortages
+  }
+}
 public enum Construction {
   public static let definitions: [BuildingDefinition] = [
     .init(
@@ -46,11 +81,12 @@ public enum Construction {
     .init(
       id: .woodshed, title: "Woodshed", task: .buildWoodshed, cost: 3,
       benefit:
-        "Firewood sales. From next season: save 1 food at winter month end and reduce seasonal shelter wear to 6. Cold shelter still needs 1 extra food at month end.",
+        "Save 1 food at winter month end and reduce winter shelter wear to 6. Firewood sales begin the following season.",
       food: 0, coins: 1),
     .init(
       id: .cellar, title: "Root cellar", task: .buildCellar, cost: 4,
-      benefit: "Preserved vegetables. From next season: Buy provisions brings 10 food for 4 coins.",
+      benefit:
+        "Buy provisions brings 10 food for 4 Galbeni once completed. Preserved vegetables arrive from the following season.",
       food: 2, coins: 0),
     .init(
       id: .barn, title: "Barn", cost: 5,
@@ -69,7 +105,9 @@ public enum Construction {
       food: 3, coins: 1),
     .init(
       id: .smithy, title: "Smithy", cost: 8,
-      benefit: "Forged tools bring the strongest coin income.", food: 0, coins: 3),
+      benefit:
+        "Craft each plank from 1 wood. Forged tools bring Galbeni from the following season.",
+      food: 0, coins: 3),
     .init(
       id: .stable, title: "Stable", cost: 9, benefit: "Horses and transport bring trade income.",
       food: 1, coins: 2),
@@ -95,6 +133,84 @@ public enum Construction {
       $0.id == id && $0.level > 0 && $0.condition > 0 && $0.completedSeason < state.turn
     }
   }
+  public static func operationalLevel(_ id: BuildingID, state: GameState) -> Int {
+    state.buildings.first { $0.id == id && $0.level > 0 && $0.condition > 0 }?.level ?? 0
+  }
+  private static func minimumLevel(_ id: BuildingID) -> Int {
+    switch id {
+    case .woodshed, .cellar, .well, .workshop: 1
+    case .barn, .granary, .apiary, .storehouse: 2
+    case .bakery, .smithy, .stable: 3
+    }
+  }
+  private static func prerequisite(_ id: BuildingID) -> BuildingID? {
+    switch id {
+    case .barn, .apiary: .well
+    case .granary: .cellar
+    case .storehouse, .smithy: .workshop
+    case .bakery: .granary
+    case .stable: .barn
+    default: nil
+    }
+  }
+  public static func unlockProblems(
+    _ id: BuildingID, state: GameState, level: Int = 1
+  ) -> [String] {
+    let required = max(minimumLevel(id), level)
+    var problems: [String] = []
+    if state.houseLevel < required { problems.append("Requires House level \(required).") }
+    if state.character.level(.building) < required {
+      problems.append("Requires Building skill level \(required).")
+    }
+    if let prerequisite = prerequisite(id),
+      !state.buildings.contains(where: { $0.id == prerequisite && $0.level > 0 })
+    {
+      problems.append("Requires completed \(definition(prerequisite).title).")
+    }
+    return problems
+  }
+  public static func requirements(
+    _ id: BuildingID, state: GameState, level: Int = 1
+  ) -> ConstructionRequirements {
+    let required = max(minimumLevel(id), level)
+    var locks = unlockProblems(id, state: state, level: level)
+    if !(1...5).contains(level) {
+      locks.append("Building levels range from 1 to 5.")
+    } else if level == 1 {
+      if stage(id, state: state) != .empty {
+        locks.append("This building already exists or has a weekly builder.")
+      }
+    } else if !state.buildings.contains(where: { $0.id == id && $0.level == level - 1 }) {
+      locks.append("An upgrade to level \(level) needs a completed level \(level - 1) building.")
+    }
+    let costLevel = min(5, max(1, level))
+    return .init(
+      houseLevel: required, buildingLevel: required, prerequisite: prerequisite(id),
+      coins: definition(id).cost * costLevel, materials: materialCost(id).scaled(costLevel),
+      state: state, locks: locks)
+  }
+  public static func repairRequirements(
+    _ id: BuildingID, state: GameState
+  ) -> ConstructionRequirements {
+    let repairable = state.buildings.contains { $0.id == id && $0.level > 0 && $0.condition < 100 }
+    return .init(
+      coins: repairCost(id), materials: repairMaterials(id), state: state,
+      locks: repairable ? [] : ["Repairs need a completed, worn building."])
+  }
+  public static func practicalBenefit(_ id: BuildingID, level: Int) -> String {
+    switch id {
+    case .woodshed: "Save 1 food at winter month end; winter shelter wear becomes 6."
+    case .cellar: "Buy provisions yields 10 food instead of 7."
+    case .well: "+\(2 * level) food per harvest."
+    case .granary: "+\(level) grain seeds per harvest."
+    case .bakery: "+\(level) food each time you Buy provisions; stacks with the Root cellar."
+    case .stable: "+1 Galbeni for each week of wages."
+    case .smithy: "Craft 1 plank from 1 wood instead of 2 wood."
+    case .workshop: "Craft planks immediately here using free wood; no worker or experience needed."
+    case .storehouse: "+\(40 * level) shared storage, including at zero condition."
+    case .barn, .apiary: "Seasonal food and Galbeni begin the following season."
+    }
+  }
   public static func unavailable(_ id: BuildingID, state: GameState) -> String? {
     if state.buildings.contains(where: { $0.id == id }) {
       return "Already completed or under construction."
@@ -117,7 +233,8 @@ public enum Construction {
     case .cellar: .init(wood: 2, stone: 4)
     case .barn: .init(wood: 6, stone: 2)
     case .well: .init(wood: 1, stone: 5)
-    case .granary, .workshop: .init(wood: 4, stone: 2, planks: 2)
+    case .workshop: .init(wood: 4, stone: 2)
+    case .granary: .init(wood: 4, stone: 2, planks: 2)
     case .bakery: .init(wood: 2, stone: 4, planks: 2)
     case .smithy: .init(wood: 2, stone: 6, planks: 2)
     case .stable: .init(wood: 4, stone: 2, planks: 4)
@@ -132,6 +249,6 @@ public enum Construction {
     }
   }
   public static func priceText(_ id: BuildingID, level: Int = 1) -> String {
-    "\(definition(id).cost * level) coins · \(materialCost(id).scaled(level).text)"
+    "\(definition(id).cost * level) Galbeni · \(materialCost(id).scaled(level).text)"
   }
 }

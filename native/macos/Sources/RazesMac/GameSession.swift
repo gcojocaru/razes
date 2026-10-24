@@ -9,6 +9,7 @@ import RazesCore
   private(set) var acceptedRevision: Int?
   var error: String?
   var storageWarning: String?
+  var assignmentNotice: String?
   private let store: SaveStore?
   let audio = Ambience()
   var soundEnabled = false { didSet { audio.setEnabled(soundEnabled && active) } }
@@ -41,6 +42,7 @@ import RazesCore
         hasSaved = false
       }
       needsRecovery = false
+      assignmentNotice = nil
       error = nil
       storageWarning = nil
     } catch {
@@ -51,7 +53,17 @@ import RazesCore
   func send(_ action: Action) {
     guard !needsRecovery else { return }
     do {
-      accept(try Rules.dispatch(state, action: action))
+      let previousTask = state.assignments["ion"] ?? .rest
+      let next = try Rules.dispatch(state, action: action)
+      accept(next)
+      assignmentNotice = nil
+      if action.type == "continue", previousTask != .rest,
+        next.assignments["ion"] == .rest,
+        let reason = Rules.assignmentProblem(next, worker: .ion, task: previousTask)
+      {
+        assignmentNotice =
+          "Ion rests instead of repeating \(Rules.task(previousTask).name): \(reason)"
+      }
     } catch { self.error = error.localizedDescription }
   }
   private func accept(_ next: GameState) {
@@ -264,6 +276,7 @@ import RazesCore
       acceptedRevision = nil
       state = fresh
       needsRecovery = false
+      assignmentNotice = nil
       error = nil
       storageWarning = nil
       hasSaved = true

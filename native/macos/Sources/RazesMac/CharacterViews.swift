@@ -24,12 +24,12 @@ struct CharacterSkillsView: View {
     VStack(alignment: .leading, spacing: 10) {
       CharacterNeedsView(character: character)
       Text("Higher hunger means greater danger. At 75 hunger, Ion loses 15 health each week.")
-        .font(.caption).foregroundStyle(GamePalette.muted)
+        .font(.system(size: 13)).foregroundStyle(GamePalette.muted)
       if character.health < 25 {
         Label(
           "Poor health: every job costs 10 extra energy.", systemImage: "exclamationmark.triangle"
         )
-        .font(.caption).foregroundStyle(.orange)
+        .font(.system(size: 13)).foregroundStyle(.orange)
       }
       ForEach(SkillID.allCases, id: \.self) { skill in
         VStack(alignment: .leading, spacing: 3) {
@@ -38,14 +38,25 @@ struct CharacterSkillsView: View {
             .accessibilityLabel("\(skill.title) experience")
             .accessibilityValue("\(character[skill]) of 12; level \(character.level(skill)) of 5")
           Text("\(character[skill])/12 XP · productive work earns 1 XP")
-            .font(.caption).foregroundStyle(GamePalette.muted)
+            .font(.system(size: 13)).foregroundStyle(GamePalette.muted)
           Group {
             switch skill {
             case .farming: Text("Each level above 1 adds 2 harvest food.")
             case .gathering: Text("Each level above 1 adds 1 gathered unit before storage limits.")
-            case .building: Text("Each level above 1 adds 5 shelter restored by house repairs.")
+            case .building:
+              Text(
+                "Each level above 1 adds 5 shelter restored by house repairs. Repairs and completed foundations earn XP; higher levels unlock buildings."
+              )
+            case .strength:
+              Text(
+                "Wages pay the starting Strength level in Galbeni, plus 1 with an operational Stable. Wages and successful gathering earn XP."
+              )
+            case .endurance:
+              Text(
+                "Each level above 1 saves 2 work energy (minimum 5) and restores 2 extra energy when resting. Productive farming, gathering, repair, worker construction and wages earn XP."
+              )
             }
-          }.font(.caption).foregroundStyle(GamePalette.muted)
+          }.font(.system(size: 13)).foregroundStyle(GamePalette.muted)
         }
       }
     }

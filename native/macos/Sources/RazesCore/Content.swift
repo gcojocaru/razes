@@ -44,7 +44,9 @@ public struct Content: Sendable {
         workers: 1, moneyCost: 0, foodCost: 0, foodGain: 0, moneyGain: 0, houseGain: 0),
       "paid": Task(
         id: .paid, name: "Work for wages",
-        description: "A week at the village mill earns 1 coin.", icon: "coin",
+        description:
+          "Village work earns Galbeni according to Strength. An operational Stable adds 1.",
+        icon: "coin",
         workers: 1, moneyCost: 0, foodCost: 0, foodGain: 0, moneyGain: 1, houseGain: 0),
       "repair": Task(
         id: .repair, name: "Mend the house",
