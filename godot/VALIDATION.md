@@ -163,3 +163,61 @@ years, and whether these crops and numbers suit historical Moldavia.
 
 Not checked: an exported build (the HTML needs an export filter), and wiki
 text beyond the crop table drifting from the rules.
+
+## Harvest kilograms and bag inventory follow-up
+
+- Grain is counted in kg. A plot is 0.1 ha; seed and full harvest per plot use
+  medieval rates. Barley, oats and rye keep their previous seed-to-harvest
+  ratios; millet and wheat changed after the realism check below. Starting
+  stock still seeds five plots of each crop and six of millet.
+- Harvests vary with the season: each growing day adds the crop's watering
+  relative to a cloudy day, and the average deviation is scaled by 5 because 60+
+  days of spells average out (unscaled, 50 seeds gave only ±5%). Mid-window
+  sowing over 50 weather seeds then gives barley 67–116% of full, oats 45–114%,
+  millet 83–105%, wheat 73–131%, rye 80–134%, averaging 87–95%. Capped at 150%
+  for an all-rain season, which real weather never reaches.
+- Realism check against sources: medieval manors sowed wheat at 2–2.5 bushels
+  an acre and oats, barley and drage at 3–4 (Postles, Oxoniensia 1979), i.e.
+  130–215 kg/ha at 60/48/32 lb bushels; game seed is 150–200 kg/ha. Medieval
+  wheat returned 2–7 times its seed and documents average about 2.7–3.9; 18th-
+  century Russian black-earth provinces averaged rye and oats sam-5 to 7, wheat
+  about 2–5, millet 4–40 with best years sam-40 to 50, swinging year to year
+  from 1.5 to 7 for rye (Milov). Romanian traditional cereals gave 800–1400
+  kg/ha, 540 in a bad year (Jarman, quoted in arXiv:1505.05121). Before: millet
+  sown at 50 kg/ha for sixfold, wheat elevenfold over two, and ±15% weather.
+  Now millet is 30 kg/ha sown for about thirteenfold, wheat 15 → 75, and the
+  swing above; averages come to 3.0–4.6-fold (490–690 kg/ha) for the four big
+  cereals. A bag of about 70 litres is two US bushels: 54 kg of wheat, 51 of
+  rye, 44 of barley, 29–35 of oats (32–38 lb bushels); proso tests about 52
+  lb/bu. No Moldavian 15th-century yield figures were found.
+- The resting-rotation check compares the mean of the later sown years with
+  the first cycle (within 20%), since weather now moves each year's harvest by
+  up to a third; resting still holds about 90% where yearly cropping falls to a
+  third.
+- Inventory (I) is an RPG-style grid of bag slots. A bag holds about 70 litres,
+  so 55 kg of wheat, 50 of rye and millet, 45 of barley, 32 of oats
+  (`Farm.CROPS[crop].bag`). `bag_icons.gd` builds each bag as a 3D scene in
+  its own SubViewport, renders it once at 128 px with 4× MSAA, copies it into a
+  mipmapped texture and frees the viewport; looks are cached per crop, eighth of
+  a bag and one of three variants. The sack is a lathed superellipse settling
+  wider at the bottom, with lumps, pleats and a wavy, rolled rim; `sack.gdshader`
+  gives it burlap (threads over and under, holes, fibres, wear, a fuzzy
+  outline). The heap is several hundred instanced kernels, shaped per crop,
+  over a dark dome; the initial is a shaded Label3D stamp. A sun with shadows,
+  a cool fill light and a blob floor shadow light it. A part-filled bag sits
+  lower and wider with gold kg. The per-crop table hides behind a Stats toggle;
+  the total stays.
+- Both headless tests pass. GPU captures at 1280×800, judged against a
+  user-supplied photo of medieval sacks for style: the first flat-polygon bags
+  had unreadable kg labels over them (moved to a strip below); a flat 2D shader
+  pass was replaced by the 3D renders, whose first version looked like orange
+  wicker pots (finer, duller, flatter weave; rounder, lumpier body; wavy mouth;
+  stamp moved up to the belly and thickened; framing tightened). The Stats test
+  needed a frame's wait: a window's header lays out the frame after it is shown.
+  One GPU capture run reported a resource still in use at exit, likely a bag
+  render still waiting for its frame when the script quit; a repeat was clean.
+
+Not checked: tooltips and hover highlight on screen (hover was only sent in the
+capture), very large stores (the grid scrolls past about six rows), slower GPUs
+(each new bag look renders a 3D scene of about 15,000 triangles once), and
+storage limits: bags are a display, so the store holds any amount.

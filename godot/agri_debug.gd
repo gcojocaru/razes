@@ -34,10 +34,10 @@ func _init(owner_game: Node3D) -> void:
 	column.add_child(title)
 
 	var fill := Button.new()
-	fill.text = "Add 50 grain of each crop"
+	fill.text = "Add 100 kg of each crop"
 	fill.pressed.connect(func() -> void:
 		for name in Farm.CROPS:
-			game.farm.stock[name] += 50
+			game.farm.stock[name] += 100
 		game._show_farm())
 	column.add_child(fill)
 	var skips := HBoxContainer.new()
@@ -91,7 +91,7 @@ func apply_to_selected() -> void:
 		crop_name = Farm.CROPS.keys()[0]
 	for cell in game.selected:
 		# Winter counts as lived through, so a winter crop set mid-growth keeps ripening.
-		game.farm.plots[cell] = {"stage": stage_name, "crop": crop_name, "growth": 1.0 if stage_name == "Ripe" else growth.value, "fertility": fertility.value, "wintered": true}
+		game.farm.plots[cell] = {"stage": stage_name, "crop": crop_name, "growth": 1.0 if stage_name == "Ripe" else growth.value, "fertility": fertility.value, "wintered": true, "moisture": 0.0, "days": 0}
 	game._show_farm()
 
 ## Shows the first selected plot's raw state.

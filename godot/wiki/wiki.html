@@ -48,29 +48,38 @@
 <li><b>Sow</b> a plowed field with a crop during that crop's sowing months. Sowing uses the crop's own grain from the inventory as seed.</li>
 <li><b>Harvest</b> a ripe crop. Its grain goes to the inventory and the field is left as stubble, which must be plowed again before sowing.</li>
 </ul>
-<p>The farm panel shows a button for each action the selected plots allow, with how many plots and how much grain it costs or brings. Plowed land stays plowed. Stubble and dead crops left alone turn back to grass after about 40 warm days; cold days count less and winter days not at all.</p>
+<p>The farm panel shows a button for each action the selected plots allow, with how many plots and how many kilograms of grain it costs or brings. Plowed land stays plowed. Stubble and dead crops left alone turn back to grass after about 40 warm days; cold days count less and winter days not at all.</p>
 
 <h2>How crops grow</h2>
 <p>A crop grows each day the temperature is above its base, fastest at its best temperature. Rain helps and sunny days dry it out: oats gain the most from rain, and millet barely minds a dry spell. A crop dies on any day at or below its frost limit, whether it is still growing or already ripe, so harvest before the frost. Wheat and rye are winter crops: sown in autumn, they grow a little, wait out the winter and ripen the next summer.</p>
 
 <h2>Crops</h2>
 <table>
-<tr><th>Crop</th><th>Sown</th><th>Grows above</th><th>Ripens after</th><th>Dies at</th><th>Seed → harvest</th></tr>
-<tr><td><b>Barley</b></td><td>Spring months 1–2</td><td>4°C</td><td>60 warm days</td><td>-3°C</td><td>2 → 7</td></tr>
-<tr><td><b>Oats</b></td><td>Spring months 1–2</td><td>4°C</td><td>75 warm days; likes rain</td><td>-4°C</td><td>2 → 7</td></tr>
-<tr><td><b>Millet</b></td><td>Spring month 3 – Summer month 1</td><td>10°C</td><td>50 warm days; hardy in drought</td><td>1°C</td><td>1 → 6</td></tr>
-<tr><td><b>Wheat</b></td><td>Autumn months 1–2</td><td>3°C</td><td>a winter, then 110 warm days</td><td>-8°C</td><td>2 → 11</td></tr>
-<tr><td><b>Rye</b></td><td>Autumn months 1–3</td><td>2°C</td><td>a winter, then 95 warm days</td><td>-16°C</td><td>2 → 8</td></tr>
+<tr><th>Crop</th><th>Sown</th><th>Grows above</th><th>Ripens after</th><th>Dies at</th><th>Seed → harvest a plot</th><th>A bag holds</th></tr>
+<tr><td><b>Barley</b></td><td>Spring months 1–2</td><td>4°C</td><td>60 warm days</td><td>-3°C</td><td>20 → 70 kg</td><td>45 kg</td></tr>
+<tr><td><b>Oats</b></td><td>Spring months 1–2</td><td>4°C</td><td>75 warm days; likes rain</td><td>-4°C</td><td>16 → 56 kg</td><td>32 kg</td></tr>
+<tr><td><b>Millet</b></td><td>Spring month 3 – Summer month 1</td><td>10°C</td><td>50 warm days; hardy in drought</td><td>1°C</td><td>3 → 40 kg</td><td>50 kg</td></tr>
+<tr><td><b>Wheat</b></td><td>Autumn months 1–2</td><td>3°C</td><td>a winter, then 110 warm days</td><td>-8°C</td><td>15 → 75 kg</td><td>55 kg</td></tr>
+<tr><td><b>Rye</b></td><td>Autumn months 1–3</td><td>2°C</td><td>a winter, then 95 warm days</td><td>-16°C</td><td>16 → 64 kg</td><td>50 kg</td></tr>
 </table>
-<p>Typically barley ripens in early summer, oats in mid to late summer, millet in late summer or early autumn, rye the next early summer and wheat after it. About one winter in five is cold enough to kill wheat. You start with 10 grain each of barley, oats, wheat and rye, and 6 of millet.</p>
+<p>Typically barley ripens in early summer, oats in mid to late summer, millet in late summer or early autumn, rye the next early summer and wheat after it. About one winter in five is cold enough to kill wheat. You start with 100 kg of barley, 80 of oats and rye, 75 of wheat and 18 of millet: seed for five plots of each and six of millet.</p>
+
+<h2>Harvest size</h2>
+<p>A plot is a tenth of a hectare. The table gives its harvest on fully fertile soil in an average season, where every cloudy day counts as average. Each day a crop grows, rain helps fill its grain and sun dries it, as much as the crop cares for water, so every harvest comes out different:</p>
+<ul>
+<li>Most years give 70–110% of the full harvest, about nine tenths on average, and a wet year up to a third more. Oats suffer most in a dry year, down to half; millet barely changes.</li>
+<li>On average that is three to five times the seed back, as in medieval manor accounts and 18th-century Russian black-earth records, and millet, sown thin, more than ten times.</li>
+<li>Worn soil gives less on top of that (see Soil).</li>
+<li>Select a growing plot to see the kilograms it is on course for, a ripe plot for its exact harvest. The ledger's Fields tab adds them up by crop.</li>
+</ul>
 
 <h2>Soil</h2>
 <p>Every harvest wears the soil: barley and millet take 30% of its fertility, oats and rye 25% and wheat 35%. Worn soil gives a smaller harvest, though oats and rye mind it least. Land without a crop recovers 25% a year. Grow barley or millet on the same plot every year and its harvest halves within about nine years; wheat wears the soil out faster, oats and rye more slowly. Let a plot rest one year in three and a spring crop's harvest holds.</p>
 
 <h2>Ledger and inventory</h2>
 <ul>
-<li>The <b>ledger</b> (<kbd>L</kbd>) has three tabs. Fields shows what is growing by crop, with growth and soil. Years shows each year's sown, frost-killed and harvested plots and the grain gained after seed; hover a year for each crop. Crops lists each crop's needs.</li>
-<li>The <b>inventory</b> (<kbd>I</kbd>) shows each crop's grain in store, how many plots it can sow and what this year has sown and harvested.</li>
+<li>The <b>ledger</b> (<kbd>L</kbd>) has three tabs. Fields shows what is growing by crop, with growth, soil and the harvest it is on course for. Years shows each year's sown, frost-killed and harvested plots and the kilograms gathered and gained after seed; hover a year for each crop. Crops lists each crop's needs.</li>
+<li>The <b>inventory</b> (<kbd>I</kbd>) shows the store as bags of grain, one slot each. A bag holds about 70 litres, so heavier grain fills it to more kilograms: wheat 55, rye and millet 50, barley 45, oats 32. Each crop fills its bags in turn. Every bag is an open burlap sack with a heap of its grain at the mouth, the crop's initial stamped on it and its kilograms underneath; the last bag, part-filled, sits lower and wider, with its weight in gold. Below the bags is the total. Press <b>Stats</b> for each crop's kilograms and bags, the plots it can sow and what this year has sown and harvested.</li>
 </ul>
 
 <h2>A first year</h2>
