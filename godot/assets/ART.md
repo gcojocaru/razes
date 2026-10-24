@@ -22,7 +22,10 @@ removed after its decoration was retained in `menu-ornament.svg`.
 Harvest uses a broad sickle blade and wrapped grip. Wheat has plump paired
 kernels, barley long awns, rye a slender alternating ear, oats hanging hulls,
 and millet clustered round grains. The wheel draws them at 46 logical pixels;
-names remain separate text controls/drawing. These are artistic game symbols,
+names remain separate text controls/drawing. The bottom panel reuses these at
+36 logical pixels, with names and amounts in tooltips. Its additional
+`actions.svg`, `ledger.svg`, `inventory.svg` and `wiki.svg` depict a segmented
+wheel, clasped ledger, grain sack and open reference book in the same palette. These are artistic game symbols,
 not verified reconstructions of period tools or botanical illustrations.
 
 ## Final icon prompt

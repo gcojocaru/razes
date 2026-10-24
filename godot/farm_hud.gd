@@ -1,6 +1,6 @@
 extends PanelContainer
-## Bottom-centre farm panel: the grain stock, the selected plots and a button for
-## each action some of them allow now, with its plot count and kg of grain spent or gained.
+## Bottom-centre farm panel: selected plots and illustrated action buttons.
+## Plot counts and grain costs/yields stay in tooltips.
 ## The action wheel offers work for the selected land, including individual crops.
 
 signal action_pressed(action: String)
@@ -10,6 +10,12 @@ signal inventory_pressed
 signal wiki_pressed
 
 const TimeHud := preload("res://time_hud.gd")
+const ICONS := {
+	"Actions": preload("res://assets/actions/actions.svg"),
+	"Ledger": preload("res://assets/actions/ledger.svg"),
+	"Inventory": preload("res://assets/actions/inventory.svg"),
+	"Wiki": preload("res://assets/actions/wiki.svg"),
+}
 const NOTES := {
 	"Grass": "Plow it into a field",
 	"Plowed": "Ready to sow",
@@ -18,7 +24,6 @@ const NOTES := {
 	"Withered": "Frost killed this crop",
 }
 
-var grain_label := Label.new()
 ## Action name -> its button.
 var buttons := {}
 var action_button: Button
@@ -42,14 +47,9 @@ func _init() -> void:
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 14)
 	add_child(row)
-	grain_label.add_theme_font_override("font", serif)
-	grain_label.add_theme_font_size_override("font_size", 20)
-	grain_label.add_theme_color_override("font_color", TimeHud.PARCHMENT)
-	grain_label.mouse_filter = Control.MOUSE_FILTER_PASS
-	row.add_child(grain_label)
-	row.add_child(VSeparator.new())
 
 	var text := VBoxContainer.new()
+	text.alignment = BoxContainer.ALIGNMENT_CENTER
 	text.add_theme_constant_override("separation", -4)
 	text.custom_minimum_size.x = 240
 	_plot_label.add_theme_font_override("font", preload("res://assets/fonts/CormorantUnicase-Bold.ttf"))
@@ -60,21 +60,20 @@ func _init() -> void:
 	_detail_label.add_theme_color_override("font_color", TimeHud.PARCHMENT)
 	text.add_child(_plot_label)
 	text.add_child(_detail_label)
+	_detail_label.mouse_filter = Control.MOUSE_FILTER_PASS
 	row.add_child(text)
 
 	for action in Farm.ACTIONS:
-		buttons[action] = _button(serif, "Key F does every ready action")
+		buttons[action] = _button(serif, action, "Key F does every ready action", action_wheel.ICONS.Barley if action == "Sow" else action_wheel.ICONS[action])
 		buttons[action].pressed.connect(action_pressed.emit.bind(action))
 		row.add_child(buttons[action])
 		if action == "Sow":
-			action_button = _button(serif, "Actions for the selected land (key C, or right-click a plot)")
-			action_button.text = "Actions"
+			action_button = _button(serif, "Actions", "Actions for the selected land (key C, or right-click a plot)", ICONS.Actions)
 			action_button.pressed.connect(open_action_menu)
 			row.add_child(action_button)
 	row.add_child(VSeparator.new())
 	for window in [["Ledger", "Plantings and yearly results (key L)", ledger_pressed], ["Inventory", "Grain in store by crop (key I)", inventory_pressed], ["Wiki", "How the game works (key F1)", wiki_pressed]]:
-		var button := _button(serif, window[1])
-		button.text = window[0]
+		var button := _button(serif, window[0], window[0] + " — " + window[1], ICONS[window[0]])
 		var opened: Signal = window[2]
 		button.pressed.connect(opened.emit)
 		row.add_child(button)
@@ -85,19 +84,24 @@ func _init() -> void:
 		else:
 			action_pressed.emit(action))
 
-func _button(font: Font, tooltip: String) -> Button:
+func _button(font: Font, label: String, tooltip: String, icon: Texture2D) -> Button:
 	var button := Button.new()
+	button.name = label + "Button"
+	button.accessibility_name = label
 	button.tooltip_text = tooltip
+	button.icon = icon
+	button.expand_icon = true
+	button.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	button.add_theme_constant_override("icon_max_width", 36)
 	# Keyboard focus would let Space press the button instead of toggling pause.
 	button.focus_mode = Control.FOCUS_NONE
-	button.custom_minimum_size = Vector2(0, 34)
+	button.custom_minimum_size = Vector2(52, 52)
 	TimeHud.style_button(button, font)
+	button.add_theme_stylebox_override("pressed", TimeHud.box(TimeHud.GOLD.darkened(0.65), TimeHud.PARCHMENT, 6, 1, Vector2(6, 4)))
 	return button
 
-## Shows the stock and what the selected plots allow on this day, sowing `seed_crop`.
+## Shows what the selected plots allow on this day, sowing `seed_crop`.
 func show_farm(farm: Farm, cells: Array, day: int, seed_crop: String) -> void:
-	grain_label.text = "Grain  %d kg" % farm.stored()
-	grain_label.tooltip_text = "Grain in store, each crop's own seed (key I):\n" + "\n".join(Farm.CROPS.keys().map(func(crop: String) -> String: return "%s %d kg" % [crop, farm.stock[crop]]))
 	var sowable := 0
 	for action in buttons:
 		var result := farm.preview(cells, day, action, seed_crop)
@@ -105,11 +109,14 @@ func show_farm(farm: Farm, cells: Array, day: int, seed_crop: String) -> void:
 			sowable = result.plots
 		var verb: String = "Sow " + seed_crop if action == "Sow" else action
 		buttons[action].visible = result.plots > 0
-		buttons[action].text = "%s %d" % [verb, result.plots] + ("" if result.grain == 0 else "  %+d kg" % result.grain)
+		buttons[action].accessibility_name = verb
+		buttons[action].tooltip_text = "%s %d" % [verb, result.plots] + ("" if result.grain == 0 else "  %+d kg" % result.grain) + "\nKey F does every ready action"
 	action_button.visible = not cells.is_empty()
 	action_wheel.show_farm(farm, cells, day, seed_crop)
 	if seed_crop != "":
-		buttons.Sow.tooltip_text = _facts(seed_crop) + " (key F)"
+		buttons.Sow.icon = action_wheel.ICONS[seed_crop]
+		buttons.Sow.tooltip_text += "\n" + _facts(seed_crop)
+	_detail_label.tooltip_text = ""
 	if cells.is_empty():
 		_plot_label.text = "Fields"
 		_detail_label.text = "Click or drag over plots; Shift adds"
@@ -120,7 +127,9 @@ func show_farm(farm: Farm, cells: Array, day: int, seed_crop: String) -> void:
 	for cell in cells:
 		var next := farm.action(cell, day, seed_crop)
 		if next.reason != "":
-			reasons[next.reason] = reasons.get(next.reason, 0) + 1
+			_detail_label.tooltip_text = next.reason
+			var reason: String = "Not enough %s seed" % seed_crop.to_lower() if " kg" in next.reason else next.reason
+			reasons[reason] = reasons.get(reason, 0) + 1
 		elif next.name == "Sow":
 			ready_to_sow += 1
 		soil += farm.fertility(cell)
@@ -141,7 +150,7 @@ func show_farm(farm: Farm, cells: Array, day: int, seed_crop: String) -> void:
 				_plot_label.text = stage
 		notes.append(reasons.keys()[0] if reasons else NOTES[stage])
 		if stage in ["Sown", "Ripe"]:
-			notes.append(("about %d kg" if stage == "Sown" else "%d kg") % farm.harvest_yield(cell))
+			_detail_label.tooltip_text = ("Expected harvest: about %d kg" if stage == "Sown" else "Harvest: %d kg") % farm.harvest_yield(cell)
 	else:
 		_plot_label.text = "%d plots" % cells.size()
 		for reason in reasons:
