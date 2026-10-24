@@ -5,9 +5,9 @@ import XCTest
 final class SaveTests: XCTestCase {
   func testFreshSaveRoundTripsAndRejectsOldSchemas() throws {
     let s = Rules.newGame()
-    XCTAssertEqual(s.version, 9)
+    XCTAssertEqual(s.version, 11)
     XCTAssertEqual(try SaveCodec.decode(SaveCodec.encode(s)), s)
-    for version in 1...8 {
+    for version in 1...9 {
       var object = try JSONSerialization.jsonObject(with: SaveCodec.encode(s)) as! [String: Any]
       object["version"] = version
       XCTAssertThrowsError(try SaveCodec.decode(JSONSerialization.data(withJSONObject: object)))

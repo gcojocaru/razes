@@ -20,11 +20,29 @@ struct SelectionInspector: View {
           }
         }
         Text(person.line).font(.callout).italic()
+        if state.phase == .work {
+          Button(
+            "Rest · recover \(CharacterSimulation.restEnergy(character: state.character, exposed: state.season == 3 && state.house < 40)) energy and health"
+          ) {
+            session.send(
+              .init(type: "assign", revision: state.revision, worker: worker, task: .rest))
+          }
+          let current = state.assignments[worker.rawValue] ?? .rest
+          Text(
+            "Current assignment: \(Rules.task(current).name) · \(CharacterSimulation.energyCost(current, character: state.character)) energy"
+          )
+          .font(.caption).foregroundStyle(GamePalette.gold)
+        } else if state.phase == .dead {
+          Text("Ion has died. Open the final report to begin a fresh household.")
+            .foregroundStyle(.orange)
+        }
+        CharacterSkillsView(character: state.character)
+        Divider()
         PlantingControls(session: session, state: state)
         if state.phase == .work {
           ForEach(
             Rules.taskOptions(state).filter {
-              $0.id != .plant && Construction.building(for: $0.id) == nil
+              $0.id != .plant && $0.id != .rest && Construction.building(for: $0.id) == nil
             }
           ) {
             task in
@@ -34,7 +52,13 @@ struct SelectionInspector: View {
                 Action(type: "assign", revision: state.revision, worker: worker, task: task.id))
             } label: {
               HStack {
-                Text(task.name)
+                VStack(alignment: .leading, spacing: 2) {
+                  Text(task.name)
+                  Text(
+                    "\(CharacterSimulation.energyCost(task.id, character: state.character)) energy"
+                  )
+                  .font(.caption).foregroundStyle(GamePalette.muted)
+                }
                 Spacer()
                 if task.id == Materials.assignments(state)[worker.rawValue] {
                   Image(systemName: "checkmark")
@@ -44,13 +68,19 @@ struct SelectionInspector: View {
             }.disabled(reason != nil).help(reason ?? task.description)
             if let reason { Text(reason).font(.caption).foregroundStyle(GamePalette.muted) }
           }
-          let task = Rules.task(Materials.assignments(state)[worker.rawValue]!)
+          let task = Rules.task(Materials.assignments(state)[worker.rawValue]!, in: state)
           Text(task.description).font(.caption).foregroundStyle(GamePalette.muted)
+          if task.id == .paid {
+            Text(
+              "Wages: \(task.moneyGain) Galbeni · Strength level \(state.character.level(.strength)) plus \(Construction.operationalLevel(.stable, state: state) > 0 ? 1 : 0) Stable bonus"
+            )
+            .font(.caption).foregroundStyle(GamePalette.gold)
+          }
           Text(
-            "Current work cost: \(task.moneyCost) money · \(task.foodCost) food · \(task.id == .plant ? Farming.seedCost : 0) seeds"
+            "Current work cost: \(task.moneyCost) Galbeni · \(task.foodCost) food · \(task.id == .plant ? Farming.seedCost : 0) seeds"
           ).font(
             .caption)
-        } else {
+        } else if state.phase != .dead {
           Text("Continue to the next week to assign work.").font(.caption)
         }
       case .building(let id):
@@ -74,13 +104,14 @@ struct SelectionInspector: View {
           Text("Shelter: \(state.house)/100")
           HouseStorageControls(session: session, state: state)
           Text(
-            "Winter wear: \(Construction.active(.woodshed, state: state) ? 6:14). Keep the roof ready for the cold."
+            "Winter wear: \(Construction.operationalLevel(.woodshed, state: state) > 0 ? 6:14). Keep the roof ready for the cold."
           ).font(.caption)
           assignmentButtons(.repair)
         case .stores:
-          Text("\(state.food) food · \(state.money) money")
-          Text("A provisions purchase brings \(Rules.suppliesGain(state)) food for 4 money.").font(
-            .caption)
+          Text("\(state.food) food · \(state.money) Galbeni")
+          Text("A provisions purchase brings \(Rules.suppliesGain(state)) food for 4 Galbeni.")
+            .font(
+              .caption)
           assignmentButtons(.supplies)
         case .field:
           Text("\(state.layout.farmland.count) farmland tiles").font(.headline)
@@ -92,7 +123,7 @@ struct SelectionInspector: View {
             Text(reason).font(.caption).foregroundStyle(GamePalette.muted)
           }
           Text("Grain seeds: \(state.seeds) · sowing needs \(Farming.seedCost)").font(.caption)
-          Button("Buy 4 grain seeds · 4 coins") { session.buySeeds(quantity: 4) }
+          Button("Buy 4 grain seeds · 4 Galbeni") { session.buySeeds(quantity: 4) }
             .disabled(
               state.money - (state.phase == .work ? Rules.preview(state).moneyCost : 0) < 4
                 || state.seeds > 99996)
@@ -119,7 +150,7 @@ struct SelectionInspector: View {
           }
         }
       }
-    }.buttonStyle(.bordered).controlSize(.regular)
+    }.buttonStyle(.bordered).controlSize(.regular).disabled(state.phase == .dead)
   }
   @ViewBuilder private func assignmentButtons(_ task: TaskID) -> some View {
     if state.phase == .work {

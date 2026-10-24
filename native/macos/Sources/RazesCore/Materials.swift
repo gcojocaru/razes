@@ -82,14 +82,17 @@ public enum Materials {
       icon: "hammer", workers: 1, moneyCost: 0, foodCost: 0, foodGain: 0, moneyGain: 0, houseGain: 0
     )
   }
+  public static func gatheringYield(_ id: TaskID, state: GameState) -> Int {
+    (id == .gatherWood ? 2 : 1) + state.character.level(.gathering) - 1
+  }
   public static func forecast(_ s: GameState) -> MaterialHaul {
     var haul = MaterialHaul()
     var room = max(0, capacity(s) - (s.materials - reserved(s)).total)
     for worker in WorkerID.allCases {
-      let task = assignments(s)[worker.rawValue]
-      guard task == .gatherWood || task == .gatherStone else { continue }
+      guard let task = assignments(s)[worker.rawValue], task == .gatherWood || task == .gatherStone
+      else { continue }
       let id: MaterialID = task == .gatherWood ? .wood : .stone
-      let expected = id == .wood ? 2 : 1
+      let expected = gatheringYield(task, state: s)
       let received = min(expected, room)
       haul.expected[id] += expected
       haul.gained[id] += received
@@ -120,16 +123,31 @@ public enum Materials {
     state.materials[id] += quantity
   }
   public static func craftPlanks(quantity: Int, state: inout GameState) throws {
-    guard (1...100000).contains(quantity) else {
-      throw GameError("Choose a positive plank quantity.")
+    let problems = craftingProblems(quantity: quantity, state: state)
+    guard problems.isEmpty else { throw GameError(problems.joined(separator: " ")) }
+    let cost = MaterialStock(wood: quantity * plankWoodCost(state: state))
+    state.materials = state.materials - cost + .init(planks: quantity)
+  }
+  public static func plankWoodCost(state: GameState) -> Int {
+    Construction.operationalLevel(.smithy, state: state) > 0 ? 1 : 2
+  }
+  public static func craftingProblems(quantity: Int, state: GameState) -> [String] {
+    var problems: [String] = []
+    if Construction.operationalLevel(.workshop, state: state) == 0 {
+      problems.append("Crafting needs a completed Workshop with condition above zero.")
     }
-    let cost = MaterialStock(wood: quantity * 2)
-    guard available(state).contains(cost) else { throw GameError("Each plank needs 2 free wood.") }
-    guard state.materials.total - cost.total + quantity <= capacity(state) else {
-      throw GameError(
+    guard (1...100000).contains(quantity) else {
+      return problems + ["Choose a positive plank quantity, at most 100000."]
+    }
+    let wood = quantity * plankWoodCost(state: state)
+    if available(state).wood < wood {
+      problems.append("Needs \(wood) free wood; \(max(0, available(state).wood)) available.")
+    }
+    if state.materials.total - wood + quantity > capacity(state) {
+      problems.append(
         "The crafted planks must fit in shared storage after using their ingredients.")
     }
-    state.materials = state.materials - cost + .init(planks: quantity)
+    return problems
   }
   public static func discard(_ id: MaterialID, quantity: Int, state: inout GameState) throws {
     guard (1...100000).contains(quantity), available(state)[id] >= quantity else {
@@ -138,11 +156,17 @@ public enum Materials {
     state.materials[id] -= quantity
   }
   public static func upgradeHouse(state: inout GameState) throws {
-    guard state.houseLevel < 5 else { throw GameError("House storage is already at level 5.") }
+    let requirements = houseUpgradeRequirements(state: state)
+    guard requirements.isMet else { throw GameError(requirements.problems.joined(separator: " ")) }
     var next = state
-    try spend(houseUpgradeMaterials, state: &next)
-    try Construction.spend(4 * (state.houseLevel + 1), state: &next)
+    try spend(requirements.materials, state: &next)
+    try Construction.spend(requirements.coins, state: &next)
     next.houseLevel += 1
     state = next
+  }
+  public static func houseUpgradeRequirements(state: GameState) -> ConstructionRequirements {
+    .init(
+      coins: 4 * min(5, state.houseLevel + 1), materials: houseUpgradeMaterials, state: state,
+      locks: state.houseLevel < 5 ? [] : ["House storage is already at level 5."])
   }
 }

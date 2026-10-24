@@ -95,15 +95,7 @@ import SpriteKit
       textures[name] = SKTexture(image: image)
     }
     let base = textures[name]!
-    let frames: [String: CGRect] = [
-      "woodshed-complete": CGRect(x: 32, y: 194, width: 1209, height: 903),
-      "woodshed-construction": CGRect(x: 54, y: 192, width: 1163, height: 871),
-      "woodshed-winter": CGRect(x: 12, y: 230, width: 1229, height: 873),
-      "cellar-complete": CGRect(x: 10, y: 282, width: 1237, height: 744),
-      "cellar-construction": CGRect(x: 17, y: 313, width: 1226, height: 646),
-      "cellar-winter": CGRect(x: 6, y: 253, width: 1242, height: 845),
-    ]
-    guard let rect = rect ?? frames[name] else { return base }
+    guard let rect = rect ?? Self.individualArtworkFrames[name] else { return base }
     let size = base.size()
     let key = "\(name)-crop-\(rect)"
     if let cached = textures[key] { return cached }
@@ -170,11 +162,11 @@ import SpriteKit
         : CGRect(x: 557, y: 0, width: 550, height: 503), point: IsometricLayout.house, width: 240,
       height: 216)
     let houseNode = sprites["house"]!
-    if s.layout.viewRotation >= 2 {
-      houseNode.texture = rearTexture(index: 0, winter: s.displaySeason == 3)
-      if let texture = houseNode.texture {
-        houseNode.size.height = houseNode.size.width * texture.size().height / texture.size().width
-      }
+    houseNode.texture = houseTexture(
+      level: s.houseLevel, damaged: p.house == "damaged", winter: s.displaySeason == 3,
+      facing: s.layout.viewRotation)
+    if s.houseLevel >= 2 || s.layout.viewRotation >= 2, let texture = houseNode.texture {
+      houseNode.size.height = houseNode.size.width * texture.size().height / texture.size().width
     }
     houseNode.xScale = s.layout.viewRotation % 2 == 0 ? 1 : -1
     let currentScenery = Set(s.layout.scenery.map { "scenery-" + $0.id })
@@ -291,7 +283,7 @@ import SpriteKit
         person.zRotation = 0
         person.yScale = 1
       }
-      if !reduced && !person.hasActions() {
+      if s.phase != .dead && !reduced && !person.hasActions() {
         person.run(
           .repeatForever(
             .sequence([.scaleY(to: 1.012, duration: 1.4), .scaleY(to: 1, duration: 1.4)])))
@@ -310,7 +302,7 @@ import SpriteKit
     updateWeather(p.weather)
     if let old, animateChanges && !reduced && old.revision != s.revision {
       let changes = [
-        ("Food", s.food - old.food), ("Money", s.money - old.money),
+        ("Food", s.food - old.food), ("Galbeni", s.money - old.money),
         ("Shelter", s.house - old.house),
       ].filter { $0.1 != 0 }
       for (index, change) in changes.enumerated() {
@@ -342,6 +334,7 @@ import SpriteKit
     let dustName = "dust-\(worker.rawValue)"
     world.childNode(withName: name)?.removeFromParent()
     world.childNode(withName: dustName)?.removeFromParent()
+    guard phase != .dead else { return }
     guard [.plant, .tend, .harvest, .repair, .buildWoodshed, .buildCellar].contains(task) else {
       return
     }

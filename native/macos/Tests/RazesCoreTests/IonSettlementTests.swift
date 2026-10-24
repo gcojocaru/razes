@@ -8,7 +8,7 @@ final class IonSettlementTests: XCTestCase {
     XCTAssertEqual(s.phase, .work)
     XCTAssertEqual(WorkerID.allCases.map(\.rawValue), ["ion"])
     XCTAssertEqual(s.assignments, ["ion": .rest])
-    XCTAssertEqual(Rules.preview(s).consumption, 0)
+    XCTAssertEqual(Rules.preview(s).consumption, 1)
   }
 
   func testSoloHarvestResolvesDirectlyToReportAndWinterRepeats() throws {

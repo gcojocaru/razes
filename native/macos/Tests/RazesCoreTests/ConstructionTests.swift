@@ -20,6 +20,7 @@ final class ConstructionTests: XCTestCase {
     XCTAssertEqual(done.money, 9)
     XCTAssertEqual(done.materials, .init(wood: 2, stone: 4))
     XCTAssertEqual(done.buildings.map(\.id), [.woodshed])
+    XCTAssertEqual(done.character.buildingXP, 0)
     XCTAssertEqual(try SaveCodec.decode(SaveCodec.encode(done)), done)
     done = try Rules.dispatch(done, action: .init(type: "continue", revision: done.revision))
     XCTAssertThrowsError(try assign(done, .ion, .buildWoodshed))
@@ -36,13 +37,13 @@ final class ConstructionTests: XCTestCase {
     try Construction.start(.woodshed, state: &s)
     XCTAssertEqual(s.buildings.first?.level, 0)
   }
-  func testCellarBenefitBeginsFollowingSeason() throws {
+  func testCellarPracticalBenefitBeginsAtCompletion() throws {
     var initial = Rules.newGame()
     initial.week = 11
     var s = try assign(initial, .ion, .buildCellar)
     XCTAssertEqual(Rules.suppliesGain(s), 7)
     s = try Rules.dispatch(s, action: .init(type: "resolve", revision: s.revision))
-    XCTAssertEqual(Rules.suppliesGain(s), 7)
+    XCTAssertEqual(Rules.suppliesGain(s), 10)
     s = try Rules.dispatch(s, action: .init(type: "continue", revision: s.revision))
     s = try assign(s, .ion, .supplies)
     XCTAssertEqual(Rules.suppliesGain(s), 10)
@@ -61,7 +62,7 @@ final class ConstructionTests: XCTestCase {
           s.layout.buildings = [.init(id: .woodshed, position: .init(x: 1, y: 1))]
         }
         let p = Rules.preview(s)
-        XCTAssertEqual(p.consumption, (woodshed ? 2 : 3) + (house < 40 ? 1 : 0))
+        XCTAssertEqual(p.consumption, (woodshed ? 0 : 1) + (house < 40 ? 1 : 0))
         XCTAssertEqual(p.wear, woodshed ? 6 : 14)
         s = try Rules.dispatch(s, action: .init(type: "resolve", revision: s.revision))
         XCTAssertEqual(s.food, p.foodAfter)

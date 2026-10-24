@@ -13,6 +13,8 @@ final class HarvestCalendarTests: XCTestCase {
 
   func testSeasonHasTwelveWeeklyAssignmentsAndYearHasFortyEight() throws {
     var s = Rules.newGame()
+    s.food = 60
+    s.house = 100
     for week in 1...48 {
       s = try advance(s)
       XCTAssertEqual(s.season, (week / 12) % 4)
@@ -22,7 +24,7 @@ final class HarvestCalendarTests: XCTestCase {
     }
   }
 
-  func testMonthlyConsumptionAndSeasonalProductionWearAndCompletion() throws {
+  func testWeeklyConsumptionAndSeasonalProductionWearAndCompletion() throws {
     var s = Rules.newGame()
     s.season = 1
     s.buildings = [.init(id: .workshop, completedSeason: 0, legacyAssignment: false)]
@@ -31,11 +33,11 @@ final class HarvestCalendarTests: XCTestCase {
     s.layout.buildings.append(.init(id: .woodshed, position: .init(x: 3, y: 8)))
     for week in 1...12 {
       let p = Rules.preview(s)
-      XCTAssertEqual(p.consumption, week % 4 == 0 ? 3 : 0)
+      XCTAssertEqual(p.consumption, 1)
       XCTAssertEqual(p.wear, week == 12 ? 5 : 0)
       XCTAssertEqual(p.moneyGain, week == 12 ? 2 : 0)
       s = try advance(s)
-      XCTAssertEqual(s.food, 18 - (week / 4) * 3)
+      XCTAssertEqual(s.food, 18 - week)
       XCTAssertEqual(s.buildings[0].condition, week == 12 ? 80 : 100)
       XCTAssertEqual(s.buildings[1].level, week == 12 ? 1 : 0)
       XCTAssertEqual(Construction.active(.woodshed, state: s), week == 12)
@@ -46,7 +48,7 @@ final class HarvestCalendarTests: XCTestCase {
   func testSowingUsesSeparateSeedsAndGrowthUnlocksASingleHarvest() throws {
     var s = Rules.newGame()
     s = try advance(s, task: .plant)
-    XCTAssertEqual(s.food, 18)
+    XCTAssertEqual(s.food, 17)
     var json = try JSONSerialization.jsonObject(with: SaveCodec.encode(s)) as! [String: Any]
     XCTAssertEqual(json["seeds"] as? Int, 4)
     XCTAssertFalse(Rules.taskOptions(s).contains { $0.id == .plant })
@@ -59,7 +61,7 @@ final class HarvestCalendarTests: XCTestCase {
     XCTAssertEqual(Presentation(state: s).field, "ripe")
     XCTAssertEqual(Rules.preview(try ConstructionTests().assign(s, .ion, .harvest)).foodGain, 28)
     s = try advance(s, task: .harvest)
-    XCTAssertEqual(s.food, 28)
+    XCTAssertEqual(s.food, 27)
     json = try JSONSerialization.jsonObject(with: SaveCodec.encode(s)) as! [String: Any]
     XCTAssertEqual(json["seeds"] as? Int, 10)
     XCTAssertFalse(Rules.taskOptions(s).contains { $0.id == .harvest })
@@ -81,13 +83,15 @@ final class HarvestCalendarTests: XCTestCase {
     XCTAssertTrue(Farming.canHarvest(s))
     XCTAssertEqual(s.nextWeekLabel, "Winter · Month 1 · Week 1 · 1495")
     s = try advance(s, task: .harvest)
-    XCTAssertEqual(s.food, 17)
+    XCTAssertEqual(s.food, 19)
     XCTAssertEqual(s.seeds, 8)
     XCTAssertEqual(s.season, 3)
   }
 
   func testMissedHarvestIsLostInWinterAndSpringClearsTheField() throws {
     var s = Rules.newGame()
+    s.food = 60
+    s.house = 100
     s = try advance(s, task: .plant)
     XCTAssertFalse(Farming.canTend(s))
     for _ in 1..<36 { s = try advance(s) }

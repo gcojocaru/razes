@@ -41,7 +41,7 @@ struct DebugBuildPanel: View {
         session.debugSetBuilding(selected, level: level, condition: condition)
       }
       .disabled(!state.buildings.contains { $0.id == selected })
-      Button("Add 100 coins and food") { session.debugResources() }
+      Button("Add 100 Galbeni and food") { session.debugResources() }
       Picker(
         "Season preview",
         selection: Binding(

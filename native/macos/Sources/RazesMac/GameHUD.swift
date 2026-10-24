@@ -21,16 +21,19 @@ struct GameHUD: View {
               .overlay(Rectangle().stroke(GamePalette.gold.opacity(0.6)))
             VStack(alignment: .leading, spacing: 4) {
               Text(person.name).font(.system(size: 15, weight: .semibold, design: .serif))
-              Text(task.name)
+              Text(state.phase == .dead ? "Deceased" : task.name)
                 .font(.system(size: 11)).lineLimit(2).multilineTextAlignment(.leading)
             }.frame(maxWidth: .infinity, alignment: .leading)
           }.frame(width: 160).padding(5)
             .background(selection == .worker(worker) ? GamePalette.gold.opacity(0.20) : .clear)
-        }.buttonStyle(.plain).accessibilityLabel("\(person.name), \(task.name)")
-          .help("Select \(person.name) and assign work")
+        }.buttonStyle(.plain)
+          .accessibilityLabel("\(person.name), \(state.phase == .dead ? "deceased" : task.name)")
+          .help("Select \(person.name) to inspect needs, skills and work")
       }
+      CharacterNeedsView(character: state.character).frame(width: 125)
       Divider().overlay(GamePalette.gold.opacity(0.5)).frame(height: 52)
       Button(action: build) { Label("Build", systemImage: "hammer").padding(.vertical, 8) }
+        .disabled(state.phase == .dead)
         .help("Build and manage eleven structure types, each with five levels")
       Spacer(minLength: 8)
       VStack(alignment: .trailing, spacing: 7) {
@@ -47,12 +50,14 @@ struct GameHUD: View {
     switch state.phase {
     case .work: "PLAN YOUR WORK"
     case .summary: "WEEK REPORT"
+    case .dead: "ION HAS DIED"
     }
   }
   private var primaryLabel: String {
     switch state.phase {
     case .work: "End week"
     case .summary: "Review week"
+    case .dead: "Final report"
     }
   }
 }

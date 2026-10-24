@@ -33,16 +33,17 @@ struct ContentView: View {
                 GamePanel {
                   GameScroll(maximumHeight: min(380, geometry.size.height * 0.46)) {
                     PhaseOverlay(
-                      session: session, state: state, close: { ui.review = false })
+                      session: session, state: state, close: { ui.review = false },
+                      restart: { restart = true })
                   }
                 }.frame(maxWidth: 760)
               }
               Spacer(minLength: 0)
-              if ui.debug || ui.selection != nil || ui.buildMode {
+              if ui.debug || ui.selection != nil {
                 GamePanel {
                   VStack(alignment: .leading, spacing: 12) {
                     HStack {
-                      Text(ui.debug ? "DEBUG BUILDER" : ui.buildMode ? "CONSTRUCTION" : "SELECTED")
+                      Text(ui.debug ? "DEBUG BUILDER" : "SELECTED")
                         .font(
                           .system(size: 10, weight: .semibold)
                         ).tracking(2).foregroundStyle(GamePalette.gold)
@@ -58,17 +59,6 @@ struct ContentView: View {
                         SelectionInspector(
                           session: session, state: state, selection: selection,
                           beginPlacement: beginPlacement, buySupplies: { sheet = "materials" })
-                      } else {
-                        BuildPanel(
-                          state: state,
-                          infrastructure: { beginPlacement(.infrastructure($0)) },
-                          select: { id in
-                            if Construction.stage(id, state: state) != .empty {
-                              choose(.building(id))
-                            } else {
-                              beginPlacement(.building(id, worker: nil, instant: false))
-                            }
-                          })
                       }
                     }
                   }
@@ -78,9 +68,8 @@ struct ContentView: View {
             GameHUD(
               state: state, selection: ui.selection, buildMode: ui.buildMode, choose: choose,
               build: {
-                let show = !ui.buildMode
                 ui.dismissOptional()
-                ui.buildMode = show
+                sheet = "construction"
               },
               primary: {
                 ui.dismissOptional()
@@ -94,23 +83,31 @@ struct ContentView: View {
     .foregroundStyle(GamePalette.paper).tint(GamePalette.gold).preferredColorScheme(.dark)
     .frame(minWidth: 1000, minHeight: 700)
     .sheet(item: Binding(get: { sheet.map(SheetID.init) }, set: { sheet = $0?.id })) { item in
-      VStack(alignment: .leading, spacing: 18) {
-        HStack {
-          Text(item.id == "materials" ? "Supplies & storage" : "How to play").font(
-            .system(size: 28, design: .serif))
-          Spacer()
-          Button("Done") { sheet = nil }.keyboardShortcut(.cancelAction)
-        }
-        ScrollView {
-          if item.id == "materials" {
-            MaterialsPanel(session: session, state: state)
-          } else {
-            Text(
-              "Select Ion’s portrait or a place in the settlement to assign one job each week. End week opens a forecast; confirm to resolve work and crop growth. Food is consumed at month end; shelter wear and construction resolve at season end. Each season has 3 months of 4 weeks (48 weeks per year). Read the weekly report and continue. Winter returns to spring with a fresh field.\n\nSow 4 grain seeds in spring. Crops sprout, grow and ripen after 24 weeks; tend once after 4 growing weeks, before ripening. Harvest ripe grain before winter for 20 food and 4 seeds (28 food and 6 seeds when tended). Buy seeds for 1 coin each in Materials or at the field. Food use is 3 at each month end; an active woodshed reduces winter use to 2. Cold winter shelter adds 1 food. Wages, gathering, provisions and repairs compete for Ion’s weekly assignment. Wages earn 1 coin per week. Shortages appear in the report; the settlement continues.\n\nBuild lets you place structures on free ground. Foundations finish at season end and produce from the following season. Completed buildings produce once per season and lose 20 condition afterwards. Upgrades and repairs are immediate. At zero condition a building above level 1 loses a level and returns to 60 condition; level 1 stays inactive until repaired. No timers or offline decay run.\n\nDrag or scroll to pan; pinch or Option-scroll to zoom. Home resets the camera. Rotate the map with the arrow controls. Rotate a building in its inspector, or press R while placing. Farmland, paths and fences cost 1 coin per tile or edge; click or drag to paint any shape. R changes the fence edge. Erase removes infrastructure and farmland without refund. Harvest crops and cancel farming assignments before changing farmland. At least one farmland tile is needed to sow; yields do not scale with plot size. Escape cancels placement or closes commands.\n\nSelect the house to see food, seeds, coins and materials. Buy supplies opens the purchasing panel. Provisions use Ion’s weekly assignment. Materials opens shared wood, stone and plank storage. Buy and craft immediately (2 wood → 1 plank), or assign Ion to gather up to 2 wood or 1 stone at week end. The forecast shows what fits. House storage upgrades add 10 slots; storehouses add 40 per completed level. Discard unwanted supplies to free room.\n\nDraft assignments and settlement changes save on this Mac. The Places menu offers keyboard alternatives to map targets. Debug season preview changes scenery only; Actual season restores the simulation view."
-            ).lineSpacing(5)
+      if item.id == "construction" || item.id == "workshop" {
+        BuildPanel(
+          session: session, state: state,
+          infrastructure: { beginPlacement(.infrastructure($0)) },
+          beginPlacement: beginPlacement, close: { sheet = nil },
+          initialSelection: item.id == "workshop" ? .workshop : nil)
+      } else {
+        VStack(alignment: .leading, spacing: 18) {
+          HStack {
+            Text(item.id == "materials" ? "Supplies & storage" : "How to play").font(
+              .system(size: 28, design: .serif))
+            Spacer()
+            Button("Done") { sheet = nil }.keyboardShortcut(.cancelAction)
           }
-        }
-      }.padding(26).frame(width: 720, height: 620).background(GamePalette.panel)
+          ScrollView {
+            if item.id == "materials" {
+              MaterialsPanel(session: session, state: state, openWorkshop: { sheet = "workshop" })
+            } else {
+              Text(
+                "Select Ion’s portrait or a place in the settlement to assign one job each week. End week opens a forecast; confirm to resolve work and crop growth. Food is consumed every week after work rewards; shelter wear and construction resolve at season end. Each season has 3 months of 4 weeks (48 weeks per year). Read the weekly report and continue. Winter returns to spring with a fresh field.\n\nSow 4 grain seeds in spring. Crops sprout, grow and ripen after 24 weeks; tend once after 4 growing weeks, before ripening. Harvest ripe grain before winter for 20 food and 4 seeds (28 food and 6 seeds when tended). Buy seeds for 1 Galbeni each in Materials or at the field. Each week uses 1 food. At winter month end, an active woodshed saves 1 food and shelter below 40 adds 1 food demand. Wages, gathering, provisions and repairs compete for Ion’s weekly assignment. Wages earn the starting Strength level in Galbeni, plus 1 with an operational Stable. Physical work starts at 20 energy; wages and provisions start at 10. Each Endurance level above 1 saves 2 energy, with a minimum cost of 5. Health below 25 adds 10 to work costs. Rest restores 35 energy, or 25 in winter exposure, plus 2 per Endurance level above 1, and heals 10 health when there is no starvation or exposure damage. Jobs require enough energy. All needs range from 0 to 100; higher hunger is worse. Missing food adds 25 hunger per unit; a fully supplied week removes 25. Hunger at 75 or more costs 15 health each week. Winter shelter below 40 also costs 10 health weekly. At zero health Ion dies, ending the settlement; the final report offers a fresh start.\n\nBuild lets you place structures on free ground. Foundations finish at season end and produce from the following season. Completed buildings produce once per season and lose 20 condition afterwards. Upgrades and repairs are immediate. At zero condition a building above level 1 loses a level and returns to 60 condition; level 1 stays inactive until repaired. No timers or offline decay run.\n\nProductive sowing, tending and harvests earn farming experience; actual material hauls earn gathering experience; house repairs that restore shelter and completed foundations earn building experience. Wages and successful gathering earn Strength experience; productive farming, gathering, repair, worker construction and wages earn Endurance experience. Each 3 XP raises a skill level, from 1 to 5 (12 XP maximum). Each level above 1 adds 2 harvest food, 1 gathered unit before storage limits, or 5 shelter repair. Bonuses use the level at the start of the week. Instant purchases, upgrades, building repairs and crafting earn no experience.\n\nDrag or scroll to pan; pinch or Option-scroll to zoom. Home resets the camera. Rotate the map with the arrow controls. Rotate a building in its inspector, or press R while placing. Farmland, paths and fences cost 1 Galbeni per tile or edge; click or drag to paint any shape. R changes the fence edge. Erase removes infrastructure and farmland without refund. Harvest crops and cancel farming assignments before changing farmland. At least one farmland tile is needed to sow; yields do not scale with plot size. Escape cancels placement or closes commands.\n\nSelect the house to see food, seeds, Galbeni and materials. Buy supplies opens the purchasing panel. Provisions use Ion’s weekly assignment. Materials opens shared wood, stone and plank storage. Buy immediately or craft in an operational Workshop (2 wood → 1 plank; an operational Smithy reduces this to 1 wood), or assign Ion to gather a base of 2 wood or 1 stone at week end, increased by gathering skill. The forecast shows what fits. House storage upgrades add 10 slots; storehouses add 40 per completed level. Discard unwanted supplies to free room.\n\nDraft assignments and settlement changes save on this Mac. The Places menu offers keyboard alternatives to map targets. Debug season preview changes scenery only; Actual season restores the simulation view."
+              ).lineSpacing(5)
+            }
+          }
+        }.padding(26).frame(width: 720, height: 620).background(GamePalette.panel)
+      }
     }
     .alert("Begin a fresh household?", isPresented: $restart) {
       Button("Cancel", role: .cancel) {}
@@ -183,7 +180,7 @@ struct ContentView: View {
         .accessibilityElement(children: .combine).help(state.calendarLabel)
       Divider().frame(height: 18).overlay(GamePalette.gold.opacity(0.4))
       resource("Food", value: "\(state.food)", icon: "leaf")
-      resource("Money", value: "\(state.money)", icon: "circle")
+      resource("Galbeni", value: "\(state.money)", icon: "circle")
       resource("Shelter", value: "\(state.house)", icon: "house")
       Button("Materials \(state.materials.total)/\(Materials.capacity(state))") {
         sheet = "materials"
@@ -196,6 +193,7 @@ struct ContentView: View {
         ui.debug = true
       }
       .help("Building and construction debug workshop")
+      .disabled(state.phase == .dead)
       Menu("Places") {
         ForEach(Hotspot.allCases, id: \.rawValue) { spot in
           Button(spot.rawValue.capitalized) { choose(.hotspot(spot)) }
@@ -232,6 +230,12 @@ struct ContentView: View {
     VStack(spacing: 3) {
       if let warning = session.storageWarning { notice(warning) }
       if let warning = resourceWarning { notice(warning) }
+      if let notice = session.assignmentNotice {
+        HStack {
+          self.notice(notice)
+          Button("Dismiss") { session.assignmentNotice = nil }.font(.caption)
+        }.background(GamePalette.panel)
+      }
       if let error = session.error {
         HStack {
           notice(error)
@@ -268,6 +272,8 @@ struct ContentView: View {
     ui.review = false
   }
   private func beginPlacement(_ tool: PlacementTool) {
+    guard state.phase != .dead else { return }
+    sheet = nil
     ui.dismissOptional()
     if case .building(let id, _, _) = tool {
       ui.placementFacing = state.layout.buildings.first { $0.id == id }?.facing ?? 0
