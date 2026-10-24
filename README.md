@@ -10,7 +10,65 @@ Each day rolls seeded weather (Clear, Cloudy, Rain, Storm, Snow) and a temperatu
 tuned to modern Moldovan (Chișinău) climate normals, with multi-day warm, cold,
 wet and dry spells. Rain and snow fall as particles, storms flash lightning, and
 fog, sky, sunlight, wet ground and lying snow blend in as the weather turns.
-Current version: **0.1.0**. No gameplay or saves yet.
+
+Farming is the first gameplay loop. Click a plot or drag over a rectangle of
+plots; hold **Shift** to add to the selection. Without a mouse, move the view
+and press **Enter** to select the plot at its centre (**Shift+Enter** adds). The
+farm panel shows a button for each action the selection allows, with its plot
+count and grain cost or yield; **F** does all of them. Plow grass, stubble or
+dead crops (not in winter), sow plowed land, and harvest ripe crops. Sowing uses
+the crop named on the Sow button, whose tooltip lists that crop's needs. To pick
+a crop, right-click a plot (it becomes the selection unless it is already part of
+it), press **Crop ▾**, or press **C** and use the arrow keys and
+Enter. The crop menu shows what each crop would sow on the selection now, greys
+out crops whose sowing months have not come and shows those months; choosing a
+crop sows it on the selected plowed plots and keeps it for the Sow button and F.
+A right-drag still rotates the view without opening the menu.
+
+| Crop | Sown | Grows above | Needs | Dies at | Seed → grain |
+| --- | --- | --- | --- | --- | --- |
+| Barley | Spring months 1–2 | 4°C | 60 warm days | -3°C | 2 → 7 |
+| Oats | Spring months 1–2 | 4°C | 75 warm days, likes rain | -4°C | 2 → 7, copes with poor soil |
+| Millet | Spring month 3 – Summer month 1 | 10°C | 50 warm days, hardy in drought | 1°C | 1 → 6 |
+| Wheat | Autumn months 1–2 | 3°C | a winter, then 110 warm days | -8°C | 2 → 11, wears soil most |
+| Rye | Autumn months 1–3 | 2°C | a winter, then 95 warm days | -16°C | 2 → 8, copes with poor soil |
+
+Across 50 weather seeds, barley ripens in early summer, oats mid-to-late
+summer, millet late summer to early autumn, rye the next early summer and wheat
+after it; about one winter in five is cold enough to kill wheat. Each crop has
+its own store: sowing uses that crop's grain as seed and its harvest goes back
+to it. You start with 10 each of barley, oats, wheat and rye and 6 of millet;
+the farm panel shows the total (hover for each crop). **I** or the Inventory
+button lists each crop's store, the plots it can sow, and this year's sowing
+and harvest. These cereals and numbers are game tuning, not verified crops or
+yields for fifteenth-century northern Moldavia.
+
+Land wears and goes wild. A harvest leaves stubble that must be plowed again,
+and takes 25–35% of the soil's fertility depending on the crop; poorer soil
+yields less, least so for oats and rye. Resting land recovers a quarter per
+year, so cropping barley or millet every year halves its yield within about
+nine years (oats fall more slowly), while resting one year in three holds it. Plowed land stays plowed;
+stubble and dead crops left untended go back to grass after about 40 warm days.
+Rain darkens the ground and leaves puddles in the furrows until it dries. **L**
+or the Ledger button opens three tabs: Fields (each crop's plots, growth and
+soil, plus idle land), Years (each year's sown, frost-killed and harvested
+plots, grain gathered and net grain after seed, with per-crop detail on hover)
+and Crops (each crop's sowing months and needs). In debug builds, **F4** opens
+an agriculture window to add 50 grain of each crop, skip days, months or to the
+next season, and set the crop, stage, growth and soil of the selected plots.
+
+**F1** or the Wiki button opens an in-game wiki: controls, the year and weather,
+working the land, how crops grow, a crop table, soil, the ledger and inventory,
+and a first-year walkthrough. It shows [`godot/wiki/wiki.html`](godot/wiki/wiki.html),
+which also opens in any browser; the game converts its headings, paragraphs,
+lists, tables, bold, italics and keys to RichTextLabel BBCode, so the page keeps
+to those tags. It is not a Godot resource, so an export preset must include
+`wiki/*.html` (Export → Resources → filters to export non-resource files).
+
+The field uses CC0 grass and ploughed-soil textures (see their
+[sources](godot/assets/textures/SOURCE.md)); crops are instanced stalks sized
+and coloured on the GPU from a per-plot data texture.
+Current version: **0.1.1**. No saves yet.
 
 The menu loops **Drumul Dracului – (Moldavian Medieval Song)** from the
 [user-selected recording](https://www.youtube.com/watch?v=HdnlsAkVnmk), at -14 dB.
@@ -33,17 +91,28 @@ if your executable is elsewhere. No Node.js installation or network is needed.
 
 ## Verify
 
-Import assets once after a fresh checkout, then run the complete test:
+Import assets once after a fresh checkout (and after adding a `class_name`
+script), then run both tests:
 
 ```sh
 ./godot/run.sh --headless --editor --import --quit
 ./godot/run.sh --headless --script tests/test_menu.gd
+./godot/run.sh --headless --script tests/test_crops.gd
 ```
 
-The test checks title spelling/font coverage, version, initial keyboard focus,
+The menu test checks title spelling/font coverage, version, initial keyboard focus,
 visible focus styling, layouts at three sizes, real keyboard/mouse activation
 the grid field, cell picking, camera rotation and pinch zoom, automatic menu music, loop wraparound and stopping
-playback when the game starts. To capture actual GPU-rendered screens:
+playback when the game starts. The crop test checks each crop's sowing months,
+warmth, rain, frost and winter needs, the plow/sow/harvest rules, stubble, plowed
+land staying plowed, returning grass, soil wear and rest, yearly records, that
+action previews match outcomes and refused actions change nothing, every crop's
+ripening across 50 weather seeds, a nine-year rotation, and selection, the F
+and Enter keys, the crop menu from C, the keyboard and right-click (and not from
+a right-drag), each crop's own seed, ledger tabs, the inventory, the wiki
+converter, that the wiki's crop table matches the game, the F1 wiki window, the
+agriculture debug window and the field texture in the running game screen.
+To capture actual GPU-rendered screens:
 
 ```sh
 ./godot/run.sh --script tests/capture_menu.gd -- /tmp/stefan-menu
@@ -67,3 +136,7 @@ connections and Git history. Ștefan is the project name; `stefan` is its ASCII
 spelling for technical identifiers. The previous browser, Swift/macOS and Godot
 game implementations were removed. No remote rename, push or deployment is
 part of this reset and first menu.
+
+The menu now uses a generated fortress landscape and aurochs game icon. See
+[artwork and generation prompts](godot/assets/ART.md) for the bundled assets and
+how the painting, gold ornament and accessible controls fit together.
