@@ -9,6 +9,14 @@ const ZOOM_MIN := 8.0
 const ZOOM_MAX := 40.0
 const ROTATE_SPEED := 1.8
 const DRAG_ROTATE_SPEED := 0.008
+const SECONDS_PER_DAY := 2.0
+
+var day := 0
+## Game-time multiplier; 0 is paused.
+var speed := 1
+var _resume_speed := 1
+var _day_time := 0.0
+var _time_hud: PanelContainer
 
 var hovered_cell := Vector2i(-1, -1)
 var selected_cell := Vector2i(-1, -1)
@@ -49,7 +57,33 @@ func _ready() -> void:
 	add_child(_camera)
 	_place_camera(Vector3.ZERO)
 
+	var hud := CanvasLayer.new()
+	add_child(hud)
+	_time_hud = preload("res://time_hud.gd").new()
+	_time_hud.speed_selected.connect(set_speed)
+	hud.add_child(_time_hud)
+	_show_date()
+
+func _show_date() -> void:
+	_time_hud.show_time(day, speed)
+
+func set_speed(new_speed: int) -> void:
+	if new_speed > 0:
+		_resume_speed = new_speed
+	speed = new_speed
+	_show_date()
+
+## Advances game time; whole days roll over and update the date display.
+func advance_time(seconds: float) -> void:
+	_day_time += seconds
+	while _day_time >= SECONDS_PER_DAY:
+		_day_time -= SECONDS_PER_DAY
+		day += 1
+	_show_date()
+
 func _process(delta: float) -> void:
+	if speed > 0:
+		advance_time(delta * speed)
 	var input := Input.get_vector("ui_left", "ui_right", "ui_up", "ui_down")
 	for key in [[KEY_A, Vector2.LEFT], [KEY_D, Vector2.RIGHT], [KEY_W, Vector2.UP], [KEY_S, Vector2.DOWN]]:
 		if Input.is_physical_key_pressed(key[0]):
@@ -74,6 +108,12 @@ func rotate_camera(radians: float) -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventMouseMotion and event.button_mask & MOUSE_BUTTON_MASK_RIGHT:
 		rotate_camera(-event.relative.x * DRAG_ROTATE_SPEED)
+	if event is InputEventKey and event.pressed and not event.echo:
+		match event.physical_keycode:
+			KEY_SPACE: set_speed(0 if speed > 0 else _resume_speed)
+			KEY_1: set_speed(1)
+			KEY_2: set_speed(2)
+			KEY_3: set_speed(4)
 	# macOS trackpads send gestures instead of wheel clicks.
 	if event is InputEventMagnifyGesture:
 		zoom_by(_zoom * (1.0 / event.factor - 1.0))
