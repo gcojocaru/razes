@@ -22,3 +22,10 @@ initial focus and a visible focus style. The empty game scene has no visible UI.
 
 Include the approved workspace reset and this new application in one local
 commit; preserve Git history and origin. Do not push or rewrite history.
+
+## Approved follow-up: menu music
+
+The user subsequently requested the track at
+https://www.youtube.com/watch?v=HdnlsAkVnmk as menu music. Bundle the selected
+recording for offline playback, loop it at a modest volume and stop it when Play
+opens the blank game screen. This supersedes the original no-sound scope.

@@ -1,8 +1,15 @@
 # Ștefan
 
 A fresh Godot desktop game, starting with a medieval Moldavian inspired main menu.
-Select **Play** or press **Enter/Space** to open the empty black game screen.
+Select **Play** or press **Enter/Space** to open the strategy field: a 16×16 grid of building plots.
+Hover or click a square to highlight or select it. Move with WASD/arrows, rotate
+with Q/E or right-drag, zoom with the mouse wheel or trackpad pinch/scroll.
 Current version: **0.1.0**. No gameplay or saves yet.
+
+The menu loops **Drumul Dracului – (Moldavian Medieval Song)** from the
+[user-selected recording](https://www.youtube.com/watch?v=HdnlsAkVnmk), at -14 dB.
+Playback stops on Play. The track is bundled for offline playback; see its
+[source and permission status](godot/assets/audio/SOURCE.md).
 
 ## Run
 
@@ -29,7 +36,8 @@ Import assets once after a fresh checkout, then run the complete test:
 
 The test checks title spelling/font coverage, version, initial keyboard focus,
 visible focus styling, layouts at three sizes, real keyboard/mouse activation
-and the empty black game scene. To capture actual GPU-rendered screens:
+the grid field, cell picking, camera rotation and pinch zoom, automatic menu music, loop wraparound and stopping
+playback when the game starts. To capture actual GPU-rendered screens:
 
 ```sh
 ./godot/run.sh --script tests/capture_menu.gd -- /tmp/stefan-menu

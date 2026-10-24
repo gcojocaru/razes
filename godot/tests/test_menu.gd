@@ -23,6 +23,18 @@ func run() -> void:
 		var title: Label = menu.get_node("Layout/Title")
 		var play: Button = menu.get_node("Layout/Play")
 		var version: Label = menu.get_node("Version")
+		var music: AudioStreamPlayer = menu.get_node_or_null("MenuMusic")
+		check(music != null, "Menu music player exists")
+		if music == null:
+			quit(1)
+			return
+		check(music.stream is AudioStreamMP3, "Menu uses bundled MP3 audio")
+		check(music.stream.loop, "Menu music loops")
+		check(music.playing, "Menu music starts automatically")
+		check(music.volume_db == -14.0, "Menu music plays at a modest volume")
+		music.seek(music.stream.get_length() - 0.05)
+		await create_timer(0.2).timeout
+		check(music.playing and music.get_playback_position() < 1.0, "Music continues across its loop boundary")
 		check(title.text == "ȘTEFAN", "Title preserves Romanian spelling")
 		check(title.get_theme_font("font").has_char(0x218), "Title font contains Romanian Ș")
 		check(version.text == "v" + str(ProjectSettings.get_setting("application/config/version")), "Version comes from project settings")
@@ -57,8 +69,21 @@ func run() -> void:
 		await process_frame
 		await process_frame
 		check(current_scene.scene_file_path == "res://game.tscn", "Play opens game via " + activation)
-		check(current_scene.get_child_count() == 0, "Game scene is empty, with no menu controls")
-		check(RenderingServer.get_default_clear_color() == Color.BLACK, "Empty game background is black")
+		check(not is_instance_valid(music), "Leaving the menu frees its music player")
+		check(current_scene.has_node("Field"), "Game shows the grid field")
+		check(current_scene.cell_at_world(Vector3(-15.9, 0, -15.9)) == Vector2i(0, 0), "Field corner is cell 0,0")
+		check(current_scene.cell_at_world(current_scene.cell_center(Vector2i(5, 9))) == Vector2i(5, 9), "Cell centre maps back to its cell")
+		check(current_scene.cell_at_world(Vector3(40, 0, 0)) == Vector2i(-1, -1), "Points off the field have no cell")
+		var centre: Vector2 = root.get_visible_rect().get_center()
+		check(current_scene.cell_at_screen(centre) != Vector2i(-1, -1), "Screen centre looks at the field")
+		var looked_at: Vector3 = current_scene._focus()
+		current_scene.rotate_camera(PI / 2)
+		var pinch := InputEventMagnifyGesture.new()
+		pinch.factor = 1.5
+		var before: float = current_scene._zoom
+		current_scene._unhandled_input(pinch)
+		check(current_scene._zoom < before, "Trackpad pinch zooms in")
+		check(current_scene._focus().is_equal_approx(looked_at), "Rotating orbits the field without moving the view centre")
 	if failures.is_empty():
-		print("PASS: title, Romanian glyph, version, focus, three layouts, Enter, Space and mouse Play, empty black game")
+		print("PASS: title, Romanian glyph, version, focus, three layouts, Enter, Space and mouse Play, looping menu music stops on start, grid field with cell picking")
 	quit(0 if failures.is_empty() else 1)

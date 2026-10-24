@@ -1,8 +1,9 @@
-[gd_scene load_steps=9 format=3]
+[gd_scene load_steps=10 format=3]
 
 [ext_resource type="Script" path="res://menu.gd" id="1"]
 [ext_resource type="Texture2D" path="res://assets/menu.svg" id="2"]
 [ext_resource type="FontFile" path="res://assets/fonts/CormorantUnicase-Bold.ttf" id="3"]
+[ext_resource type="AudioStream" path="res://assets/audio/menu-music.mp3" id="4"]
 
 [sub_resource type="StyleBoxFlat" id="ButtonNormal"]
 bg_color = Color(0.19, 0.075, 0.058, 1)
@@ -137,3 +138,8 @@ theme_override_fonts/font = SubResource("InterfaceFont")
 theme_override_font_sizes/font_size = 22
 text = "v0.1.0"
 horizontal_alignment = 2
+
+[node name="MenuMusic" type="AudioStreamPlayer" parent="."]
+stream = ExtResource("4")
+volume_db = -14.0
+autoplay = true
