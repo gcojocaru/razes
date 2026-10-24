@@ -83,7 +83,36 @@ func run() -> void:
 		var before: float = current_scene._zoom
 		current_scene._unhandled_input(pinch)
 		check(current_scene._zoom < before, "Trackpad pinch zooms in")
+		check(Calendar.DAYS_PER_YEAR == 336, "Year is 4 seasons x 3 months x 4 weeks x 7 days")
+		check(Calendar.date(0) == {"year": 1, "season": 0, "month": 1, "week": 1, "day": 1}, "Time starts on the first day of spring")
+		check(Calendar.date(335) == {"year": 1, "season": 3, "month": 3, "week": 4, "day": 7}, "Last day of the year is in winter")
+		check(Calendar.date(336).year == 2 and Calendar.date(336).season == 0, "Year rolls over into spring")
+		check(Calendar.date(28).month == 2 and Calendar.date(84).season == 1, "Months and seasons roll over")
+		var start_day: int = current_scene.day
+		current_scene.advance_time(current_scene.seconds_per_day * 3)
+		check(current_scene.day == start_day + 3, "Game time advances whole days")
+		check(current_scene.find_child("TimeHud", true, false) != null, "Game shows the time panel")
+		var space := InputEventKey.new()
+		space.physical_keycode = KEY_SPACE
+		space.pressed = true
+		current_scene._unhandled_input(space)
+		check(current_scene.speed == 0, "Space pauses time")
+		current_scene._unhandled_input(space)
+		check(current_scene.speed == 1, "Space resumes the previous speed")
+		current_scene.set_speed(4)
+		start_day = current_scene.day
+		current_scene._process(current_scene.seconds_per_day)
+		check(current_scene.day == start_day + 4, "Fastest speed runs four days per normal day")
+		var debug: PanelContainer = current_scene.find_child("DebugPanel", true, false)
+		check(debug != null and not debug.visible, "Debug panel exists but starts hidden")
+		var f3 := InputEventKey.new()
+		f3.physical_keycode = KEY_F3
+		f3.pressed = true
+		current_scene._unhandled_input(f3)
+		check(debug.visible, "F3 shows the debug panel")
+		debug.day_length.value = 0.5
+		check(is_equal_approx(current_scene.seconds_per_day, 0.5), "Debug panel sets the day length")
 		check(current_scene._focus().is_equal_approx(looked_at), "Rotating orbits the field without moving the view centre")
 	if failures.is_empty():
-		print("PASS: title, Romanian glyph, version, focus, three layouts, Enter, Space and mouse Play, looping menu music stops on start, grid field with cell picking")
+		print("PASS: title, Romanian glyph, version, focus, three layouts, Enter, Space and mouse Play, looping menu music stops on start, grid field with cell picking, calendar with pause, speeds and debug day length")
 	quit(0 if failures.is_empty() else 1)

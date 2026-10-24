@@ -3,7 +3,9 @@
 A fresh Godot desktop game, starting with a medieval Moldavian inspired main menu.
 Select **Play** or press **Enter/Space** to open the strategy field: a 16×16 grid of building plots.
 Hover or click a square to highlight or select it. Move with WASD/arrows, rotate
-with Q/E or right-drag, zoom with the mouse wheel or trackpad pinch/scroll.
+with Q/E or right-drag, zoom with the mouse wheel or trackpad pinch/scroll. Time runs at one day every
+2 seconds (a year is 4 seasons × 3 months × 4 weeks × 7 days); Space pauses and
+1/2/3 pick 1×/2×/4× speed. In debug builds, F3 opens a panel to set the day length.
 Current version: **0.1.0**. No gameplay or saves yet.
 
 The menu loops **Drumul Dracului – (Moldavian Medieval Song)** from the
