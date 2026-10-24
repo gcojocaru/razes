@@ -306,4 +306,7 @@ func run() -> void:
 	check(game.day == SUMMER + 1 and game.farm.growth(start) > 0.0, "Skipping a day grows sown crops")
 	if failures.is_empty():
 		print("PASS: five crops with own months, warmth, rain, frost and winter needs; plow, sow, harvest, stubble, plowed land kept, regrowing grass, soil wear and rest, year records, previews; 50-seed ripening per crop and 9-year rotation; selection, F/C/Enter keys, crop picker, ledger tabs, inventory, wiki page and window, agriculture debug and field texture")
+	current_scene.free()
+	# Let the audio server release stopped playback before the test process exits.
+	await create_timer(0.2).timeout
 	quit(0 if failures.is_empty() else 1)

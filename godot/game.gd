@@ -28,6 +28,8 @@ var snow_cover := 0.0
 var _sun: DirectionalLight3D
 var _environment: Environment
 var _weather_effects: Node3D
+var _weather_audio: Node
+var _sound_control: Control
 
 ## Furrow rows per plot (matching the furrow texture) and crop stalks per row.
 const FURROWS := 7
@@ -107,6 +109,9 @@ func _ready() -> void:
 	add_child(_crop_stalks())
 	_weather_effects = preload("res://weather_effects.gd").new(_sun, _environment, _field)
 	add_child(_weather_effects)
+	_weather_audio = preload("res://weather_audio.gd").new()
+	add_child(_weather_audio)
+	_weather_effects.lightning.connect(_weather_audio.lightning)
 
 	_camera = Camera3D.new()
 	_camera.rotation_degrees = Vector3(-55, 45, 0)
@@ -118,6 +123,8 @@ func _ready() -> void:
 	_time_hud = preload("res://time_hud.gd").new()
 	_time_hud.speed_selected.connect(set_speed)
 	hud.add_child(_time_hud)
+	_sound_control = preload("res://sound_control.gd").new()
+	hud.add_child(_sound_control)
 	_farm_hud = preload("res://farm_hud.gd").new()
 	_farm_hud.action_pressed.connect(work)
 	_farm_hud.crop_chosen.connect(choose_crop)
@@ -150,6 +157,7 @@ func _start_day() -> void:
 	elif today.temperature > 2:
 		snow_cover = maxf(snow_cover - 0.02 * today.temperature, 0.0)
 	# The first day appears at once; later days blend in.
+	_weather_audio.show_weather(today.condition, _weather_effects.condition == "")
 	_weather_effects.show_weather(today.condition, _weather_effects.condition == "")
 	for material in [_field, _stalks]:
 		material.set_shader_parameter("snow", snow_cover)
@@ -291,8 +299,13 @@ func advance_time(seconds: float) -> void:
 	_show_date()
 
 func _process(delta: float) -> void:
+	if is_instance_valid(_weather_audio):
+		_weather_effects.set_wind(_weather_audio.wind_direction, _weather_audio.wind_strength)
+		_stalks.set_shader_parameter("wind", _weather_audio.wind_direction * _weather_audio.wind_strength)
 	if speed > 0:
 		advance_time(delta * speed)
+	if _sound_control.panel.visible:
+		return
 	var input := Input.get_vector("ui_left", "ui_right", "ui_up", "ui_down")
 	for key in [[KEY_A, Vector2.LEFT], [KEY_D, Vector2.RIGHT], [KEY_W, Vector2.UP], [KEY_S, Vector2.DOWN]]:
 		if Input.is_physical_key_pressed(key[0]):
@@ -315,6 +328,8 @@ func rotate_camera(radians: float) -> void:
 	_place_camera(focus)
 
 func _unhandled_input(event: InputEvent) -> void:
+	if _sound_control.panel.visible and event is InputEventKey:
+		return
 	if event is InputEventMouseMotion and event.button_mask & MOUSE_BUTTON_MASK_RIGHT:
 		rotate_camera(-event.relative.x * DRAG_ROTATE_SPEED)
 		# Once it moves, it is a rotating drag, even if it ends where it began.

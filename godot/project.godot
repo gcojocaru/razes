@@ -18,6 +18,10 @@ config/custom_user_dir_name="Stefan"
 config/features=PackedStringArray("4.7", "GL Compatibility")
 config/icon="res://assets/game-icon.png"
 
+[autoload]
+
+Audio="*res://audio.gd"
+
 [display]
 
 window/size/viewport_width=1440

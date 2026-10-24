@@ -145,4 +145,7 @@ func run() -> void:
 		check(current_scene._focus().is_equal_approx(looked_at), "Rotating orbits the field without moving the view centre")
 	if failures.is_empty():
 		print("PASS: title, Romanian glyph, version, focus, three layouts, Enter, Space and mouse Play, looping menu music stops on start, grid field with cell picking, calendar with pause, speeds, debug day length, seasonal weather with particles")
+	current_scene.free()
+	# Let the audio server release stopped playback before the test process exits.
+	await create_timer(0.2).timeout
 	quit(0 if failures.is_empty() else 1)
