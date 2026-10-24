@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+  <defs><linearGradient id="gold" x2=".8" y2="1"><stop stop-color="#ffdfa0"/><stop offset="1" stop-color="#be8739"/></linearGradient></defs>
+  <!-- A bowed, clustered seed panicle. Round grains distinguish it from the ears. -->
+  <path d="M22 61c1-13 5-20 10-31 4-9 6-18 0-24m0 25 15-12M29 38l-9-15m14-2 14 9" fill="none" stroke="#e8c17a" stroke-width="2.3" stroke-linecap="round"/>
+  <path d="M24 53c-10-1-14-5-16-13 10 2 14 5 16 13Z" fill="#b99d57" stroke="#e6cb8c" stroke-width=".8"/>
+  <g fill="url(#gold)" stroke="#91682f" stroke-width=".7">
+    <ellipse cx="30" cy="8" rx="4" ry="4.5"/><ellipse cx="35" cy="13" rx="4" ry="4.5"/>
+    <ellipse cx="29" cy="17" rx="4" ry="4.5"/><ellipse cx="38" cy="20" rx="4" ry="4.5"/>
+    <ellipse cx="31" cy="25" rx="4.5" ry="4.5"/><ellipse cx="43" cy="17" rx="4" ry="4.5"/>
+    <ellipse cx="48" cy="21" rx="4" ry="4.5"/><ellipse cx="42" cy="27" rx="4.5" ry="4.5"/>
+    <ellipse cx="49" cy="30" rx="4" ry="4.5"/><ellipse cx="41" cy="35" rx="4" ry="4.5"/>
+    <ellipse cx="49" cy="39" rx="4" ry="4.5"/><ellipse cx="25" cy="30" rx="4" ry="4.5"/>
+    <ellipse cx="19" cy="24" rx="4" ry="4.5"/><ellipse cx="18" cy="33" rx="4" ry="4.5"/>
+    <ellipse cx="24" cy="39" rx="4" ry="4.5"/><ellipse cx="35" cy="40" rx="4" ry="4.5"/>
+  </g>
+</svg>

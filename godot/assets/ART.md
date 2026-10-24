@@ -15,6 +15,16 @@ The title and Play remain actual Godot controls; no text is baked into the art.
 A 22% darkening layer helps retain contrast. The previous opaque `menu.svg` was
 removed after its decoration was retained in `menu-ornament.svg`.
 
+## Field action icons
+
+`actions/*.svg` are original, hand-authored transparent vector illustrations,
+64×64 with a shared antique-gold palette. Plow uses a wheeled plow silhouette;
+Harvest uses a broad sickle blade and wrapped grip. Wheat has plump paired
+kernels, barley long awns, rye a slender alternating ear, oats hanging hulls,
+and millet clustered round grains. The wheel draws them at 46 logical pixels;
+names remain separate text controls/drawing. These are artistic game symbols,
+not verified reconstructions of period tools or botanical illustrations.
+
 ## Final icon prompt
 
 Use case: stylized-concept. Asset type: finished desktop game icon for Ștefan, a medieval Moldavian game. Create ONE square 1024x1024 richly crafted icon. A powerful stylized golden aurochs head with elegant upward curving horns, a small eight-point star above, restrained crescent moon and rosette details, embossed on a deep oxblood burgundy shield with antique gold edging. Medieval Moldavian manuscript and hammered-metal craft influence, tactile worn gold, confident simple silhouette readable at 32 pixels. Frontal symmetrical composition, nearly fills square but with safe margins, dark forest-charcoal background, gentle warm dramatic light. Premium historical strategy game art, painterly craftsmanship, refined and sober. No words, letters, numerals, modern flags, UI, watermark or mockup frame. Opaque full-bleed square image; no rounded outer app corners.
