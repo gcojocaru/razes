@@ -1,6 +1,6 @@
 extends PanelContainer
 ## Bottom-centre farm panel: the grain stock, the selected plots and a button for
-## each action some of them allow now, with its plot count and grain cost or yield.
+## each action some of them allow now, with its plot count and kg of grain spent or gained.
 ## The action wheel offers work for the selected land, including individual crops.
 
 signal action_pressed(action: String)
@@ -96,8 +96,8 @@ func _button(font: Font, tooltip: String) -> Button:
 
 ## Shows the stock and what the selected plots allow on this day, sowing `seed_crop`.
 func show_farm(farm: Farm, cells: Array, day: int, seed_crop: String) -> void:
-	grain_label.text = "Grain  %d" % farm.stored()
-	grain_label.tooltip_text = "Grain in store, each crop's own seed (key I):\n" + "\n".join(Farm.CROPS.keys().map(func(crop: String) -> String: return "%s %d" % [crop, farm.stock[crop]]))
+	grain_label.text = "Grain  %d kg" % farm.stored()
+	grain_label.tooltip_text = "Grain in store, each crop's own seed (key I):\n" + "\n".join(Farm.CROPS.keys().map(func(crop: String) -> String: return "%s %d kg" % [crop, farm.stock[crop]]))
 	var sowable := 0
 	for action in buttons:
 		var result := farm.preview(cells, day, action, seed_crop)
@@ -105,7 +105,7 @@ func show_farm(farm: Farm, cells: Array, day: int, seed_crop: String) -> void:
 			sowable = result.plots
 		var verb: String = "Sow " + seed_crop if action == "Sow" else action
 		buttons[action].visible = result.plots > 0
-		buttons[action].text = "%s %d" % [verb, result.plots] + ("" if result.grain == 0 else "  %+d grain" % result.grain)
+		buttons[action].text = "%s %d" % [verb, result.plots] + ("" if result.grain == 0 else "  %+d kg" % result.grain)
 	action_button.visible = not cells.is_empty()
 	action_wheel.show_farm(farm, cells, day, seed_crop)
 	if seed_crop != "":
@@ -140,6 +140,8 @@ func show_farm(farm: Farm, cells: Array, day: int, seed_crop: String) -> void:
 			_:
 				_plot_label.text = stage
 		notes.append(reasons.keys()[0] if reasons else NOTES[stage])
+		if stage in ["Sown", "Ripe"]:
+			notes.append(("about %d kg" if stage == "Sown" else "%d kg") % farm.harvest_yield(cell))
 	else:
 		_plot_label.text = "%d plots" % cells.size()
 		for reason in reasons:
@@ -150,7 +152,7 @@ func show_farm(farm: Farm, cells: Array, day: int, seed_crop: String) -> void:
 ## One line on what a crop needs and gives.
 func _facts(crop: String) -> String:
 	var kind: Dictionary = Farm.CROPS[crop]
-	return "%s: sown %s, needs about %d warm days%s, dies at %d°C, %d seed for up to %d grain" % [crop, Farm.sowing_window(crop), kind.ripe, " and a winter" if kind.winter else "", kind.frost, kind.seed, kind.grain]
+	return "%s: sown %s, needs about %d warm days%s, dies at %d°C, %d kg seed a plot for about %d kg" % [crop, Farm.sowing_window(crop), kind.ripe, " and a winter" if kind.winter else "", kind.frost, kind.seed, kind.grain]
 
 ## Opens contextual actions at the pointer, or above the farm panel for C/the button.
 func open_action_menu(at := Vector2(-1, -1)) -> void:

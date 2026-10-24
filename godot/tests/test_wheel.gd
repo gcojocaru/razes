@@ -51,7 +51,7 @@ func run() -> void:
 	farm.act(cell, 0)
 	wheel.show_farm(farm, [cell], 0, "Barley")
 	check(wheel.entries.map(func(e: Dictionary): return e.crop) == ["Barley", "Oats"], "Plowed land offers only crops sowable now")
-	check(wheel.entries[0].plots == 1 and wheel.entries[0].grain == -2, "Sowing describes its actual seed cost")
+	check(wheel.entries[0].plots == 1 and wheel.entries[0].grain == -Farm.CROPS.Barley.seed, "Sowing describes its actual seed cost")
 	wheel.open_at(Vector2.ZERO)
 	check(wheel.wheel_rect().position.x >= 0 and wheel.wheel_rect().position.y >= 0, "The wheel fits at the top-left edge")
 	wheel.open_at(root.get_visible_rect().size)
@@ -72,7 +72,7 @@ func run() -> void:
 	check(wheel.entries.is_empty() and "seed" in wheel.hub_detail.text.to_lower(), "No seed gives an explanation, not an unusable action")
 	wheel.show_farm(farm, [cell], Calendar.DAYS_PER_SEASON * 3, "")
 	check(wheel.entries.is_empty() and "sowing" in wheel.hub_detail.text.to_lower(), "Winter plowed land explains the next sowing window")
-	farm.stock.Barley = 10
+	farm.stock.Barley = Farm.STARTING_STOCK.Barley
 	farm.act(cell, 0, "Barley")
 	wheel.show_farm(farm, [cell], 0, "Barley")
 	check(wheel.entries.is_empty() and "ripe" in wheel.hub_detail.text.to_lower(), "Growing crops show their status without Harvest")
@@ -81,7 +81,7 @@ func run() -> void:
 	farm.act(plowed, 0)
 	wheel.show_farm(farm, [cell, plowed, Vector2i(2, 0)], 0, "Barley")
 	check(wheel.entries.map(func(e: Dictionary): return e.action) == ["Plow", "Sow", "Harvest"], "Mixed selection offers all applicable actions with seed available")
-	check(wheel.entries[-1].grain == 7, "Harvest displays the correct yield")
+	check(wheel.entries[-1].grain == Farm.CROPS.Barley.grain, "Harvest displays the correct yield")
 	wheel.open_at(Vector2(400, 350))
 	wheel.show_farm(farm, [Vector2i(2, 0)], Calendar.DAYS_PER_SEASON * 3, "")
 	check(wheel.visible and wheel.entries.is_empty() and "frozen" in wheel.hub_detail.text.to_lower(), "An open wheel refreshes when its action becomes unavailable")
