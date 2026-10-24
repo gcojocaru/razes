@@ -8,3 +8,9 @@ playwright-report/
 native/macos/.build/
 native/macos/.swiftpm/
 native/macos/build/
+
+# Godot generated caches, local credentials and exports
+godot/.godot/
+godot/build/
+godot/export_credentials.cfg
+godot/screenshots/
