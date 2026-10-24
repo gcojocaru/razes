@@ -2,6 +2,8 @@ extends Node3D
 ## Weather you can see: rain and snow particles, storm lightning, fog, and
 ## sky, sunlight and wet-ground changes that blend in when the weather turns.
 
+signal lightning
+
 const BLEND_SECONDS := 2.0
 ## Per condition: sky, sun energy, sun colour, fog density, ambient energy, field wetness.
 const LOOKS := {
@@ -127,6 +129,7 @@ func _process(delta: float) -> void:
 
 ## A lightning strike: two quick bright pulses on the sun and sky.
 func flash() -> void:
+	lightning.emit()
 	var look: Array = LOOKS[condition]
 	if _tween:
 		_tween.kill()
@@ -136,3 +139,10 @@ func flash() -> void:
 		_tween.tween_property(_sun, "light_energy", pulse[0], pulse[1])
 		_tween.parallel().tween_property(_environment, "background_color", sky, pulse[1])
 		_tween.parallel().tween_property(_environment, "ambient_light_energy", 1.6 if pulse[0] > 1.0 else look[4], pulse[1])
+
+## Shared wind drives precipitation and the crop shader.
+func set_wind(direction: Vector2, strength: float) -> void:
+	var drift := direction * strength
+	rain.process_material.direction = Vector3(drift.x * 0.5, -1, drift.y * 0.5)
+	snow.process_material.direction = Vector3(drift.x, -1, drift.y)
+	snow.process_material.gravity = Vector3(drift.x * 0.8, -0.4, drift.y * 0.8)

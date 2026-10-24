@@ -1,6 +1,8 @@
 extends Control
 
 func _ready() -> void:
+	add_child(preload("res://sound_control.gd").new())
+	$MenuMusic.bus = "Music"
 	$Version.text = "v" + str(ProjectSettings.get_setting("application/config/version"))
 	$Layout/Play.pressed.connect(_play)
 	$Layout/Play.grab_focus()

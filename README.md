@@ -75,6 +75,15 @@ The menu loops **Drumul Dracului – (Moldavian Medieval Song)** from the
 Playback stops on Play. The track is bundled for offline playback; see its
 [source and permission status](godot/assets/audio/SOURCE.md).
 
+Wind, rain and winter ambience now play in the field, with long layered rain
+recordings, changing gusts, smooth weather transitions and delayed thunder after
+lightning. Wind also steers precipitation and crop sway. Sound continues at normal
+speed while the calendar is paused or accelerated. **Sound** (top right) or **F10**
+opens master mute and master/weather/music volumes in both menu and game; arrow
+keys adjust focused sliders and Escape closes the panel. Preferences are saved
+separately in `user://sound.cfg`. Weather recordings and licenses are documented
+in [weather audio credits](godot/assets/audio/weather/SOURCE.md).
+
 ## Run
 
 Use **Godot 4.7.2** with its Compatibility renderer. Open `godot/project.godot`
@@ -98,6 +107,7 @@ script), then run both tests:
 ./godot/run.sh --headless --editor --import --quit
 ./godot/run.sh --headless --script tests/test_menu.gd
 ./godot/run.sh --headless --script tests/test_crops.gd
+./godot/run.sh --headless --script tests/test_audio.gd
 ```
 
 The menu test checks title spelling/font coverage, version, initial keyboard focus,

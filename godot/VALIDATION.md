@@ -163,3 +163,28 @@ years, and whether these crops and numbers suit historical Moldavia.
 
 Not checked: an exported build (the HTML needs an export filter), and wiki
 text beyond the crop table drifting from the rules.
+
+## Weather soundscape and controls — 24 October 2026
+
+- Added five continuously offset ambience layers: long wind, filtered winter wind,
+  and three loopable rain textures, plus lightning-triggered delayed thunder.
+  Repeated days keep playback running; leaving a storm cancels pending thunder.
+- Shared wind strength/direction drives crop sway and precipitation. Calendar
+  pause and acceleration do not change audio speed. No crop rules or saves changed.
+- Sound button/F10 in menu and field opens mute and master/weather/music sliders.
+  Escape closes it; settings persist in sound.cfg independently of gameplay.
+  Runtime wind attribution includes source/license links and modification notice
+  in the credits tooltip; full provenance is in assets/audio/weather/SOURCE.md.
+- Asset import and test_audio.gd, test_menu.gd and test_crops.gd pass on Godot
+  4.7.2 / Apple M4. Audio tests check settings validation/round-trip, zero volume,
+  mute preserving levels, running layers, thunder delay/cancellation, repeated
+  weather, transitions, menu music bus, both controls, F10/Escape, camera isolation
+  and panel geometry at 1000×700. Tests restore preferences after slider changes.
+- GPU captures of rain, storm, snow and the panel at 1000×700 were inspected.
+  Fixed initially off-screen anchors and made the Sound button opaque for contrast.
+- Godot reports particle shader RID cleanup warnings at shutdown. An unchanged
+  HEAD copy reproduced the same shader warnings. Waiting for the audio server
+  after freeing test scenes eliminates the additional audio shutdown warnings.
+
+Not checked: subjective headphone/speaker balance, assistive-technology behavior,
+long-session listening fatigue, or an exported build.
