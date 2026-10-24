@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+  <defs><linearGradient id="gold" x2=".8" y2="1"><stop stop-color="#fff0ba"/><stop offset="1" stop-color="#bc8e43"/></linearGradient></defs>
+  <!-- Plump paired kernels make wheat a broad, compact ear. -->
+  <path d="M31 59 33 15" stroke="#e9c57d" stroke-width="2.7" stroke-linecap="round"/>
+  <g fill="url(#gold)" stroke="#a47b38" stroke-width=".7">
+    <path d="M33 18c-6-4-7-10 0-15 6 6 5 11 0 15Z"/>
+    <path d="M31 26c-9 0-14-6-13-14 9 1 14 6 13 14Z"/>
+    <path d="M34 25c9-1 14-7 12-15-9 2-13 7-12 15Z"/>
+    <path d="M31 36c-10 0-16-6-15-15 10 1 15 7 15 15Z"/>
+    <path d="M34 35c10-1 15-8 13-16-9 1-14 8-13 16Z"/>
+    <path d="M31 46c-11 0-17-7-16-16 10 1 16 8 16 16Z"/>
+    <path d="M33 45c11-1 17-8 15-17-10 2-15 9-15 17Z"/>
+  </g>
+  <path d="m20 17 8 7m14-8-6 7M18 26l10 8m16-9-8 8M18 35l10 9m17-11-9 9" stroke="#fff0be" stroke-width="1" fill="none" stroke-linecap="round"/>
+  <path d="M31 57c-8 0-12-4-14-10 8 0 12 3 14 10Z" fill="#c4a35d"/>
+</svg>

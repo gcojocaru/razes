@@ -28,6 +28,8 @@ var snow_cover := 0.0
 var _sun: DirectionalLight3D
 var _environment: Environment
 var _weather_effects: Node3D
+var _weather_audio: Node
+var _sound_control: Control
 
 ## Furrow rows per plot (matching the furrow texture) and crop stalks per row.
 const FURROWS := 7
@@ -107,6 +109,9 @@ func _ready() -> void:
 	add_child(_crop_stalks())
 	_weather_effects = preload("res://weather_effects.gd").new(_sun, _environment, _field)
 	add_child(_weather_effects)
+	_weather_audio = preload("res://weather_audio.gd").new()
+	add_child(_weather_audio)
+	_weather_effects.lightning.connect(_weather_audio.lightning)
 
 	_camera = Camera3D.new()
 	_camera.rotation_degrees = Vector3(-55, 45, 0)
@@ -118,6 +123,8 @@ func _ready() -> void:
 	_time_hud = preload("res://time_hud.gd").new()
 	_time_hud.speed_selected.connect(set_speed)
 	hud.add_child(_time_hud)
+	_sound_control = preload("res://sound_control.gd").new()
+	hud.add_child(_sound_control)
 	_farm_hud = preload("res://farm_hud.gd").new()
 	_farm_hud.action_pressed.connect(work)
 	_farm_hud.crop_chosen.connect(choose_crop)
@@ -137,6 +144,8 @@ func _ready() -> void:
 		hud.add_child(_debug_panel)
 		_agri_debug = preload("res://agri_debug.gd").new(self)
 		hud.add_child(_agri_debug)
+	# GUI input follows sibling order, so the modal wheel must follow every HUD window.
+	hud.add_child(_farm_hud.action_wheel)
 	_start_day()
 
 func _show_date() -> void:
@@ -150,6 +159,7 @@ func _start_day() -> void:
 	elif today.temperature > 2:
 		snow_cover = maxf(snow_cover - 0.02 * today.temperature, 0.0)
 	# The first day appears at once; later days blend in.
+	_weather_audio.show_weather(today.condition, _weather_effects.condition == "")
 	_weather_effects.show_weather(today.condition, _weather_effects.condition == "")
 	for material in [_field, _stalks]:
 		material.set_shader_parameter("snow", snow_cover)
@@ -173,15 +183,16 @@ func choose_crop(crop: String) -> void:
 	farm.work(selected.keys(), day, "Sow", crop)
 	_show_farm()
 
-## Right-click: offers crops for the plot under the pointer, selecting it unless
+## Right-click: offers actions for the land under the pointer, selecting it unless
 ## it is already part of the selection.
-func _open_crop_menu(position: Vector2) -> void:
+func _open_action_menu(position: Vector2) -> void:
 	var cell := cell_at_screen(position)
 	if cell == Vector2i(-1, -1):
 		return
 	if not selected.has(cell):
 		_start_selection(cell, false)
-	_farm_hud.open_crop_menu(position)
+	_drag_from = Vector2i(-1, -1)
+	_farm_hud.open_action_menu(position)
 
 ## Debug: runs `days` whole days at once.
 func skip_days(days: int) -> void:
@@ -291,8 +302,13 @@ func advance_time(seconds: float) -> void:
 	_show_date()
 
 func _process(delta: float) -> void:
+	if is_instance_valid(_weather_audio):
+		_weather_effects.set_wind(_weather_audio.wind_direction, _weather_audio.wind_strength)
+		_stalks.set_shader_parameter("wind", _weather_audio.wind_direction * _weather_audio.wind_strength)
 	if speed > 0:
 		advance_time(delta * speed)
+	if _sound_control.panel.visible or _farm_hud.action_wheel.visible:
+		return
 	var input := Input.get_vector("ui_left", "ui_right", "ui_up", "ui_down")
 	for key in [[KEY_A, Vector2.LEFT], [KEY_D, Vector2.RIGHT], [KEY_W, Vector2.UP], [KEY_S, Vector2.DOWN]]:
 		if Input.is_physical_key_pressed(key[0]):
@@ -315,6 +331,8 @@ func rotate_camera(radians: float) -> void:
 	_place_camera(focus)
 
 func _unhandled_input(event: InputEvent) -> void:
+	if _farm_hud.action_wheel.visible or (_sound_control.panel.visible and event is InputEventKey):
+		return
 	if event is InputEventMouseMotion and event.button_mask & MOUSE_BUTTON_MASK_RIGHT:
 		rotate_camera(-event.relative.x * DRAG_ROTATE_SPEED)
 		# Once it moves, it is a rotating drag, even if it ends where it began.
@@ -329,7 +347,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			# Keyboard alternative to clicking: WASD moves the view, Enter selects its centre plot.
 			KEY_ENTER, KEY_KP_ENTER: _start_selection(cell_at_world(_focus()), event.shift_pressed)
 			KEY_F: work()
-			KEY_C: _farm_hud.open_crop_menu()
+			KEY_C: _farm_hud.open_action_menu()
 			KEY_L: toggle(_ledger)
 			KEY_I: toggle(_inventory)
 			KEY_F1: toggle(_wiki)
@@ -356,7 +374,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif event is InputEventMouseButton and not event.pressed and event.button_index == MOUSE_BUTTON_RIGHT:
 		# A right click, not the end of a camera-rotating drag.
 		if event.position.distance_to(_right_from) < 6.0:
-			_open_crop_menu(event.position)
+			_open_action_menu(event.position)
 	elif event is InputEventMouseButton and event.pressed:
 		# Clicking the world gives keys back to the game, e.g. after typing in the debug panel.
 		get_viewport().gui_release_focus()

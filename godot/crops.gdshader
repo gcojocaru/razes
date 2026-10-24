@@ -6,6 +6,7 @@ render_mode cull_disabled;
 uniform float grid_size = 16.0;
 uniform float cell_size = 2.0;
 uniform vec2 hovered = vec2(-1.0);
+uniform vec2 wind = vec2(0.2, 0.06);
 uniform float snow = 0.0;
 // Same per-cell texture as the field shader: R (stage index + 8 × crop number) / 255, G growth, B selected.
 uniform sampler2D crops : filter_nearest;
@@ -47,8 +48,9 @@ void vertex() {
 	float spread = step(0.001, height) * min(1.0, 0.3 + height);
 	VERTEX *= vec3(spread, height, spread);
 	// Withered crops slump; the rest sway together in the wind.
-	float lean = stage == 5 ? 0.35 : 0.07 * sin(TIME * 1.6 + origin.x * 0.6 + origin.z * 0.4);
-	VERTEX += transpose(mat3(MODEL_MATRIX)) * vec3(lean * UV.y * height, 0.0, 0.0);
+	float sway = 0.35 * sin(TIME * 1.6 + origin.x * 0.6 + origin.z * 0.4);
+	vec2 lean = stage == 5 ? vec2(0.35, 0.0) : wind * sway;
+	VERTEX += transpose(mat3(MODEL_MATRIX)) * vec3(lean.x, 0.0, lean.y) * UV.y * height;
 
 	tint *= 0.8 + 0.4 * r;
 	if (crop.b > 0.5) tint = mix(tint, vec3(0.98, 0.72, 0.25), 0.5);

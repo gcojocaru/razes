@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+  <defs><linearGradient id="gold" x2=".7" y2="1"><stop stop-color="#fff0b8"/><stop offset="1" stop-color="#be944b"/></linearGradient></defs>
+  <!-- A compact head surrounded by the long, unmistakable barley awns. -->
+  <g fill="none" stroke="#e6c681" stroke-width="1.2" stroke-linecap="round">
+    <path d="M27 20 16 4m14 14L25 2m10 16 6-16m-2 18L51 4M24 29 10 11m14 27L8 23m15 23L9 36M41 28l14-17M41 37l15-16M40 45l14-12M32 57V12"/>
+  </g>
+  <g fill="url(#gold)" stroke="#9a7537" stroke-width=".7">
+    <path d="M31 27c-7-1-10-7-7-13 6 3 8 7 7 13Z"/>
+    <path d="M34 27c7-1 10-7 7-13-6 3-8 7-7 13Z"/>
+    <path d="M31 36c-8-1-11-7-9-14 7 3 10 7 9 14Z"/>
+    <path d="M34 36c8-1 11-7 9-14-7 3-10 7-9 14Z"/>
+    <path d="M31 45c-8-1-12-7-10-14 7 3 11 7 10 14Z"/>
+    <path d="M34 45c8-1 12-7 10-14-7 3-11 7-10 14Z"/>
+    <path d="M31 52c-7-1-11-6-10-12 7 2 10 6 10 12Z"/>
+    <path d="M34 52c7-1 11-6 10-12-7 2-10 6-10 12Z"/>
+  </g>
+  <path d="M32 61V20" stroke="#f6d995" stroke-width="2" stroke-linecap="round"/>
+</svg>

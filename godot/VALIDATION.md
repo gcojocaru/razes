@@ -164,6 +164,62 @@ years, and whether these crops and numbers suit historical Moldavia.
 Not checked: an exported build (the HTML needs an export filter), and wiki
 text beyond the crop table drifting from the rules.
 
+## Weather soundscape and controls — 24 October 2026
+
+- Added five continuously offset ambience layers: long wind, filtered winter wind,
+  and three loopable rain textures, plus lightning-triggered delayed thunder.
+  Repeated days keep playback running; leaving a storm cancels pending thunder.
+- Shared wind strength/direction drives crop sway and precipitation. Calendar
+  pause and acceleration do not change audio speed. No crop rules or saves changed.
+- Sound button/F10 in menu and field opens mute and master/weather/music sliders.
+  Escape closes it; settings persist in sound.cfg independently of gameplay.
+  Runtime wind attribution includes source/license links and modification notice
+  in the credits tooltip; full provenance is in assets/audio/weather/SOURCE.md.
+- Asset import and test_audio.gd, test_menu.gd and test_crops.gd pass on Godot
+  4.7.2 / Apple M4. Audio tests check settings validation/round-trip, zero volume,
+  mute preserving levels, running layers, thunder delay/cancellation, repeated
+  weather, transitions, menu music bus, both controls, F10/Escape, camera isolation
+  and panel geometry at 1000×700. Tests restore preferences after slider changes.
+- GPU captures of rain, storm, snow and the panel at 1000×700 were inspected.
+  Fixed initially off-screen anchors and made the Sound button opaque for contrast.
+- Godot reports particle shader RID cleanup warnings at shutdown. An unchanged
+  HEAD copy reproduced the same shader warnings. Waiting for the audio server
+  after freeing test scenes eliminates the additional audio shutdown warnings.
+
+Not checked: subjective headphone/speaker balance, assistive-technology behavior,
+long-session listening fatigue, or an exported build.
+
+## Contextual action wheel — 2026-10-24
+
+- Replaced the crop popup with the selected segmented wheel design. Right-click,
+  C and Actions show eligible Plow, individual Sow crops, and Harvest segments
+  with distinct illustrated SVG icons, plot counts and grain changes. Status-only land
+  explains its limits in the hub; long mixed reasons have a full-text tooltip.
+- `tests/test_wheel.gd` passes: grass/stubble/withered, plowed, growing, ripe,
+  mixed, spring/autumn/winter, exhausted seed, activation-time revalidation,
+  live refresh, keyboard activation/Escape, outside dismissal, first-opening
+  layout, long reasons, and viewport-edge/hint fit.
+- `tests/test_crops.gd` and `tests/test_menu.gd` pass. Crop integration now uses
+  routed input and checks both keyboard sowing and mouse plowing, preserving
+  right-drag rotation and mixed selection, blocking outside drag selection and
+  underlying inventory-button clicks while the wheel is open.
+- GPU captures from `tests/capture_wheel.gd` checked on Apple M4/OpenGL:
+  grass, plowed, growing, ripe, mixed, autumn wheat/rye, millet, winter status,
+  and bottom-right placement at the 1000×700 minimum window. The checks caught
+  and corrected first-opening label expansion and an overlapping edge hint.
+- A separate code review caught GUI sibling input ordering; the wheel now sits
+  after every HUD window and the inventory regression passes.
+- Headless runs report a macOS system-CA lookup diagnostic and renderer shader
+  allocations at exit; rendered captures also report particle shader cleanup
+  diagnostics at shutdown. No script errors or failed assertions remain.
+- Physical VoiceOver, other GPUs/platforms and long play sessions are unverified.
+- Icon refinement: seven original 64×64 SVG assets replace procedural line
+  symbols. Wheel and crop tests pass, including texture import/dimension checks;
+  rendered mixed, autumn, millet and minimum-window icons were visually checked.
+- Rebased onto the merged weather-audio update on main; wheel, crop, menu and
+  audio tests all pass. The sandbox blocks default sound-preference writes;
+  the audio suite's explicit temporary-file round-trip passes.
+
 ## Harvest kilograms and bag inventory follow-up
 
 - Grain is counted in kg. A plot is 0.1 ha; seed and full harvest per plot use
@@ -216,6 +272,11 @@ text beyond the crop table drifting from the rules.
   needed a frame's wait: a window's header lays out the frame after it is shown.
   One GPU capture run reported a resource still in use at exit, likely a bag
   render still waiting for its frame when the script quit; a repeat was clean.
+
+- Merged after the action wheel landed on main: its segment labels, hub text
+  and test now use kg (seed and harvest from `Farm.CROPS`), and the crop test
+  keeps the wheel's click-through check, pressing the inventory's close button
+  by its text now that Stats sits before it.
 
 Not checked: tooltips and hover highlight on screen (hover was only sent in the
 capture), very large stores (the grid scrolls past about six rows), slower GPUs

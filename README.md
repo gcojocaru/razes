@@ -17,13 +17,18 @@ and press **Enter** to select the plot at its centre (**Shift+Enter** adds). The
 farm panel shows a button for each action the selection allows, with its plot
 count and the kilograms of grain it costs or brings; **F** does all of them. Plow grass, stubble or
 dead crops (not in winter), sow plowed land, and harvest ripe crops. Sowing uses
-the crop named on the Sow button, whose tooltip lists that crop's needs. To pick
-a crop, right-click a plot (it becomes the selection unless it is already part of
-it), press **Crop ▾**, or press **C** and use the arrow keys and
-Enter. The crop menu shows what each crop would sow on the selection now, greys
-out crops whose sowing months have not come and shows those months; choosing a
-crop sows it on the selected plowed plots and keeps it for the Sow button and F.
-A right-drag still rotates the view without opening the menu.
+the crop named on the Sow button, whose tooltip lists that crop's needs.
+Right-click a plot, press **Actions**, or press **C** to open a segmented action
+wheel. Right-clicking a plot selects it unless it is already in the selection.
+The wheel offers **Plow** on grass, stubble and dead crops; individual crop
+icons on plowed land; and **Harvest** on ripe crops. It shows only actions that
+can be done now, with plot counts and seed costs or harvest yields in kg. Growing
+crops, frozen ground and seed shortages show an explanation instead. Mixed
+selections offer work for each eligible part of the selection.
+Click a segment, or use arrows/Tab and **Enter**. Choosing a crop sows it and
+remembers it for the Sow button and F. **Escape** or an outside click dismisses
+the wheel; a right-drag still rotates the view. Time continues while it is open,
+and availability refreshes as days change.
 
 | Crop | Sown | Grows above | Needs | Dies at | Seed → harvest a plot | Bag |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -89,6 +94,15 @@ The menu loops **Drumul Dracului – (Moldavian Medieval Song)** from the
 Playback stops on Play. The track is bundled for offline playback; see its
 [source and permission status](godot/assets/audio/SOURCE.md).
 
+Wind, rain and winter ambience now play in the field, with long layered rain
+recordings, changing gusts, smooth weather transitions and delayed thunder after
+lightning. Wind also steers precipitation and crop sway. Sound continues at normal
+speed while the calendar is paused or accelerated. **Sound** (top right) or **F10**
+opens master mute and master/weather/music volumes in both menu and game; arrow
+keys adjust focused sliders and Escape closes the panel. Preferences are saved
+separately in `user://sound.cfg`. Weather recordings and licenses are documented
+in [weather audio credits](godot/assets/audio/weather/SOURCE.md).
+
 ## Run
 
 Use **Godot 4.7.2** with its Compatibility renderer. Open `godot/project.godot`
@@ -106,12 +120,15 @@ if your executable is elsewhere. No Node.js installation or network is needed.
 ## Verify
 
 Import assets once after a fresh checkout (and after adding a `class_name`
-script), then run both tests:
+script), then run the tests:
 
 ```sh
 ./godot/run.sh --headless --editor --import --quit
 ./godot/run.sh --headless --script tests/test_menu.gd
 ./godot/run.sh --headless --script tests/test_crops.gd
+./godot/run.sh --headless --script tests/test_audio.gd
+
+./godot/run.sh --headless --script tests/test_wheel.gd
 ```
 
 The menu test checks title spelling/font coverage, version, initial keyboard focus,
@@ -123,14 +140,17 @@ land staying plowed, returning grass, soil wear and rest, yearly records, that
 action previews match outcomes and refused actions change nothing, harvest kg
 by soil and season, bag filling, every crop's
 ripening across 50 weather seeds, a nine-year rotation, and selection, the F
-and Enter keys, the crop menu from C, the keyboard and right-click (and not from
+and Enter keys, the action wheel from C, the keyboard and right-click (and not from
 a right-drag), each crop's own seed, ledger tabs, the bag inventory, the wiki
 converter, that the wiki's crop table matches the game, the F1 wiki window, the
 agriculture debug window and the field texture in the running game screen.
+The wheel test also covers seed shortages, season changes, mixed states, live
+refresh, keyboard activation and dismissal, and viewport-edge placement.
 To capture actual GPU-rendered screens:
 
 ```sh
 ./godot/run.sh --script tests/capture_menu.gd -- /tmp/stefan-menu
+./godot/run.sh --script tests/capture_wheel.gd -- /tmp/stefan-wheel
 ```
 
 The default window is 1280×800; the minimum is 1000×700. The title uses bundled
