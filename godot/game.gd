@@ -9,14 +9,16 @@ const ZOOM_MIN := 8.0
 const ZOOM_MAX := 40.0
 const ROTATE_SPEED := 1.8
 const DRAG_ROTATE_SPEED := 0.008
-const SECONDS_PER_DAY := 2.0
 
+## Real seconds per game day at 1×; tunable from the debug panel.
+var seconds_per_day := 2.0
 var day := 0
 ## Game-time multiplier; 0 is paused.
 var speed := 1
 var _resume_speed := 1
 var _day_time := 0.0
 var _time_hud: PanelContainer
+var _debug_panel: PanelContainer
 
 var hovered_cell := Vector2i(-1, -1)
 var selected_cell := Vector2i(-1, -1)
@@ -62,6 +64,10 @@ func _ready() -> void:
 	_time_hud = preload("res://time_hud.gd").new()
 	_time_hud.speed_selected.connect(set_speed)
 	hud.add_child(_time_hud)
+	if OS.is_debug_build():
+		_debug_panel = preload("res://debug_panel.gd").new(seconds_per_day)
+		_debug_panel.day_length_changed.connect(func(seconds: float) -> void: seconds_per_day = seconds)
+		hud.add_child(_debug_panel)
 	_show_date()
 
 func _show_date() -> void:
@@ -76,8 +82,8 @@ func set_speed(new_speed: int) -> void:
 ## Advances game time; whole days roll over and update the date display.
 func advance_time(seconds: float) -> void:
 	_day_time += seconds
-	while _day_time >= SECONDS_PER_DAY:
-		_day_time -= SECONDS_PER_DAY
+	while _day_time >= seconds_per_day:
+		_day_time -= seconds_per_day
 		day += 1
 	_show_date()
 
@@ -114,6 +120,10 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_1: set_speed(1)
 			KEY_2: set_speed(2)
 			KEY_3: set_speed(4)
+			KEY_F3:
+				if _debug_panel:
+					_debug_panel.visible = not _debug_panel.visible
+					get_viewport().gui_release_focus()
 	# macOS trackpads send gestures instead of wheel clicks.
 	if event is InputEventMagnifyGesture:
 		zoom_by(_zoom * (1.0 / event.factor - 1.0))
@@ -123,6 +133,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		hovered_cell = cell_at_screen(event.position)
 		_field.set_shader_parameter("hovered", Vector2(hovered_cell))
 	elif event is InputEventMouseButton and event.pressed:
+		# Clicking the world gives keys back to the game, e.g. after typing in the debug panel.
+		get_viewport().gui_release_focus()
 		match event.button_index:
 			MOUSE_BUTTON_WHEEL_UP, MOUSE_BUTTON_WHEEL_DOWN:
 				zoom_by(ZOOM_STEP if event.button_index == MOUSE_BUTTON_WHEEL_DOWN else -ZOOM_STEP)

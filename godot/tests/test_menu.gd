@@ -89,7 +89,7 @@ func run() -> void:
 		check(Calendar.date(336).year == 2 and Calendar.date(336).season == 0, "Year rolls over into spring")
 		check(Calendar.date(28).month == 2 and Calendar.date(84).season == 1, "Months and seasons roll over")
 		var start_day: int = current_scene.day
-		current_scene.advance_time(current_scene.SECONDS_PER_DAY * 3)
+		current_scene.advance_time(current_scene.seconds_per_day * 3)
 		check(current_scene.day == start_day + 3, "Game time advances whole days")
 		check(current_scene.find_child("TimeHud", true, false) != null, "Game shows the time panel")
 		var space := InputEventKey.new()
@@ -101,9 +101,18 @@ func run() -> void:
 		check(current_scene.speed == 1, "Space resumes the previous speed")
 		current_scene.set_speed(4)
 		start_day = current_scene.day
-		current_scene._process(current_scene.SECONDS_PER_DAY)
+		current_scene._process(current_scene.seconds_per_day)
 		check(current_scene.day == start_day + 4, "Fastest speed runs four days per normal day")
+		var debug: PanelContainer = current_scene.find_child("DebugPanel", true, false)
+		check(debug != null and not debug.visible, "Debug panel exists but starts hidden")
+		var f3 := InputEventKey.new()
+		f3.physical_keycode = KEY_F3
+		f3.pressed = true
+		current_scene._unhandled_input(f3)
+		check(debug.visible, "F3 shows the debug panel")
+		debug.day_length.value = 0.5
+		check(is_equal_approx(current_scene.seconds_per_day, 0.5), "Debug panel sets the day length")
 		check(current_scene._focus().is_equal_approx(looked_at), "Rotating orbits the field without moving the view centre")
 	if failures.is_empty():
-		print("PASS: title, Romanian glyph, version, focus, three layouts, Enter, Space and mouse Play, looping menu music stops on start, grid field with cell picking, calendar with pause and speeds")
+		print("PASS: title, Romanian glyph, version, focus, three layouts, Enter, Space and mouse Play, looping menu music stops on start, grid field with cell picking, calendar with pause, speeds and debug day length")
 	quit(0 if failures.is_empty() else 1)
