@@ -28,10 +28,9 @@ func _init() -> void:
 	anchor_right = 0.5
 	grow_horizontal = Control.GROW_DIRECTION_BOTH
 	offset_top = 14
-	add_theme_stylebox_override("panel", _box(INK, GOLD, 10, 2, Vector2(18, 10)))
+	add_theme_stylebox_override("panel", box(INK, GOLD, 10, 2, Vector2(18, 10)))
 
-	var serif := SystemFont.new()
-	serif.font_names = PackedStringArray(["Georgia", "Noto Serif", "DejaVu Serif"])
+	var serif := serif_font()
 
 	var column := VBoxContainer.new()
 	column.add_theme_constant_override("separation", 8)
@@ -90,16 +89,7 @@ func _init() -> void:
 		# Keyboard focus would let Space press a button instead of toggling pause.
 		button.focus_mode = Control.FOCUS_NONE
 		button.custom_minimum_size = Vector2(44, 34)
-		button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
-		button.add_theme_font_override("font", serif)
-		button.add_theme_font_size_override("font_size", 13)
-		button.add_theme_color_override("font_color", PARCHMENT)
-		button.add_theme_color_override("font_pressed_color", INK)
-		button.add_theme_color_override("font_hover_pressed_color", INK)
-		button.add_theme_stylebox_override("normal", _box(Color(0, 0, 0, 0), GOLD.darkened(0.4), 6, 1, Vector2(6, 4)))
-		button.add_theme_stylebox_override("hover", _box(Color(GOLD, 0.15), GOLD, 6, 1, Vector2(6, 4)))
-		button.add_theme_stylebox_override("pressed", _box(GOLD, GOLD, 6, 1, Vector2(6, 4)))
-		button.add_theme_stylebox_override("hover_pressed", _box(GOLD.lightened(0.15), GOLD, 6, 1, Vector2(6, 4)))
+		style_button(button, serif)
 		button.pressed.connect(func() -> void: speed_selected.emit(SPEEDS[i]))
 		_buttons.append(button)
 		row.add_child(button)
@@ -202,7 +192,28 @@ func _draw_year_bar() -> void:
 	var x := progress * width
 	_year_bar.draw_rect(Rect2(x - 1.5, 0, 3, height), PARCHMENT)
 
-func _box(fill: Color, border: Color, radius: int, border_width: int, padding: Vector2) -> StyleBoxFlat:
+## Serif HUD text font, shared with the farm panel and ledger.
+static func serif_font() -> SystemFont:
+	var font := SystemFont.new()
+	font.font_names = PackedStringArray(["Georgia", "Noto Serif", "DejaVu Serif"])
+	return font
+
+## Gold-outlined HUD button look, shared with the farm panel.
+static func style_button(button: Button, font: Font) -> void:
+	button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	button.add_theme_font_override("font", font)
+	button.add_theme_font_size_override("font_size", 13)
+	button.add_theme_color_override("font_color", PARCHMENT)
+	button.add_theme_color_override("font_pressed_color", INK)
+	button.add_theme_color_override("font_hover_pressed_color", INK)
+	button.add_theme_color_override("font_disabled_color", PARCHMENT.darkened(0.5))
+	button.add_theme_stylebox_override("normal", box(Color(0, 0, 0, 0), GOLD.darkened(0.4), 6, 1, Vector2(6, 4)))
+	button.add_theme_stylebox_override("hover", box(Color(GOLD, 0.15), GOLD, 6, 1, Vector2(6, 4)))
+	button.add_theme_stylebox_override("pressed", box(GOLD, GOLD, 6, 1, Vector2(6, 4)))
+	button.add_theme_stylebox_override("hover_pressed", box(GOLD.lightened(0.15), GOLD, 6, 1, Vector2(6, 4)))
+	button.add_theme_stylebox_override("disabled", box(Color(0, 0, 0, 0), GOLD.darkened(0.65), 6, 1, Vector2(6, 4)))
+
+static func box(fill: Color, border: Color, radius: int, border_width: int, padding: Vector2) -> StyleBoxFlat:
 	var box := StyleBoxFlat.new()
 	box.bg_color = fill
 	box.border_color = border

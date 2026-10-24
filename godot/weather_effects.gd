@@ -96,8 +96,8 @@ func show_weather(new_condition: String, instant := false) -> void:
 	_set_emitting(rain, condition in ["Rain", "Storm"])
 	rain.amount_ratio = 1.0 if condition == "Storm" else 0.45
 	_set_emitting(snow, condition == "Snow")
-	# First strike after the blend, so it never cuts the blend short.
-	_next_flash = randf_range(BLEND_SECONDS + 1.0, BLEND_SECONDS + 4.0)
+	# First strike after the blend, so it never cuts the blend short; wet ground blends twice as long.
+	_next_flash = randf_range(BLEND_SECONDS * 2 + 1.0, BLEND_SECONDS * 2 + 4.0)
 
 	var look: Array = LOOKS[condition]
 	if _tween:

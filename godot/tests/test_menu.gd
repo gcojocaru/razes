@@ -33,7 +33,10 @@ func run() -> void:
 		check(music.playing, "Menu music starts automatically")
 		check(music.volume_db == -14.0, "Menu music plays at a modest volume")
 		music.seek(music.stream.get_length() - 0.05)
-		await create_timer(0.2).timeout
+		# Wait on the real clock: a slow first frame can run a game-time timer out before the audio loops.
+		var deadline := Time.get_ticks_msec() + 1000
+		while music.get_playback_position() > 1.0 and Time.get_ticks_msec() < deadline:
+			await process_frame
 		check(music.playing and music.get_playback_position() < 1.0, "Music continues across its loop boundary")
 		check(title.text == "ȘTEFAN", "Title preserves Romanian spelling")
 		check(title.get_theme_font("font").has_char(0x218), "Title font contains Romanian Ș")
@@ -133,6 +136,12 @@ func run() -> void:
 		check(effects.snow.emitting and not effects.rain.emitting, "Snow days snow")
 		effects.show_weather("Clear", true)
 		check(not effects.snow.emitting and not effects.rain.emitting, "Clear days have no particles")
+		var first_flash := INF
+		for storm in 20:
+			effects.show_weather("Clear", true)
+			effects.show_weather("Storm")
+			first_flash = minf(first_flash, effects._next_flash)
+		check(first_flash > effects.BLEND_SECONDS * 2, "The first lightning waits until the ground has turned wet")
 		check(current_scene._focus().is_equal_approx(looked_at), "Rotating orbits the field without moving the view centre")
 	if failures.is_empty():
 		print("PASS: title, Romanian glyph, version, focus, three layouts, Enter, Space and mouse Play, looping menu music stops on start, grid field with cell picking, calendar with pause, speeds, debug day length, seasonal weather with particles")
