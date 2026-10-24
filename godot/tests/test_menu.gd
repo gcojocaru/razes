@@ -112,7 +112,28 @@ func run() -> void:
 		check(debug.visible, "F3 shows the debug panel")
 		debug.day_length.value = 0.5
 		check(is_equal_approx(current_scene.seconds_per_day, 0.5), "Debug panel sets the day length")
+		var weather := Weather.new(7)
+		check(weather.on(50) == Weather.new(7).on(50), "Same seed and day give the same weather")
+		var season_temperature := [0.0, 0.0, 0.0, 0.0]
+		var seen := {}
+		var snow_when_warm := false
+		for weather_day in Calendar.DAYS_PER_YEAR * 3:
+			var forecast: Dictionary = weather.on(weather_day)
+			season_temperature[Calendar.date(weather_day).season] += forecast.temperature
+			seen[forecast.condition] = true
+			snow_when_warm = snow_when_warm or (forecast.condition == "Snow" and forecast.temperature > 1)
+		check(season_temperature[1] > season_temperature[0] and season_temperature[0] > season_temperature[3], "Summer is warmest and winter coldest")
+		check(seen.size() == Weather.CONDITIONS.size(), "Every weather condition happens within three years")
+		check(not snow_when_warm, "Snow only falls at 1°C or colder")
+		check(current_scene.today == current_scene.weather.on(current_scene.day), "Game shows the weather for today")
+		var effects: Node3D = current_scene.find_child("WeatherEffects", true, false)
+		effects.show_weather("Storm", true)
+		check(effects.rain.emitting and not effects.snow.emitting, "Storms rain")
+		effects.show_weather("Snow", true)
+		check(effects.snow.emitting and not effects.rain.emitting, "Snow days snow")
+		effects.show_weather("Clear", true)
+		check(not effects.snow.emitting and not effects.rain.emitting, "Clear days have no particles")
 		check(current_scene._focus().is_equal_approx(looked_at), "Rotating orbits the field without moving the view centre")
 	if failures.is_empty():
-		print("PASS: title, Romanian glyph, version, focus, three layouts, Enter, Space and mouse Play, looping menu music stops on start, grid field with cell picking, calendar with pause, speeds and debug day length")
+		print("PASS: title, Romanian glyph, version, focus, three layouts, Enter, Space and mouse Play, looping menu music stops on start, grid field with cell picking, calendar with pause, speeds, debug day length, seasonal weather with particles")
 	quit(0 if failures.is_empty() else 1)

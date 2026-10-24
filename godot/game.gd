@@ -20,6 +20,14 @@ var _day_time := 0.0
 var _time_hud: PanelContainer
 var _debug_panel: PanelContainer
 
+var weather := Weather.new(randi())
+var today := {}
+## 0–1 snow lying on the field: snow days cover it, warm days melt it.
+var snow_cover := 0.0
+var _sun: DirectionalLight3D
+var _environment: Environment
+var _weather_effects: Node3D
+
 var hovered_cell := Vector2i(-1, -1)
 var selected_cell := Vector2i(-1, -1)
 
@@ -28,19 +36,18 @@ var _field: ShaderMaterial
 var _zoom := 24.0
 
 func _ready() -> void:
-	var sun := DirectionalLight3D.new()
-	sun.rotation_degrees = Vector3(-55, -35, 0)
-	sun.shadow_enabled = true
-	add_child(sun)
+	_sun = DirectionalLight3D.new()
+	_sun.rotation_degrees = Vector3(-55, -35, 0)
+	_sun.shadow_enabled = true
+	add_child(_sun)
 
-	var environment := Environment.new()
-	environment.background_mode = Environment.BG_COLOR
-	environment.background_color = Color(0.55, 0.68, 0.78)
-	environment.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	environment.ambient_light_color = Color(0.75, 0.78, 0.8)
-	environment.ambient_light_energy = 0.6
+	_environment = Environment.new()
+	_environment.background_mode = Environment.BG_COLOR
+	_environment.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
+	_environment.ambient_light_color = Color(0.75, 0.78, 0.8)
+	_environment.ambient_light_energy = 0.6
 	var world := WorldEnvironment.new()
-	world.environment = environment
+	world.environment = _environment
 	add_child(world)
 
 	_field = ShaderMaterial.new()
@@ -53,6 +60,8 @@ func _ready() -> void:
 	ground.mesh = plane
 	ground.material_override = _field
 	add_child(ground)
+	_weather_effects = preload("res://weather_effects.gd").new(_sun, _environment, _field)
+	add_child(_weather_effects)
 
 	_camera = Camera3D.new()
 	_camera.rotation_degrees = Vector3(-55, 45, 0)
@@ -68,10 +77,22 @@ func _ready() -> void:
 		_debug_panel = preload("res://debug_panel.gd").new(seconds_per_day)
 		_debug_panel.day_length_changed.connect(func(seconds: float) -> void: seconds_per_day = seconds)
 		hud.add_child(_debug_panel)
-	_show_date()
+	_start_day()
 
 func _show_date() -> void:
-	_time_hud.show_time(day, speed)
+	_time_hud.show_time(day, speed, today)
+
+## Rolls the weather for the current day and applies it to the sky and field.
+func _start_day() -> void:
+	today = weather.on(day)
+	if today.condition == "Snow":
+		snow_cover = 1.0
+	elif today.temperature > 2:
+		snow_cover = maxf(snow_cover - 0.02 * today.temperature, 0.0)
+	# The first day appears at once; later days blend in.
+	_weather_effects.show_weather(today.condition, _weather_effects.condition == "")
+	_field.set_shader_parameter("snow", snow_cover)
+	_show_date()
 
 func set_speed(new_speed: int) -> void:
 	if new_speed > 0:
@@ -85,6 +106,7 @@ func advance_time(seconds: float) -> void:
 	while _day_time >= seconds_per_day:
 		_day_time -= seconds_per_day
 		day += 1
+		_start_day()
 	_show_date()
 
 func _process(delta: float) -> void:

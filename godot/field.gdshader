@@ -3,6 +3,8 @@ shader_type spatial;
 uniform float grid_size = 16.0;
 uniform vec2 hovered = vec2(-1.0);
 uniform vec2 selected = vec2(-1.0);
+uniform float snow = 0.0;
+uniform float wet = 0.0;
 
 varying vec2 grid;
 
@@ -21,6 +23,8 @@ void fragment() {
 	float line = 1.0 - clamp(min(edge.x, edge.y) - 0.5, 0.0, 1.0);
 
 	vec3 grass = mix(vec3(0.33, 0.45, 0.2), vec3(0.4, 0.52, 0.24), hash(cell));
+	grass *= 1.0 - 0.3 * wet;
+	grass = mix(grass, vec3(0.74, 0.78, 0.83), snow * (0.75 + 0.25 * hash(cell + 7.0)));
 	if (cell == hovered) grass = mix(grass, vec3(0.9, 0.85, 0.55), 0.35);
 	if (cell == selected) grass = mix(grass, vec3(0.85, 0.65, 0.2), 0.6);
 

@@ -6,6 +6,10 @@ Hover or click a square to highlight or select it. Move with WASD/arrows, rotate
 with Q/E or right-drag, zoom with the mouse wheel or trackpad pinch/scroll. Time runs at one day every
 2 seconds (a year is 4 seasons × 3 months × 4 weeks × 7 days); Space pauses and
 1/2/3 pick 1×/2×/4× speed. In debug builds, F3 opens a panel to set the day length.
+Each day rolls seeded weather (Clear, Cloudy, Rain, Storm, Snow) and a temperature
+tuned to modern Moldovan (Chișinău) climate normals, with multi-day warm, cold,
+wet and dry spells. Rain and snow fall as particles, storms flash lightning, and
+fog, sky, sunlight, wet ground and lying snow blend in as the weather turns.
 Current version: **0.1.0**. No gameplay or saves yet.
 
 The menu loops **Drumul Dracului – (Moldavian Medieval Song)** from the
