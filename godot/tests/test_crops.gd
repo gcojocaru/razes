@@ -86,7 +86,7 @@ func key(code: Key, shift := false) -> void:
 	event.physical_keycode = code
 	event.pressed = true
 	event.shift_pressed = shift
-	current_scene._unhandled_input(event)
+	root.push_input(event, true)
 
 func texts(node: Node) -> Array:
 	return node.find_children("*", "Label", true, false).map(func(label: Label) -> String: return label.text)
@@ -220,15 +220,13 @@ func run() -> void:
 	var seeded: int = mini(6, Farm.STARTING_STOCK.Barley / barley.seed)
 	check(hud.buttons.Sow.text == "Sow Barley %d  %+d grain" % [seeded, -barley.seed * seeded] and hud.buttons.Plow.text == "Plow 1", "Mixed selections offer each action with its crop, count and grain")
 	check(seeded == 6 or "Seed for %d of 6" % seeded in hud._detail_label.text, "The panel says when seed runs short")
-	check(hud.crop_button.visible and "Barley" in hud.buttons.Sow.tooltip_text, "The Sow button explains its crop, beside a crop menu button")
+	check(hud.action_button.visible and "Barley" in hud.buttons.Sow.tooltip_text, "The Sow button explains its crop, beside an actions button")
 	key(KEY_C)
-	var menu: PopupMenu = hud.crop_menu
-	var oats: int = Farm.CROPS.keys().find("Oats")
-	var winter_wheat: int = Farm.CROPS.keys().find("Wheat")
-	check(menu.visible and menu.is_item_checked(0) and not menu.is_item_disabled(oats) and menu.is_item_disabled(winter_wheat), "C opens the crop menu: current crop checked, out-of-season crops disabled")
+	var menu = hud.action_wheel
+	check(menu.visible and menu.entries.map(func(e: Dictionary): return e.action) == ["Plow", "Sow", "Sow"], "C opens a wheel with Plow and the two available crops")
 	var oats_sown: int = mini(6, Farm.STARTING_STOCK.Oats / Farm.CROPS.Oats.seed)
-	check(menu.get_item_text(oats) == "Oats (%d)  ·  sow %d, %+d grain" % [Farm.STARTING_STOCK.Oats, oats_sown, -Farm.CROPS.Oats.seed * oats_sown] and menu.get_item_text(winter_wheat) == "Wheat (%d)  ·  Autumn months 1–2" % Farm.STARTING_STOCK.Wheat, "Menu items show the store and what they would sow, or when the crop is sown")
-	menu.set_focused_item(oats)
+	check(menu.entries[2].crop == "Oats" and menu.entries[2].plots == oats_sown and menu.entries[2].grain == -Farm.CROPS.Oats.seed * oats_sown, "The oats segment shows what it would sow and cost")
+	key(KEY_RIGHT)
 	for pressed in [true, false]:
 		var enter := InputEventKey.new()
 		enter.keycode = KEY_ENTER
@@ -250,8 +248,26 @@ func run() -> void:
 	await right_click(start_screen, start_screen + Vector2(2, 0), [start_screen + Vector2(80, 0), start_screen + Vector2(2, 0)])
 	check(not menu.visible and game.selected.keys() == [extra], "A right-drag that comes back to where it began does not open the menu")
 	await right_click(start_screen, start_screen)
-	check(menu.visible and game.selected.keys() == [start], "Right-clicking a plot selects it and opens the crop menu")
+	check(menu.visible and game.selected.keys() == [start], "Right-clicking a plot selects it and opens the action wheel")
+	check(menu.entries.is_empty() and "ripe" in menu.hub_detail.text.to_lower(), "Right-clicking a growing crop shows status, not sowing options")
 	menu.hide()
+	game.selected = {start: true, extra: true}
+	game._show_farm()
+	await right_click(start_screen, start_screen)
+	check(menu.visible and game.selected.size() == 2 and menu.entries[0].action == "Plow", "Right-clicking an existing group keeps it and offers its available work")
+	var outside := Vector2(15, root.get_visible_rect().size.y / 2)
+	await click(outside, true)
+	var outside_drag := InputEventMouseMotion.new()
+	outside_drag.position = start_screen
+	outside_drag.button_mask = MOUSE_BUTTON_MASK_LEFT
+	root.push_input(outside_drag, true)
+	await click(start_screen, false)
+	check(not menu.visible and game.selected == {start: true, extra: true}, "Outside dismissal and dragging do not leak through to the selection")
+	await right_click(start_screen, start_screen)
+	var segment: Vector2 = menu._origin + Vector2(0, -132)
+	await click(segment, true)
+	await click(segment, false)
+	check(not menu.visible and game.farm.stage(extra) == "Plowed" and game.farm.stage(start) == "Sown", "Clicking Plow works only the eligible plots and dismisses the wheel")
 	game._place_camera(game.cell_center(Vector2i(12, 3)))
 	key(KEY_ENTER)
 	check(game.selected.keys() == [Vector2i(12, 3)], "Enter selects the plot at the centre of the view")
@@ -287,6 +303,12 @@ func run() -> void:
 	var stored := texts(inventory.body)
 	check(inventory.visible and str(game.farm.stock.Oats) in stored and "%d plots" % (game.farm.stock.Barley / barley.seed) in stored, "I shows each crop's store and the plots it can sow")
 	check("−%d sown" % (Farm.CROPS.Oats.seed * oats_sown) in stored and "—" in stored and str(game.farm.stored()) in stored, "The inventory shows this year's sowing, a dash for none, and the total")
+	var inventory_close: Button = inventory.find_children("*", "Button", true, false)[0]
+	var close_at := inventory_close.get_global_rect().get_center()
+	menu.open_at(close_at + Vector2(132, 0))
+	await press(inventory_close)
+	check(inventory.visible and not menu.visible, "The action wheel consumes clicks over an underlying inventory control")
+	inventory.hide()
 
 	var Wiki := preload("res://wiki.gd")
 	var bb: String = Wiki.to_bbcode("<head><title>Hidden</title></head><h2>Crops</h2>\n<p>Sow <b>barley</b> [early]&amp;<kbd>F</kbd></p><ul>\n<li>one</li> <li>two</li></ul><table><tr><th>A</th><th>B</th></tr><tr><td>1</td><td><i>2</i></td></tr></table>")
@@ -305,7 +327,7 @@ func run() -> void:
 	game.skip_days(1)
 	check(game.day == SUMMER + 1 and game.farm.growth(start) > 0.0, "Skipping a day grows sown crops")
 	if failures.is_empty():
-		print("PASS: five crops with own months, warmth, rain, frost and winter needs; plow, sow, harvest, stubble, plowed land kept, regrowing grass, soil wear and rest, year records, previews; 50-seed ripening per crop and 9-year rotation; selection, F/C/Enter keys, crop picker, ledger tabs, inventory, wiki page and window, agriculture debug and field texture")
+		print("PASS: five crops with own months, warmth, rain, frost and winter needs; plow, sow, harvest, stubble, plowed land kept, regrowing grass, soil wear and rest, year records, previews; 50-seed ripening per crop and 9-year rotation; selection, F/C/Enter keys, action wheel, ledger tabs, inventory, wiki page and window, agriculture debug and field texture")
 	current_scene.free()
 	# Let the audio server release stopped playback before the test process exits.
 	await create_timer(0.2).timeout

@@ -188,3 +188,34 @@ text beyond the crop table drifting from the rules.
 
 Not checked: subjective headphone/speaker balance, assistive-technology behavior,
 long-session listening fatigue, or an exported build.
+
+## Contextual action wheel — 2026-10-24
+
+- Replaced the crop popup with the selected segmented wheel design. Right-click,
+  C and Actions show eligible Plow, individual Sow crops, and Harvest segments
+  with distinct illustrated SVG icons, plot counts and grain changes. Status-only land
+  explains its limits in the hub; long mixed reasons have a full-text tooltip.
+- `tests/test_wheel.gd` passes: grass/stubble/withered, plowed, growing, ripe,
+  mixed, spring/autumn/winter, exhausted seed, activation-time revalidation,
+  live refresh, keyboard activation/Escape, outside dismissal, first-opening
+  layout, long reasons, and viewport-edge/hint fit.
+- `tests/test_crops.gd` and `tests/test_menu.gd` pass. Crop integration now uses
+  routed input and checks both keyboard sowing and mouse plowing, preserving
+  right-drag rotation and mixed selection, blocking outside drag selection and
+  underlying inventory-button clicks while the wheel is open.
+- GPU captures from `tests/capture_wheel.gd` checked on Apple M4/OpenGL:
+  grass, plowed, growing, ripe, mixed, autumn wheat/rye, millet, winter status,
+  and bottom-right placement at the 1000×700 minimum window. The checks caught
+  and corrected first-opening label expansion and an overlapping edge hint.
+- A separate code review caught GUI sibling input ordering; the wheel now sits
+  after every HUD window and the inventory regression passes.
+- Headless runs report a macOS system-CA lookup diagnostic and renderer shader
+  allocations at exit; rendered captures also report particle shader cleanup
+  diagnostics at shutdown. No script errors or failed assertions remain.
+- Physical VoiceOver, other GPUs/platforms and long play sessions are unverified.
+- Icon refinement: seven original 64×64 SVG assets replace procedural line
+  symbols. Wheel and crop tests pass, including texture import/dimension checks;
+  rendered mixed, autumn, millet and minimum-window icons were visually checked.
+- Rebased onto the merged weather-audio update on main; wheel, crop, menu and
+  audio tests all pass. The sandbox blocks default sound-preference writes;
+  the audio suite's explicit temporary-file round-trip passes.

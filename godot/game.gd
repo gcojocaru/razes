@@ -144,6 +144,8 @@ func _ready() -> void:
 		hud.add_child(_debug_panel)
 		_agri_debug = preload("res://agri_debug.gd").new(self)
 		hud.add_child(_agri_debug)
+	# GUI input follows sibling order, so the modal wheel must follow every HUD window.
+	hud.add_child(_farm_hud.action_wheel)
 	_start_day()
 
 func _show_date() -> void:
@@ -181,15 +183,16 @@ func choose_crop(crop: String) -> void:
 	farm.work(selected.keys(), day, "Sow", crop)
 	_show_farm()
 
-## Right-click: offers crops for the plot under the pointer, selecting it unless
+## Right-click: offers actions for the land under the pointer, selecting it unless
 ## it is already part of the selection.
-func _open_crop_menu(position: Vector2) -> void:
+func _open_action_menu(position: Vector2) -> void:
 	var cell := cell_at_screen(position)
 	if cell == Vector2i(-1, -1):
 		return
 	if not selected.has(cell):
 		_start_selection(cell, false)
-	_farm_hud.open_crop_menu(position)
+	_drag_from = Vector2i(-1, -1)
+	_farm_hud.open_action_menu(position)
 
 ## Debug: runs `days` whole days at once.
 func skip_days(days: int) -> void:
@@ -304,7 +307,7 @@ func _process(delta: float) -> void:
 		_stalks.set_shader_parameter("wind", _weather_audio.wind_direction * _weather_audio.wind_strength)
 	if speed > 0:
 		advance_time(delta * speed)
-	if _sound_control.panel.visible:
+	if _sound_control.panel.visible or _farm_hud.action_wheel.visible:
 		return
 	var input := Input.get_vector("ui_left", "ui_right", "ui_up", "ui_down")
 	for key in [[KEY_A, Vector2.LEFT], [KEY_D, Vector2.RIGHT], [KEY_W, Vector2.UP], [KEY_S, Vector2.DOWN]]:
@@ -328,7 +331,7 @@ func rotate_camera(radians: float) -> void:
 	_place_camera(focus)
 
 func _unhandled_input(event: InputEvent) -> void:
-	if _sound_control.panel.visible and event is InputEventKey:
+	if _farm_hud.action_wheel.visible or (_sound_control.panel.visible and event is InputEventKey):
 		return
 	if event is InputEventMouseMotion and event.button_mask & MOUSE_BUTTON_MASK_RIGHT:
 		rotate_camera(-event.relative.x * DRAG_ROTATE_SPEED)
@@ -344,7 +347,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			# Keyboard alternative to clicking: WASD moves the view, Enter selects its centre plot.
 			KEY_ENTER, KEY_KP_ENTER: _start_selection(cell_at_world(_focus()), event.shift_pressed)
 			KEY_F: work()
-			KEY_C: _farm_hud.open_crop_menu()
+			KEY_C: _farm_hud.open_action_menu()
 			KEY_L: toggle(_ledger)
 			KEY_I: toggle(_inventory)
 			KEY_F1: toggle(_wiki)
@@ -371,7 +374,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif event is InputEventMouseButton and not event.pressed and event.button_index == MOUSE_BUTTON_RIGHT:
 		# A right click, not the end of a camera-rotating drag.
 		if event.position.distance_to(_right_from) < 6.0:
-			_open_crop_menu(event.position)
+			_open_action_menu(event.position)
 	elif event is InputEventMouseButton and event.pressed:
 		# Clicking the world gives keys back to the game, e.g. after typing in the debug panel.
 		get_viewport().gui_release_focus()

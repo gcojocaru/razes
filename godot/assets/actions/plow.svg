@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+  <defs><linearGradient id="gold" x2="0.7" y2="1"><stop stop-color="#ffe6a6"/><stop offset="1" stop-color="#b88a3e"/></linearGradient></defs>
+  <!-- Wooden beam, upright handles and a broad iron share. -->
+  <path d="M9 23 47 31 45 36 8 28Z" fill="url(#gold)" stroke="#80602e" stroke-width="1"/>
+  <path d="m35 33 7-22 10-3 2 3-8 4-5 20M40 34l10-15 9-1" fill="none" stroke="#e4c17a" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="m30 33-5 13 10 7 19-12-13-1-4-6Z" fill="url(#gold)" stroke="#f3d695" stroke-width="1.2" stroke-linejoin="round"/>
+  <path d="m28 45 11-3 12-1M36 36l-3 10 3 4" fill="none" stroke="#89632e" stroke-width="1.4"/>
+  <path d="m17 29 1 12 16-7" fill="none" stroke="#f0d08b" stroke-width="3" stroke-linejoin="round"/>
+  <circle cx="17" cy="43" r="10" fill="#28251a" stroke="url(#gold)" stroke-width="3"/>
+  <path d="M17 34v18M8 43h18m-15-6 12 12m0-12L11 49" stroke="#c6a15b" stroke-width="1.3"/>
+  <circle cx="17" cy="43" r="2.6" fill="#ffe1a0"/>
+  <path d="M6 57h39" stroke="#a9874d" stroke-width="1.3" stroke-linecap="round"/>
+</svg>
