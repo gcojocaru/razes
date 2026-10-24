@@ -14,11 +14,11 @@ fog, sky, sunlight, wet ground and lying snow blend in as the weather turns.
 Farming is the first gameplay loop. Click a plot or drag over a rectangle of
 plots; hold **Shift** to add to the selection. Without a mouse, move the view
 and press **Enter** to select the plot at its centre (**Shift+Enter** adds). The
-farm panel shows a button for each action the selection allows, with its plot
-count and the kilograms of grain it costs or brings; **F** does all of them. Plow grass, stubble or
+farm panel shows illustrated icons for each action the selection allows; hover
+for plot counts and the kilograms of grain it costs or brings; **F** does all of them. Plow grass, stubble or
 dead crops (not in winter), sow plowed land, and harvest ripe crops. Sowing uses
-the crop named on the Sow button, whose tooltip lists that crop's needs.
-Right-click a plot, press **Actions**, or press **C** to open a segmented action
+the crop pictured on the sowing icon, whose tooltip names it and lists its needs.
+Right-click a plot, click the **Actions** wheel icon, or press **C** to open a segmented action
 wheel. Right-clicking a plot selects it unless it is already in the selection.
 The wheel offers **Plow** on grass, stubble and dead crops; individual crop
 icons on plowed land; and **Harvest** on ripe crops. It shows only actions that
@@ -26,7 +26,7 @@ can be done now, with plot counts and seed costs or harvest yields in kg. Growin
 crops, frozen ground and seed shortages show an explanation instead. Mixed
 selections offer work for each eligible part of the selection.
 Click a segment, or use arrows/Tab and **Enter**. Choosing a crop sows it and
-remembers it for the Sow button and F. **Escape** or an outside click dismisses
+remembers it for the sowing icon and F. **Escape** or an outside click dismisses
 the wheel; a right-drag still rotates the view. Time continues while it is open,
 and availability refreshes as days change.
 
@@ -45,13 +45,13 @@ its own store: sowing uses that crop's grain as seed and its harvest goes back
 to it. Grain is counted in kilograms: a plot is a tenth of a hectare, sown at
 medieval manor rates of 2–4 bushels an acre (130–215 kg/ha; millet, sown thin,
 30 kg/ha). You start with 100 kg of barley, 80 of oats and rye, 75 of wheat and
-18 of millet, seed for five plots each and six of millet; the farm panel shows
-the total (hover for each crop). Harvests vary with the season: each growing
+18 of millet, seed for five plots each and six of millet; the inventory shows
+the total and each crop. Harvests vary with the season: each growing
 day's rain or sun counts towards the grain, so most years give 70–110% of the
 table's full harvest and a wet year up to a third more, oats fall to half in a
 dry year and millet barely changes (50 weather seeds). On average that returns
 three to five times the seed (490–690 kg/ha), as in medieval manor accounts and
-18th-century Russian black-earth records, and millet about thirteen times. Select a growing plot to see the kilograms it is on course
+18th-century Russian black-earth records, and millet about thirteen times. Select a growing plot and hover its status to see the kilograms it is on course
 for. **I** or the Inventory button shows the store as an inventory grid of
 grain bags: a bag holds about 70 litres, so 55 kg of wheat but 32 kg of oats.
 Each is an open burlap sack rendered once as a small lit 3D scene

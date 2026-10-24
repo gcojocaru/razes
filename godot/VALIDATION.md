@@ -282,3 +282,16 @@ Not checked: tooltips and hover highlight on screen (hover was only sent in the
 capture), very large stores (the grid scrolls past about six rows), slower GPUs
 (each new bag look renders a 3D scene of about 15,000 triangles once), and
 storage limits: bags are a display, so the store holds any amount.
+
+
+## Bottom panel icons — 25 October 2026
+
+- Removed the grain total from the bottom panel and moved action counts, seed
+  costs and harvest weights to tooltips. The sowing icon follows the remembered
+  crop; seed shortages keep a visible explanation and exact cost on hover.
+- Reused the farming SVGs and added matching gold wheel, ledger, sack and open
+  book icons. Buttons retain shortcut tooltips and explicit accessible names.
+- Crop, menu, wheel and audio headless checks pass. GPU captures at 1280×800
+  and 1000×700 cover empty selection, all actions together and seed shortage;
+  the panel fits both sizes. Godot still reports shader/resource cleanup
+  warnings at process exit. VoiceOver has not been checked.
