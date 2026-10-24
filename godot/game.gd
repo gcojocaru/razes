@@ -20,20 +20,13 @@ var _day_time := 0.0
 var _time_hud: PanelContainer
 var _debug_panel: PanelContainer
 
-## Sky colour and sunlight strength per weather condition.
-const SKIES := {
-	"Clear": [Color(0.55, 0.68, 0.78), 1.0],
-	"Cloudy": [Color(0.6, 0.64, 0.68), 0.6],
-	"Rain": [Color(0.45, 0.5, 0.55), 0.4],
-	"Storm": [Color(0.3, 0.33, 0.38), 0.25],
-	"Snow": [Color(0.78, 0.8, 0.84), 0.5],
-}
 var weather := Weather.new(randi())
 var today := {}
 ## 0–1 snow lying on the field: snow days cover it, warm days melt it.
 var snow_cover := 0.0
 var _sun: DirectionalLight3D
 var _environment: Environment
+var _weather_effects: Node3D
 
 var hovered_cell := Vector2i(-1, -1)
 var selected_cell := Vector2i(-1, -1)
@@ -67,6 +60,8 @@ func _ready() -> void:
 	ground.mesh = plane
 	ground.material_override = _field
 	add_child(ground)
+	_weather_effects = preload("res://weather_effects.gd").new(_sun, _environment, _field)
+	add_child(_weather_effects)
 
 	_camera = Camera3D.new()
 	_camera.rotation_degrees = Vector3(-55, 45, 0)
@@ -94,9 +89,8 @@ func _start_day() -> void:
 		snow_cover = 1.0
 	elif today.temperature > 2:
 		snow_cover = maxf(snow_cover - 0.02 * today.temperature, 0.0)
-	var sky: Array = SKIES[today.condition]
-	_environment.background_color = sky[0]
-	_sun.light_energy = sky[1]
+	# The first day appears at once; later days blend in.
+	_weather_effects.show_weather(today.condition, _weather_effects.condition == "")
 	_field.set_shader_parameter("snow", snow_cover)
 	_show_date()
 
