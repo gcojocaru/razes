@@ -9,9 +9,11 @@ extends RefCounted
 
 const PLOT_AREA_M2 := 100
 
-## Grams of each crop in store at the start: seed for five plots, six of millet.
-## Sowing a crop uses its own grain as seed.
-const STARTING_STOCK := {"Barley": 10000, "Oats": 8000, "Millet": 1800, "Wheat": 7500, "Rye": 8000}
+## Grams of each crop in store at the start, left from last year's harvest: seed
+## for 25 plots each (30 of millet), and food until the first barley ripens about
+## day 110. Five times less starves a careful player by day 90 in every weather
+## (tests/sim_first_year.gd). Sowing a crop uses its own grain as seed.
+const STARTING_STOCK := {"Barley": 50000, "Oats": 40000, "Millet": 9000, "Wheat": 37500, "Rye": 40000}
 ## sow: months of the year it may be sown (0 is the first month of spring, 11 the
 ## last of winter). base, best: °C where growth starts and where it is fastest.
 ## water: how much rain helps and sun dries it (1 average). ripe: days of full

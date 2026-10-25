@@ -1,6 +1,9 @@
 extends SceneTree
 ## Real scene input, the shared clock, queued farming and the needs panel.
 
+## The old five-plot seed store, which these checks' seed arithmetic was written for.
+const OLD_STOCK := {"Barley": 10000, "Oats": 8000, "Millet": 1800, "Wheat": 7500, "Rye": 8000}
+
 var failures: Array[String] = []
 
 func check(ok: bool, message: String) -> void:
@@ -34,6 +37,7 @@ func run() -> void:
 	await process_frame
 	await process_frame
 	var game = current_scene
+	game.farm.stock = OLD_STOCK.duplicate()
 	var person = game.get("human")
 	check(person != null, "The game starts with one simulated person")
 	if person == null:

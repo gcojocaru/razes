@@ -5,28 +5,29 @@ Godot 4.7.2.stable.official.ed1daf0bf, macOS, Apple M4, Compatibility renderer.
 Run every suite with `./run_tests.sh` (set `GODOT_BIN` if `godot` is not on the path).
 The per-feature notes below record suite counts at their time.
 
-## Rigged peasant model — 25 October 2026
+## Starting store and first-year balance — 25 October 2026
 
-- The block farmer is replaced by `assets/peasant/peasant.glb`, built by
-  `assets/peasant/build_peasant.py` from four CC0 Quaternius packs (see its
-  `SOURCE.md`): the Male Peasant outfit, the base character's head, hair and
-  beard (split into a moustache), and eight clips. Walking, hoeing (a chopping
-  clip with the hoe), sowing, reaping, cooking (kneeling), resting (sitting on
-  the ground), sleeping (lying on the bedroll) and dying play from the clips;
-  paused redraws hold still. Skin, hair, beard and clothes tint the textures.
-- Found while testing: the GLB's armature scale was baked into the skinned
-  vertices and applied again on the node, so the farmer rendered at 1.60 m. The
-  model now imports at its own 1.85 m and the actor shrinks it to the peasant's
-  height. A pose change also threw away that frame's time, so the death fall
-  never started. The menu test hung, not failed, on a script error reading the
-  old single materials.
-- All 12 suites exit 0. The actor test now measures skeleton joints for poses,
-  since skinned meshes keep their rest bounds; standing height still uses the
-  mesh. GPU captures of creation (default and customised) and every farm pose
-  were inspected.
+- New `tests/sim_first_year.gd` plays years headlessly with the real Farm,
+  Human and Weather rules and a scripted player (sow as windows open, harvest
+  when ripe, three meals that refill ready energy, 22:00–06:00 sleep, about 8
+  hours of jobs queued each morning). It is a tool, not a suite.
+- With the old 35.3 kg start, all 30 runs (10 weather seeds; never eating seed,
+  eating the wheat and rye seed, or eating anything spare) died on day 84–90:
+  the first barley ripens about day 110, and the grain plus the farmer's fat
+  cannot last that long. Weather made no difference, since death came first.
+- The store is now five times larger, last year's grain: 50 kg barley, 40 oats
+  and rye, 37.5 wheat, 9 millet (176.5 kg). Over three years at up to 20 plots a
+  crop, 10 of 10 weather seeds survive; sowing everything also survives year
+  one in all 10. Three and four times failed some seeds over three years.
+- Also found: jobs run 06:00–22:00, but the gut absorbs about 3,900 kcal a day,
+  roughly 10 hours of hoeing, so a fully queued farmer wastes away beside a full
+  store. Only Sleep stops a working day early.
+- Tests that check seed arithmetic now set the old amounts as their own fixture;
+  the bag and stock checks follow `Farm.STARTING_STOCK`.
 
-Not checked: two-handed hoeing (the clip swings one-handed), hair and face
-normal maps (missing from the download), or a female body.
+Not checked: real play, hills and ponds in the sim (it uses a flat field), a
+player who eats extra to regain weight (sim survivors end at BMI 16–17), or
+balance past year three.
 
 ## Land presets — 25 October 2026
 
