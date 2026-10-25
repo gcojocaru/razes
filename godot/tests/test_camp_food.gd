@@ -28,7 +28,11 @@ func click(at: Vector2, button := MOUSE_BUTTON_LEFT) -> void:
 		await process_frame
 
 func run() -> void:
-	change_scene_to_file("res://game.tscn")
+	var field_scene = load("res://game.tscn").instantiate()
+	field_scene.terrain_seed = 40
+	root.add_child(field_scene)
+	field_scene.set_speed(0)
+	current_scene = field_scene
 	await process_frame
 	await process_frame
 	var game = current_scene
@@ -36,7 +40,7 @@ func run() -> void:
 	game._focus_person()
 	var selected := Vector2i(0, 8)
 	game._start_selection(selected, false)
-	var camp: Vector3 = Vector3(game.human.home.x, 0, game.human.home.y) * game.METRES_TO_UNITS
+	var camp: Vector3 = game._surface_point(game.human.home * game.METRES_TO_UNITS)
 	var stock: Dictionary = game.farm.stock.duplicate()
 	await click(game._camera.unproject_position(camp))
 	check(game.get("_camp_menu") != null, "Clicking camp opens a camp context menu")

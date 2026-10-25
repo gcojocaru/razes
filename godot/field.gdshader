@@ -1,6 +1,7 @@
 shader_type spatial;
 
 uniform float grid_size = 16.0;
+uniform float cell_size = 2.0;
 uniform vec2 hovered = vec2(-1.0);
 uniform float snow = 0.0;
 uniform float wet = 0.0;
@@ -14,10 +15,13 @@ uniform sampler2D furrow_color : source_color, filter_linear_mipmap_anisotropic,
 uniform sampler2D furrow_normal : hint_normal, filter_linear_mipmap_anisotropic, repeat_enable;
 
 varying vec2 grid;
+varying float height;
+varying float slope;
 
 void vertex() {
-	// One plot-width of ungridded grass surrounds the selectable field and camp.
-	grid = UV * (grid_size + 2.0) - vec2(1.0);
+	grid = VERTEX.xz / cell_size + vec2(grid_size * 0.5);
+	height = VERTEX.y;
+	slope = 1.0 - NORMAL.y;
 }
 
 float hash(vec2 p) {
@@ -40,8 +44,14 @@ void fragment() {
 
 	// Two scales of the grass texture hide its repeat.
 	vec3 color = mix(texture(grass_color, grid * 0.5).rgb, texture(grass_color, grid * 0.13 + 0.37).rgb, 0.35);
-	color *= 0.9 + 0.2 * hash(cell);
+	color *= inside ? 0.9 + 0.2 * hash(cell) : 0.94 + 0.12 * noise(grid * 0.4);
 	vec3 normal = texture(grass_normal, grid * 0.5).rgb;
+	// The basin's low banks expose sand; steep hills expose stone.
+	float bank = 1.0 - smoothstep(-0.25, 0.0, height);
+	float rock = smoothstep(0.20, 0.42, slope) * 0.6;
+	color = mix(color, vec3(0.44, 0.38, 0.25) * (0.85 + 0.25 * noise(grid * 4.0)), bank);
+	color = mix(color, vec3(0.34, 0.33, 0.29) * (0.8 + 0.35 * noise(grid * 2.0)), rock);
+	normal = mix(normal, vec3(0.5, 0.5, 1.0), max(bank, rock) * 0.7);
 	vec4 crop = inside ? texelFetch(crops, ivec2(cell), 0) : vec4(0.0);
 	int stage = int(round(crop.r * 255.0)) % 8;
 	float roughness = 1.0;
@@ -65,7 +75,8 @@ void fragment() {
 		normal = mix(soil_normal, normal, weeds);
 		roughness = mix(1.0, 0.15, puddle * (1.0 - weeds));
 	}
-	color = mix(color, vec3(0.86, 0.89, 0.93), snow * (0.75 + 0.25 * hash(cell + 7.0)));
+	float cover = inside ? hash(cell + 7.0) : noise(grid * 0.6 + 7.0);
+	color = mix(color, vec3(0.86, 0.89, 0.93), snow * (0.75 + 0.25 * cover));
 	if (inside && cell == hovered) color = mix(color, vec3(0.95, 0.88, 0.55), 0.3);
 	if (crop.b > 0.5) color = mix(color, vec3(0.95, 0.7, 0.25), 0.45);
 

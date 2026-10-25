@@ -229,7 +229,12 @@ func run() -> void:
 	# Per sown year, over the six years after the first cycle (four sown), against the first two.
 	check(sum.call(rested.slice(3)) / 4.0 > sum.call(rested.slice(0, 3)) / 2.0 * 0.8, "Resting one year in three keeps barley's yield, give or take the weather")
 
-	change_scene_to_file("res://game.tscn")
+	var field_scene = load("res://game.tscn").instantiate()
+	# These farming fixtures use dry plots on a repeatable hilly map.
+	field_scene.terrain_seed = 67
+	root.add_child(field_scene)
+	field_scene.set_speed(0)
+	current_scene = field_scene
 	await process_frame
 	await process_frame
 	var game: Node3D = current_scene

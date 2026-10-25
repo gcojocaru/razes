@@ -90,6 +90,8 @@ func apply_to_selected() -> void:
 	if stage_name in ["Sown", "Ripe"] and crop_name == "":
 		crop_name = Farm.CROPS.keys()[0]
 	for cell in game.selected:
+		if game.farm.terrain != null and game.farm.terrain.cell_reason(cell) != "":
+			continue
 		# Winter counts as lived through, so a winter crop set mid-growth keeps ripening.
 		game.farm.plots[cell] = {"stage": stage_name, "crop": crop_name, "growth": 1.0 if stage_name == "Ripe" else growth.value, "fertility": fertility.value, "wintered": true, "moisture": 0.0, "days": 0}
 	game._show_farm()

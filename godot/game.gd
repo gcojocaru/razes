@@ -3,6 +3,7 @@ extends Node3D
 
 const GRID_SIZE := 16
 const CELL_SIZE := 2.0
+const Terrain := preload("res://terrain.gd")
 const TimeHud := preload("res://time_hud.gd")
 const METRES_TO_UNITS := CELL_SIZE / 10.0
 const PAN_SPEED := 18.0
@@ -71,11 +72,18 @@ var _crops := Image.create_empty(GRID_SIZE, GRID_SIZE, false, Image.FORMAT_RGBA8
 var _crop_texture := ImageTexture.create_from_image(_crops)
 
 var _camera: Camera3D
+var _camera_focus := Vector3.ZERO
 var _field: ShaderMaterial
 var _stalks: ShaderMaterial
-var _zoom := 24.0
+var _water: ShaderMaterial
+var terrain_seed := randi()
+var terrain: RefCounted
+var _zoom := 36.0
 
 func _ready() -> void:
+	terrain = Terrain.new(terrain_seed, Terrain.land)
+	farm.terrain = terrain
+	human.terrain = terrain
 	_sun = DirectionalLight3D.new()
 	_sun.shadow_enabled = true
 	add_child(_sun)
@@ -89,6 +97,7 @@ func _ready() -> void:
 
 	_field = ShaderMaterial.new()
 	_field.shader = preload("res://field.gdshader")
+	_field.set_shader_parameter("cell_size", CELL_SIZE)
 	_field.set_shader_parameter("grass_color", preload("res://assets/textures/grass_color.jpg"))
 	_field.set_shader_parameter("grass_normal", preload("res://assets/textures/grass_normal.jpg"))
 	_field.set_shader_parameter("furrow_color", preload("res://assets/textures/furrows_color.jpg"))
@@ -96,6 +105,9 @@ func _ready() -> void:
 	_stalks = ShaderMaterial.new()
 	_stalks.shader = preload("res://crops.gdshader")
 	_stalks.set_shader_parameter("cell_size", CELL_SIZE)
+	_water = ShaderMaterial.new()
+	_water.shader = preload("res://water.gdshader")
+	_water.set_shader_parameter("cell_size", CELL_SIZE)
 	# Entry 0 is for plots without a crop.
 	var tall := PackedFloat32Array([0.8])
 	var ripe := PackedVector3Array([Vector3(0.88, 0.69, 0.3)])
@@ -105,17 +117,23 @@ func _ready() -> void:
 	_stalks.set_shader_parameter("tall", tall)
 	_stalks.set_shader_parameter("ripe", ripe)
 	_stalks.set_shader_parameter("metres_to_units", METRES_TO_UNITS)
-	for material in [_field, _stalks]:
+	for material in [_field, _stalks, _water]:
 		material.set_shader_parameter("grid_size", float(GRID_SIZE))
 		material.set_shader_parameter("crops", _crop_texture)
-	var plane := PlaneMesh.new()
-	# A ten-metre grass margin grounds the camp beside the selectable field.
-	plane.size = Vector2.ONE * (GRID_SIZE + 2) * CELL_SIZE
 	var ground := MeshInstance3D.new()
 	ground.name = "Field"
-	ground.mesh = plane
+	ground.mesh = terrain.create_mesh()
 	ground.material_override = _field
 	add_child(ground)
+	var water := MeshInstance3D.new()
+	water.name = "Water"
+	var surface := PlaneMesh.new()
+	surface.size = Vector2.ONE * Terrain.HALF_EXTENT * 2.0
+	water.mesh = surface
+	water.position.y = Terrain.WATER_LEVEL
+	water.material_override = _water
+	water.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(water)
 	add_child(_crop_stalks())
 	_human_actor = preload("res://human_actor.gd").new(METRES_TO_UNITS)
 	_human_actor.name = "HumanActor"
@@ -124,7 +142,7 @@ func _ready() -> void:
 		_human_actor.dress(Human.peasant)
 	add_child(_human_actor)
 	var camp: Node3D = _human_actor.create_camp()
-	camp.position = Vector3(human.home.x, 0, human.home.y) * METRES_TO_UNITS
+	camp.position = _surface_point(human.home * METRES_TO_UNITS)
 	add_child(camp)
 	_weather_effects = preload("res://weather_effects.gd").new(_sun, _environment, _field, camp.get_node("Firelight"))
 	add_child(_weather_effects)
@@ -250,6 +268,7 @@ func _show_date() -> void:
 
 func _show_person(seconds := 0.0) -> void:
 	_human_actor.show_person(human, seconds)
+	_human_actor.position.y = terrain.height_at(human.position * METRES_TO_UNITS)
 	_human_hud.show_person(human)
 	_human_hud.visible = not _inventory.visible and not _wiki.visible and not _food_window.visible and not _sleep_window.visible and not _body.visible
 	if _body.visible:
@@ -261,7 +280,7 @@ func _show_person(seconds := 0.0) -> void:
 
 func _focus_person() -> void:
 	_zoom = minf(_zoom, 8.0)
-	_place_camera(Vector3(human.position.x, 0, human.position.y) * METRES_TO_UNITS)
+	_place_camera(_human_actor.position)
 
 func _open_camp_menu(at := Vector2(-1, -1)) -> void:
 	if human.activity == "Dead":
@@ -270,7 +289,7 @@ func _open_camp_menu(at := Vector2(-1, -1)) -> void:
 	_drag_from = Vector2i(-1, -1)
 	_camp_press = Vector2.INF
 	if at == Vector2(-1, -1):
-		var camp := Vector3(human.home.x, 0, human.home.y) * METRES_TO_UNITS
+		var camp := _surface_point(human.home * METRES_TO_UNITS)
 		_zoom = minf(_zoom, 8.0)
 		_place_camera(camp)
 		at = _camera.unproject_position(camp)
@@ -428,7 +447,9 @@ func _crop_stalks() -> MultiMeshInstance3D:
 					# Keep clear of the plot edges, where the furrow texture has a dark border.
 					var along := 0.06 + 0.88 * (stalk + randf()) / STALKS_PER_FURROW
 					var across := (row + 0.5 + randf_range(-0.1, 0.1)) / FURROWS
-					multimesh.set_instance_transform(i, Transform3D(Basis(Vector3.UP, randf() * TAU), corner + Vector3(along, 0, across) * CELL_SIZE))
+					var root := corner + Vector3(along, 0, across) * CELL_SIZE
+					root.y = terrain.height_at(Vector2(root.x, root.z))
+					multimesh.set_instance_transform(i, Transform3D(Basis(Vector3.UP, randf() * TAU), root))
 					i += 1
 	var stalks := MultiMeshInstance3D.new()
 	stalks.name = "Crops"
@@ -580,7 +601,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		zoom_by(event.delta.y * ZOOM_STEP * 0.5)
 	if event is InputEventMouseMotion:
 		hovered_cell = cell_at_screen(event.position)
-		for material in [_field, _stalks]:
+		for material in [_field, _stalks, _water]:
 			material.set_shader_parameter("hovered", Vector2(hovered_cell))
 		if event.button_mask & MOUSE_BUTTON_MASK_LEFT and _drag_from != Vector2i(-1, -1) and hovered_cell not in [Vector2i(-1, -1), _drag_to]:
 			_select_to(hovered_cell)
@@ -617,12 +638,12 @@ func zoom_by(amount: float) -> void:
 
 ## Grid cell under a screen point, or (-1, -1) when off the field.
 func cell_at_screen(screen_position: Vector2) -> Vector2i:
-	var hit = Plane.PLANE_XZ.intersects_ray(_camera.project_ray_origin(screen_position), _camera.project_ray_normal(screen_position))
+	var hit = terrain.ray_hit(_camera.project_ray_origin(screen_position), _camera.project_ray_normal(screen_position))
 	return cell_at_world(hit) if hit != null else Vector2i(-1, -1)
 
 func _camp_at(screen_position: Vector2) -> bool:
-	var hit = Plane.PLANE_XZ.intersects_ray(_camera.project_ray_origin(screen_position), _camera.project_ray_normal(screen_position))
-	var camp := Vector3(human.home.x, 0, human.home.y) * METRES_TO_UNITS
+	var hit = terrain.ray_hit(_camera.project_ray_origin(screen_position), _camera.project_ray_normal(screen_position))
+	var camp := _surface_point(human.home * METRES_TO_UNITS)
 	# The 2.2 m clearing has 0.3 m of picking padding.
 	return hit != null and hit.distance_to(camp) <= 2.5 * METRES_TO_UNITS
 
@@ -632,11 +653,19 @@ func cell_at_world(point: Vector3) -> Vector2i:
 
 ## World-space centre of a cell, where a future building would stand.
 func cell_center(cell: Vector2i) -> Vector3:
-	return Vector3((cell.x - GRID_SIZE / 2.0 + 0.5) * CELL_SIZE, 0, (cell.y - GRID_SIZE / 2.0 + 0.5) * CELL_SIZE)
+	return _surface_point(Vector2(cell.x - GRID_SIZE / 2.0 + 0.5, cell.y - GRID_SIZE / 2.0 + 0.5) * CELL_SIZE)
+
+func _surface_point(point: Vector2) -> Vector3:
+	return Vector3(point.x, maxf(terrain.height_at(point), Terrain.WATER_LEVEL), point.y)
 
 func _focus() -> Vector3:
-	var hit = Plane.PLANE_XZ.intersects_ray(_camera.position, -_camera.global_basis.z)
-	return hit if hit != null else Vector3.ZERO
+	return _camera_focus
 
 func _place_camera(focus: Vector3) -> void:
-	_camera.position = focus + _camera.global_basis.z * _zoom
+	_camera_focus = _surface_point(Vector2(focus.x, focus.z))
+	var distance := _zoom
+	_camera.position = _camera_focus + _camera.global_basis.z * distance
+	# Back away from a hillside while retaining the selected focus and pitch.
+	while _camera.position.y < terrain.height_at(Vector2(_camera.position.x, _camera.position.z)) + 0.35:
+		distance += 0.5
+		_camera.position = _camera_focus + _camera.global_basis.z * distance

@@ -1,11 +1,20 @@
 extends "res://hud_window.gd"
 ## Peasant creation, opened by Play over the menu: a name, the body the needs
 ## simulation runs on (height, weight and body fat) with what it means for food and
-## work, and looks, beside a turning preview. Begin starts the game as this peasant.
+## work, and looks, beside a turning preview; then the land, a preset or Custom
+## hills and ponds. Begin starts the game as this peasant on that land.
 
 const HumanActor := preload("res://human_actor.gd")
+const Terrain := preload("res://terrain.gd")
 ## Weight is kept between full health (BMI 18.5) and obese (30) at the chosen height.
 const BMIS := Vector2(18.5, 30.0)
+## Each land's tooltip; the presets' hills and ponds are Terrain.PRESETS.
+const LANDS := {
+	"Steppe": "Low, open land with one pond: the most farmland",
+	"Hills": "Rolling hills with two ponds; some slopes are too steep to farm",
+	"Lakeland": "Gentle hills between four ponds; the farmer walks around the water",
+	"Custom": "Choose how high the hills rise and how many ponds lie in the field",
+}
 
 var name_edit := LineEdit.new()
 var begin := Button.new()
@@ -15,6 +24,11 @@ var sliders := {}
 var looks := {}
 ## What Begin starts the game with; Human.create() and HumanActor.dress() read it.
 var peasant := {}
+## Each of LANDS -> its button.
+var lands := {}
+## The land Begin starts the game on: {"hills": metres, "ponds"}.
+var land := {}
+var _land_group := ButtonGroup.new()
 var _values := {}
 var _info := _label("")
 var _person := Human.new()
@@ -65,6 +79,26 @@ func _init() -> void:
 	_choices(grid, "hair", HumanActor.HAIRS)
 	_choices(grid, "beard", HumanActor.BEARDS)
 	_choices(grid, "clothes", HumanActor.CLOTHES)
+	form.add_child(_label("Land", TimeHud.GOLD, 20, preload("res://assets/fonts/CormorantUnicase-Bold.ttf")))
+	grid = _grid(form)
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 8)
+	_field(grid, "Preset", row)
+	for option in LANDS:
+		var button := Button.new()
+		button.text = option
+		button.tooltip_text = LANDS[option]
+		button.toggle_mode = true
+		button.button_group = _land_group
+		TimeHud.style_button(button, _serif)
+		button.toggled.connect(func(on: bool) -> void:
+			if on:
+				_changed())
+		row.add_child(button)
+		lands[option] = button
+	lands.Hills.set_pressed_no_signal(true)
+	_slider(grid, "Hills", 0.0, Terrain.MAX_HILLS, 1.0, 18.0, "How many metres the field's hills rise; Custom sets it")
+	_slider(grid, "Ponds", 0.0, 4.0, 1.0, 2.0, "How many ponds lie in the field; Custom sets it")
 	begin.text = "Begin"
 	TimeHud.style_button(begin, _serif)
 	begin.add_theme_font_size_override("font_size", 18)
@@ -209,6 +243,16 @@ func _changed() -> void:
 	_person.create(peasant)
 	_actor.dress(peasant)
 	_info.text = "BMI %.1f · %.1f kg lean, %.1f kg fat\nBasal %d kcal a day · ready energy %d kcal\nHoeing burns %d kcal an hour" % [_person.bmi(), _person.lean, _person.fat, roundi(_person.basal() * 24.0), roundi(_person.glycogen), roundi(_person.burn("Plow"))]
+	# A preset shows its hills and ponds; only Custom moves them.
+	var preset: String = _land_group.get_pressed_button().text
+	for title in ["Hills", "Ponds"]:
+		sliders[title].editable = preset == "Custom"
+		sliders[title].modulate.a = 1.0 if preset == "Custom" else 0.45
+		if preset != "Custom":
+			sliders[title].set_value_no_signal(Terrain.PRESETS[preset][title.to_lower()])
+	land = {"hills": sliders.Hills.value, "ponds": int(sliders.Ponds.value)}
+	_values.Hills.text = "%d m" % land.hills
+	_values.Ponds.text = str(land.ponds)
 	begin.disabled = peasant.name == ""
 	begin.tooltip_text = "Name your peasant first" if begin.disabled else "Start farming as %s (Enter in the name field)" % peasant.name
 
@@ -218,6 +262,7 @@ func _begin() -> void:
 	if begin.disabled:
 		return
 	Human.peasant = peasant.duplicate()
+	Terrain.land = land.duplicate()
 	var error := get_tree().change_scene_to_file("res://game.tscn")
 	if error != OK:
 		push_error("Could not open the game scene: " + error_string(error))

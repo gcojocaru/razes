@@ -83,11 +83,16 @@ var eating_requested := false
 var meal_crop := ""
 var meal_grams := 0
 var advanced_hours := 0.0
+## Navigation is in world units; the needs simulation keeps metres.
+var terrain: RefCounted
+var terrain_scale := 0.2
 
 var _carrying_seed := false
 var _returning_home := false
 var _cooking_remaining := 0.0
 var _farm_changed := false
+var _route := PackedVector2Array()
+var _route_destination := Vector2(INF, INF)
 
 ## Gives the farmer the creation screen's name and a body of `chosen.weight` kg, a
 ## `chosen.body_fat` share of it fat, with full glycogen.
@@ -113,6 +118,10 @@ func order(farm: Farm, cells: Array, day: int, action := "", crop := "") -> int:
 			continue
 		var next := farm.action(cell, day, crop)
 		if next.reason != "" or (action != "" and action != next.name):
+			continue
+		var destination := Vector2(cell) * 10.0 - Vector2.ONE * 75.0
+		if not _reachable(home, destination) or not _reachable(position, home):
+			message = "No dry route to this plot and camp"
 			continue
 		var seed: int = Farm.CROPS[crop].seed if next.name == "Sow" else 0
 		if seed:
@@ -186,6 +195,9 @@ func sleep(hours: Variant) -> bool:
 	if typeof(hours) not in [TYPE_INT, TYPE_FLOAT] or not is_finite(hours) or hours <= 0.0 or hours > MAX_SLEEP_HOURS:
 		message = "Choose sleep hours above zero and up to 24"
 		return false
+	if not _reachable(position, home):
+		message = "No dry route to camp"
+		return false
 	sleep_remaining = hours
 	message = "Returning home to sleep"
 	return true
@@ -199,8 +211,10 @@ func wake_up() -> void:
 
 func sleep_prediction(hours: Variant) -> Dictionary:
 	var forecast := Human.new()
-	for property in ["position", "home", "carried", "carried_crop", "height", "fat", "lean", "glycogen", "stomach", "stomach_kcal", "fatigue"]:
+	for property in ["position", "home", "carried", "carried_crop", "height", "fat", "lean", "glycogen", "stomach", "stomach_kcal", "fatigue", "terrain", "terrain_scale"]:
 		forecast.set(property, get(property))
+	forecast._route = _route.duplicate()
+	forecast._route_destination = _route_destination
 	if not forecast.sleep(hours):
 		return {}
 	var farm := Farm.new()
@@ -209,6 +223,8 @@ func sleep_prediction(hours: Variant) -> Dictionary:
 	while forecast.position != forecast.home and forecast.activity != "Dead":
 		forecast.advance(farm, 0, 0, forecast.position.distance_to(forecast.home) / (WALK_SPEED * forecast.pace()))
 		elapsed += forecast.advanced_hours
+		if forecast.sleep_remaining == 0.0 and forecast.activity != "Dead":
+			return {}
 	forecast.advance(farm, 0, 0, float(hours))
 	return {"fatigue": forecast.fatigue, "glycogen": forecast.glycogen, "mass": forecast.mass(), "health": forecast.health, "hours": elapsed + forecast.advanced_hours}
 
@@ -229,6 +245,9 @@ func eat(farm: Farm, crop: String, grams: Variant) -> bool:
 		return false
 	if farm.stock[crop] < grams:
 		message = "Not enough unreserved %s" % crop.to_lower()
+		return false
+	if not _reachable(position, home):
+		message = "No dry route to camp"
 		return false
 	farm.stock[crop] -= grams
 	meal_crop = crop
@@ -312,6 +331,36 @@ func _step(farm: Farm, day: int, _hour: float, hours: float) -> float:
 	return used
 
 func _walk(farm: Farm, destination: Vector2, hours: float) -> float:
+	if terrain != null:
+		if _route_destination != destination:
+			_route = terrain.path(position * terrain_scale, destination * terrain_scale)
+			for index in _route.size():
+				_route[index] /= terrain_scale
+			if not _route.is_empty():
+				_route[0] = position
+				_route[-1] = destination
+			_route_destination = destination
+		while not _route.is_empty() and position.distance_to(_route[0]) < EPSILON:
+			_route.remove_at(0)
+		if _route.is_empty():
+			if not job.is_empty():
+				if job.seed:
+					farm.stock[job.crop] += job.seed - (carried if _carrying_seed else 0)
+					_farm_changed = true
+				job = {}
+			if eating_requested:
+				farm.stock[meal_crop] += meal_grams
+				_farm_changed = true
+				eating_requested = false
+				meal_crop = ""
+				meal_grams = 0
+				_cooking_remaining = 0.0
+			sleep_remaining = 0.0
+			_returning_home = false
+			activity = "Idle"
+			message = "No dry route; work cancelled and unused grain returned"
+			return _spend(hours, "Idle")
+		destination = _route[0]
 	activity = "Walking"
 	var distance := position.distance_to(destination)
 	facing = position.direction_to(destination)
@@ -323,6 +372,9 @@ func _walk(farm: Farm, destination: Vector2, hours: float) -> float:
 		if position == home and activity != "Dead":
 			_deposit(farm)
 	return used
+
+func _reachable(from: Vector2, to: Vector2) -> bool:
+	return terrain == null or not terrain.path(from * terrain_scale, to * terrain_scale).is_empty()
 
 ## Spends up to `hours` on `action` and returns the hours used. Stops where pace,
 ## digestion or survival change, so frame size never changes the outcome.

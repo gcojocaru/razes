@@ -109,10 +109,21 @@ func run() -> void:
 			creation.sliders.Height.value = 1.85
 			creation.sliders["Body fat"].value = 25
 			check(creation.sliders.Weight.min_value == 64 and creation.peasant.height == 1.85 and creation.peasant.body_fat == 0.25 and creation._info.text.begins_with("BMI 21.0 · 54.0 kg lean, 18.0 kg fat"), "Height and body fat set the body, and the summary follows")
+			var presets: Dictionary = creation.Terrain.PRESETS
+			check(creation.lands.Hills.button_pressed and creation.land == presets.Hills and creation._values.Hills.text == "18 m" and creation._values.Ponds.text == "2" and not creation.sliders.Hills.editable and not creation.sliders.Ponds.editable, "Land starts on the Hills preset with its sliders locked")
+			creation.lands.Steppe.button_pressed = true
+			check(creation.land == presets.Steppe and creation._values.Hills.text == "7 m" and creation._values.Ponds.text == "1", "A preset sets the land's hills and ponds")
+			creation.lands.Custom.button_pressed = true
+			creation.sliders.Hills.value = 22
+			creation.sliders.Ponds.value = 3
+			check(creation.sliders.Hills.editable and creation.land == {"hills": 22.0, "ponds": 3} and creation._values.Hills.text == "22 m" and creation._values.Ponds.text == "3", "Custom unlocks the hills and ponds")
+			creation.sliders.Hills.value = 99
+			check(creation.land.hills == creation.sliders.Hills.max_value and creation.sliders.Hills.max_value <= creation.Terrain.MAX_HILLS, "Custom hills stop at the highest land the terrain tests cover")
+			creation.sliders.Hills.value = 22
 			await press(KEY_ESCAPE)
 			check(not creation.visible and layout.visible and play.has_focus(), "Escape returns from creation to Play")
 			await activate(activation, play)
-			check(creation.visible and creation.peasant.name == "Toader" and creation.peasant.height == 1.85, "Reopening keeps the peasant being made")
+			check(creation.visible and creation.peasant.name == "Toader" and creation.peasant.height == 1.85 and creation.lands.Custom.button_pressed and creation.land == {"hills": 22.0, "ponds": 3}, "Reopening keeps the peasant and land being made")
 			creation.name_edit.text = "  "
 			creation.name_edit.text_changed.emit(creation.name_edit.text)
 			await press(KEY_ENTER)
@@ -126,6 +137,8 @@ func run() -> void:
 			for look in [["skin", "Olive"], ["beard", "Beard"], ["clothes", "Woad blue"]]:
 				creation.looks[look[0]][look[1]].button_pressed = true
 			check(creation.peasant.hair == "Red" and creation.peasant.beard == "Beard" and creation._values.Hair.text == "Red", "Clicking a swatch chooses its look")
+			await activate(activation, creation.lands.Lakeland)
+			check(creation.land == creation.Terrain.PRESETS.Lakeland and creation._values.Ponds.text == "4", "Clicking a land preset chooses it")
 		await activate(activation, creation.begin)
 		check(current_scene.scene_file_path == "res://game.tscn", "Begin opens game via " + activation)
 		check(not is_instance_valid(music), "Leaving the menu frees its music player")
@@ -135,15 +148,19 @@ func run() -> void:
 			current_scene._body.show_body(farmer)
 			check(farmer.name == "Toader" and current_scene._human_hud.title.text == "Toader" and current_scene._human_actor.get_node("Name").text == "Toader", "The game's farmer, panel and label carry the chosen name")
 			check(farmer.height == 1.85 and is_equal_approx(farmer.mass(), 72.0) and is_equal_approx(farmer.fat, 18.0) and absf(farmer.glycogen - 54.0 * Human.GLYCOGEN_PER_LEAN) < 5.0 and current_scene._body._values["Height"][0].text == "1.85 m" and current_scene._body._values["Weight"][1].text == "+0.00 kg since start", "The farmer starts in the chosen body, the start of their Body window")
+			check(current_scene.terrain.hills == 22.0 and current_scene.terrain.ponds.size() == 3, "The field is made from the custom land")
 		elif activation == "Space":
-			check(farmer.name == "Ion" and is_equal_approx(farmer.mass(), 65.0), "A new creation screen offers the default peasant again")
+			check(farmer.name == "Ion" and is_equal_approx(farmer.mass(), 65.0) and current_scene.terrain.hills == 18.0 and current_scene.terrain.ponds.size() == 2, "A new creation screen offers the default peasant and land again")
 		else:
 			var actor: Node3D = current_scene._human_actor
 			check(actor._hair.albedo_color == actor.HAIRS.Red and actor._skin.albedo_color == actor.SKINS.Olive and actor._clothes.albedo_color == actor.CLOTHES["Woad blue"] and actor._beard.visible, "The farmer wears the chosen looks")
+			check(current_scene.terrain.hills == 11.0 and current_scene.terrain.ponds.size() == 4, "The field is made from the chosen preset")
+			var first_seed: int = current_scene.terrain.seed
 			reload_current_scene()
 			await process_frame
 			await process_frame
 			check(current_scene.human.name == "Ion" and current_scene._human_actor._beard.visible and is_equal_approx(current_scene.human.mass(), 65.0), "Restart begins again with the same peasant")
+			check(current_scene.terrain.hills == 11.0 and current_scene.terrain.ponds.size() == 4 and current_scene.terrain.seed != first_seed, "Restart keeps the land with a fresh field")
 		check(current_scene.has_node("Field"), "Game shows the grid field")
 		check(current_scene.cell_at_world(Vector3(-15.9, 0, -15.9)) == Vector2i(0, 0), "Field corner is cell 0,0")
 		check(current_scene.cell_at_world(current_scene.cell_center(Vector2i(5, 9))) == Vector2i(5, 9), "Cell centre maps back to its cell")
@@ -235,7 +252,7 @@ func run() -> void:
 		check(night and not hud._night, "The time panel shows a moon at night and the sun by day")
 		check(current_scene._focus().is_equal_approx(looked_at), "Rotating orbits the field without moving the view centre")
 	if failures.is_empty():
-		print("PASS: title, Romanian glyph, version, focus, three layouts, Enter, Space and mouse Play into peasant creation (name, body limits, looks, Escape, blank names) and Begin into the game as that peasant, kept on Restart; looping menu music stops on start, grid field with cell picking, calendar with pause, speeds, debug day length, seasonal weather with particles, sun path, day and night lighting")
+		print("PASS: title, Romanian glyph, version, focus, three layouts, Enter, Space and mouse Play into peasant creation (name, body limits, looks, land presets and Custom, Escape, blank names) and Begin into the game as that peasant on that land, both kept on Restart; looping menu music stops on start, grid field with cell picking, calendar with pause, speeds, debug day length, seasonal weather with particles, sun path, day and night lighting")
 	current_scene.free()
 	# Let the audio server release stopped playback before the test process exits.
 	await create_timer(0.2).timeout

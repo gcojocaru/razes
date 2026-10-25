@@ -96,6 +96,8 @@ func show_farm(farm: Farm, cells: Array, day: int, seed_crop: String, queued: Ar
 				_title = "%s %d%%" % [farm.crop(cell), floori(farm.growth(cell) * 100)]
 			elif _title == "Ripe":
 				_title = "Ripe " + farm.crop(cell).to_lower()
+			if farm.terrain != null and farm.terrain.cell_reason(cell) != "":
+				_title = farm.terrain.cell_reason(cell)
 			_detail = "Soil %d%%" % roundi(farm.fertility(cell) * 100)
 		if next.is_empty():
 			var reasons := PackedStringArray()
