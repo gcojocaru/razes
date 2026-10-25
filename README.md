@@ -32,10 +32,10 @@ the wheel; a right-drag still rotates the view. Time continues while it is open,
 and availability refreshes as days change.
 
 One **Farmer** carries out these orders. **H** or Focus finds them; **G** opens
-the camp menu, **R** opens Sleep (or wakes the farmer early), and **Backspace**
-or Clear jobs cancels work.
-The Farmer panel shows activity, work left, food energy, fatigue, health,
-reserved seed and their carried grain. Orders reserve seed immediately;
+the camp menu, **R** opens Sleep (or wakes the farmer early), **B** or Body
+opens the Body window, and **Backspace** or Clear jobs cancels work.
+The Farmer panel shows activity, work left, energy, stomach, weight and BMI,
+fatigue, health, reserved seed and their carried grain. Orders reserve seed immediately;
 the farmer collects it at camp, walks to the plot and completes the work before
 the field changes. Duplicate orders on a plot are ignored. Plowing takes
 3 game hours per plot, sowing half an hour and harvesting 2 hours. Harvested
@@ -46,11 +46,12 @@ Eating and resting require your command. The farmer does not stop work for
 hunger, exhaustion or night. Click the camp to open the same segmented action
 wheel used for fields, with **Eat** and **Sleep** icons. Choose **Eat**, then select a grain
 bag and a quantity in whole grams in the inventory-style **Prepare food** window.
-It previews calories and preparation time. **Prepare & Eat Porridge** reserves
-exactly that grain and sends the farmer to camp to cook and eat it; energy is
-added when preparation finishes. A 300 g portion takes half an hour; time scales
-with quantity, and calories also depend on the grain. Only unreserved grain is
-available, with one meal pending at a time. Opening or closing the window spends
+It previews calories, preparation time and stomach room. **Prepare & Eat
+Porridge** reserves exactly that grain and sends the farmer to camp to cook and
+eat it; the porridge then fills the stomach and digests into energy. A 300 g
+portion takes half an hour; time scales with quantity, and calories also depend
+on the grain. A meal must fit the stomach, at most 375 g of grain when empty.
+Only unreserved grain is available, with one meal pending at a time. Opening or closing the window spends
 nothing. **G** opens the same camp menu; **Escape** closes the menu or window.
 There is no starting flour. Arrows/Tab and Enter choose either wheel action;
 the first focused action is Eat. The hub/outside click dismisses it.
@@ -71,20 +72,38 @@ Quantities stand for dry edible grain; dehulling/milling losses are abstracted.
 See [nutrition source notes](docs/historical-research.md#grain-calorie-reference--25-october-2026).
 
 Choose **Sleep** in the camp menu to enter the hours you want to sleep (up to
-24, with quarter-hour controls). Its live preview shows restedness, food energy,
-health and total time including the walk to camp. Sleep recovers 20 fatigue
-points per hour and burns 60 kcal per hour; it does not create food calories.
+24, with quarter-hour controls). Its live preview shows restedness, energy,
+weight, health and total time including the walk to camp. Eight hours of sleep
+clear a full day's fatigue; sleep burns basal metabolism and creates no calories.
 Confirmation preserves field work, walks home and sleeps for the chosen hours,
 including during daytime. Work resumes when that time ends; **Wake up** or
 **R** ends sleep early. Opening or closing the window starts nothing. Finish a
 pending meal before sleeping, and wake before preparing another meal.
-Food energy supports daily life and work and can
-fall below zero. Once depleted, health starts falling. At zero health a centred
-**Game Over** message appears and gameplay, time and debug skips stop. Restart
-or Enter begins a fresh farm. F4 skips otherwise advance the farmer as well as
-the crops. Pause stops both; weather audio continues. Water, cooking fuel, milling losses,
-diet quality and weather exposure are still abstracted, and food/work rates
-are game tuning rather than a verified historical survival model.
+
+Needs follow from a simulated body: 1.72 m and 65 kg with 15% body fat (BMI 22).
+Lean mass sets basal metabolism (Katch–McArdle, 1,563 kcal a day) and each
+activity burns a multiple of it (FAO physical activity ratios): sleep 1.0, idle
+1.4, cooking 2.1, walking 3.2, sowing and harvesting 4.1, hoeing 5.0. Moving
+adds about 1 kcal an hour per kilogram moved for each step above rest, so a
+heavier body or a load costs more. The stomach holds 375 g of grain as
+porridge, and the gut absorbs at most 2.5 times basal metabolism (Thurber et al.
+2019), about 160 kcal an hour, into glycogen, the ready energy (about 2,000
+kcal); work harder than that runs the body down. A surplus is stored at two
+thirds efficiency, two thirds of the gain as fat, so 84,000 kcal of overeating
+adds about 8 kg; a deficit burns fat and lean tissue by Forbes' rule. Weight and
+BMI change with both. The Body window (**B**) shows build, change since the
+start, stores, tiredness and each activity's cost, live. Health is full down to
+a BMI of 18.5 and gone at 12.5: an idle
+farmer with no food dies after about two months, as in the 1981 hunger strike.
+Sixteen idle hours awake build 70% fatigue and a day with nine hours of hoeing
+100%; eight hours of sleep clear it. From 70% fatigue the farmer works and walks
+at 80% pace, from 90% at 60%. At zero health a centred **Game Over** message
+appears and gameplay, time and debug skips stop. Restart or Enter begins a fresh
+farm. F4 skips otherwise advance the farmer as well as the crops. Pause stops
+both; weather audio continues. Water, cooking fuel, hulls and milling losses,
+diet quality and weather exposure are still abstracted, and the fatigue and pace
+figures are game tuning. See the
+[body sources](docs/historical-research.md#body-and-needs-model--25-october-2026).
 
 The person and cereal heights share the plot's metre scale; **H** zooms in to
 make the farmer easy to see. The camp and clothing are original low-poly art,
@@ -212,12 +231,15 @@ converter, that the wiki's crop table matches the game, the F1 wiki window, the
 agriculture debug window and the field texture in the running game screen.
 The wheel test also covers seed shortages, season changes, mixed states, live
 refresh, keyboard activation and dismissal, and viewport-edge placement.
-The human tests cover exact reservations and refunds, timed work, walking,
-hauling, stale orders, timed sleep and meals, food exhaustion and death,
-subdivision of time, physical mesh scale and poses, and actual scene input,
-pause, focus, cancellation and debug skips.
+The human tests cover the body's metabolism, load, digestion and its daily
+limit, fat and lean gain and loss, two-month starvation, refeeding, tired pace
+and the live Body window, exact reservations and
+refunds, timed work, walking, hauling, stale orders, timed sleep and meals,
+death at the limit of survival, subdivision of time, physical mesh scale and
+poses, and actual scene input, pause, focus, cancellation and debug skips.
 The camp food test follows real camp clicks, menu and bag selection, typed
-portions and their live previews, exact grain reservation, proportional cooking,
+portions and their live previews, stomach room, exact grain reservation,
+proportional cooking, digestion,
 stale stock, dismissal, viewport resizing and Game Over input isolation.
 It also checks wheel hit targets, first-opening keyboard focus, left/right camp
 clicks and the calorie preview for all five grains. Model tests verify each

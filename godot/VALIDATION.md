@@ -2,6 +2,43 @@
 
 Godot 4.7.2.stable.official.ed1daf0bf, macOS, Apple M4, Compatibility renderer.
 
+## Simulated body — 25 October 2026
+
+- Needs now derive from a body (1.718 m, 65 kg, 15% fat): Katch–McArdle basal
+  metabolism from lean mass, FAO activity ratios per activity (hoeing 5.0), with
+  moving costing about 1 kcal an hour per kilogram of body and load per step of
+  effort; a 375 g stomach whose gut absorbs at most 2.5 × basal (the alimentary
+  limit) into glycogen; gains stored at two-thirds efficiency, two thirds fat,
+  and losses by Forbes' rule. Health follows BMI (full at 18.5, zero at 12.5)
+  and recovers with weight. Fatigue builds per hour awake plus effort, sleep
+  clears 12.5 an hour, and tiredness from 70% and 90% slows work and walking to
+  80% and 60%. Sources and choices are in `docs/historical-research.md`.
+- A first version let a resting farmer fed at every chance gain 0.84 kg a day,
+  about half of it muscle; with the gut limit and gain split it gains 0.15 kg,
+  two thirds fat. A Body window (B, or Body in the Farmer panel) shows build and
+  change since the start, stores, digestion, burn, fatigue and pace, and every
+  activity's cost for the current body, updated live. Its first GPU capture
+  showed only the title: rows were measured before they had fonts; it now fits
+  on each update and a test checks the rows show.
+- The step splits at stomach-empty, pace bands and the survival limit, so frame
+  size still leaves results unchanged; death lands exactly at BMI 12.5. Sleep
+  forecasts walk home step by step, since tiredness can slow the walk.
+- All nine suites pass with exit 0: human, human_actor, person_scene, camp_food,
+  camp_sleep, crops, wheel, menu and audio. New model checks cover basal rate,
+  load, digestion, overflow into fat and lean, two-month starvation (full health
+  to day 26, death on day 60), refeeding, tired pace, stomach room and meal
+  refusal. One new check first failed on floating residue (fatigue 1e-13 after
+  exactly eight hours of sleep) and now compares approximately.
+- GPU captures (`tests/capture_human.gd`) at 1280×800 and 1000×700 were
+  inspected: the Farmer panel's energy, stomach, weight and BMI lines and its
+  Body button, the Body window, food preparation with stomach room, sleep
+  forecasts with weight, the starvation warning and Game Over at BMI 12.5.
+  Existing shutdown shader warnings remain.
+
+Not checked: whether year one is now survivable in real play, long-term weight
+balance, other platforms or accessibility. Hulls, water and dehulling labour
+remain abstracted.
+
 ## Camp wheel and grain calories — 25 October 2026
 
 - Camp Eat/Sleep now inherit the actual field action wheel, sharing rings,

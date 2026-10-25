@@ -83,11 +83,25 @@ func run() -> void:
 	game._process(0.01)
 	Input.action_release("ui_left")
 	check(game._focus().x < camp_focus.x, "Panning west from camp moves west instead of snapping back to the field")
+	key(KEY_B)
+	var body = game._body
+	check(body.visible and not game._human_hud.visible and body._values["Weight"][0].text == "%.1f kg" % person.mass() and body._values["Basal"][0].text.contains("kcal a day"), "B opens the Body window with the farmer's weight and metabolism, in place of the Farmer panel")
+	check(body._scroll.custom_minimum_size.y > 300.0, "The Body window opens with all its rows showing")
+	var energy: String = body._values["Ready energy"][0].text
+	game.advance_time(game.seconds_per_day / 24.0)
+	check(body._values["Ready energy"][0].text != energy and body._values["Burning now"][0].text.begins_with("Idle"), "The Body window follows the farmer live")
+	key(KEY_I)
+	check(game._inventory.visible and not body.visible, "Inventory and Body share the left side, one at a time")
+	key(KEY_I)
+	game._human_hud._buttons.get_child(1).pressed.emit()
+	check(body.visible, "The Farmer panel's Body button opens the Body window")
+	key(KEY_B)
+	check(not body.visible and game._human_hud.visible, "B closes the Body window and brings back the Farmer panel")
 	key(KEY_G)
 	key(KEY_ENTER)
 	game._food_window.prepare.pressed.emit()
 	game.advance_time(game.seconds_per_day / 48.0)
-	check(game.farm.stock.Barley == 9700 and person.calories > 1000.0, "Camp Eat and explicit preparation cook grain from the player's existing stock")
+	check(game.farm.stock.Barley == 9700 and person.stomach_kcal > 1000.0, "Camp Eat and explicit preparation cook grain from the player's existing stock")
 	key(KEY_R)
 	check(game._sleep_window.visible and person.sleep_remaining == 0, "R opens explicit sleep configuration without starting it")
 	game._sleep_window.start.pressed.emit()
@@ -105,7 +119,6 @@ func run() -> void:
 	var stale := Vector2i(9, 8)
 	game._day_time = game.seconds_per_day / 3.0
 	person.wake_up()
-	person.calories = 3000
 	person.fatigue = 0
 	game.farm.plots[stale] = {"stage": "Ripe", "crop": "Oats", "growth": 1.0, "fertility": 1.0, "wintered": true, "moisture": 0.0, "days": 0}
 	game._start_selection(stale, false)
@@ -115,15 +128,19 @@ func run() -> void:
 	check(until(game, func(): return person.queue.is_empty() and person.job.is_empty(), 4.0), "A harvest invalidated by frost releases its job")
 	check(game._farm_hud.buttons.Plow.visible and "queued" not in game._farm_hud._detail_label.text.to_lower(), "Releasing stale work refreshes field actions without selecting the plot again")
 	person.position = person.home
-	person.calories = 45
-	person.health = 1
+	# A body 50 g above the limit of survival, with no ready energy or food.
+	person.glycogen = 0.0
+	person.stomach = 0.0
+	person.stomach_kcal = 0.0
+	person.fat = 2.0
+	person.lean = Human.DEATH_BMI * Human.HEIGHT * Human.HEIGHT - 1.95
 	var death_clock: float = game._day_time
 	game.advance_time(game.seconds_per_day / 4.0)
 	check(person.activity == "Dead" and game.get("_game_over") != null, "Zero health ends the game and creates the Game Over screen")
 	if game.get("_game_over") != null:
 		var game_over_title = game._game_over.find_child("GameOverTitle", true, false)
 		check(game._game_over.visible and game_over_title != null and game_over_title.text == "Game Over", "Game Over is visibly displayed after health reaches zero")
-	check(is_equal_approx(game._day_time, death_clock + game.seconds_per_day / 24.0), "A long time skip stops the clock at death rather than consuming its remaining hours")
+	check(game._day_time > death_clock and game._day_time < death_clock + game.seconds_per_day / 8.0 and is_equal_approx(person.bmi(), Human.DEATH_BMI), "A long time skip stops the clock at death rather than consuming its remaining hours")
 	clock = game._day_time
 	old_day = game.day
 	stored = game.farm.stored()

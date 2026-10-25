@@ -26,6 +26,14 @@ func ripe() -> Farm:
 	farm.plots[CELL].stage = "Ripe"
 	return farm
 
+## Leaves `person` `kcal` of body tissue above starving to death, with no glycogen.
+func starving(person, kcal: float) -> void:
+	person.glycogen = 0.0
+	person.fat = 2.0
+	# Forbes' rule at 2 kg of fat: the kcal each kilogram of body mass still holds.
+	var per_kg: float = (Human.FAT_KCAL + Human.LEAN_KCAL * Human.FORBES / 2.0) / (1.0 + Human.FORBES / 2.0)
+	person.lean = Human.DEATH_BMI * Human.HEIGHT * Human.HEIGHT - 2.0 + kcal / per_kg
+
 func run() -> void:
 	if not ResourceLoader.exists("res://human.gd"):
 		check(false, "The timed farmer model exists before any field job can execute")
@@ -40,6 +48,9 @@ func run() -> void:
 		check(false, "The farmer accepts a chosen sleep duration")
 		quit(1)
 		return
+	test_body()
+	test_starvation()
+	test_tired_pace()
 	test_orders_and_work()
 	test_seed_reservations()
 	test_cancellation()
@@ -59,8 +70,100 @@ func run() -> void:
 	test_subdivision()
 	test_meal_subdivision()
 	if failures.is_empty():
-		print("PASS: human walking and timed jobs; seed and selected-meal reservations; proportional porridge; invalid meal requests; cancellation and death; hauling; timed sleep and forecasts; deterministic subdivision")
+		print("PASS: body-derived metabolism, digestion, fat and lean stores, starvation and tired pace; human walking and timed jobs; seed and selected-meal reservations; proportional porridge; invalid meal requests; cancellation and death; hauling; timed sleep and forecasts; deterministic subdivision")
 	quit(0 if failures.is_empty() else 1)
+
+func test_body() -> void:
+	var person = Model.new()
+	check(is_equal_approx(person.mass(), 65.0) and absf(person.bmi() - 22.02) < 0.01 and person.health == 100.0, "The farmer starts as a lean 65 kg adult of 1.718 m, BMI 22, in full health")
+	check(is_equal_approx(person.basal() * 24.0, 1563.4) and is_equal_approx(person.glycogen, 1989.0) and person.room() == 375, "Lean mass sets basal metabolism of 1563.4 kcal a day and 1989 kcal of glycogen; the stomach is empty")
+	person.advance(Farm.new(), DAY, 6.0, 1.0)
+	check(is_equal_approx(person.glycogen, 1989.0 - 1.4 * 1563.4 / 24.0) and is_equal_approx(person.fatigue, 4.375), "An idle hour burns 1.4 times basal metabolism and builds the fatigue of being awake")
+	var loaded = Model.new()
+	var empty = Model.new()
+	loaded.carried = 15000
+	loaded.carried_crop = "Barley"
+	for walker in [loaded, empty]:
+		walker.position = walker.home + Vector2(4500, 0)
+		walker.cancel(Farm.new())
+		walker.advance(Farm.new(), DAY, 6.0, 1.0)
+	check(loaded.position == loaded.home and is_equal_approx(empty.glycogen - loaded.glycogen, 2.2 * 15.0), "A 15 kg sack adds 2.2 kcal an hour per kilogram to walking: one MET per kilogram moved")
+	var farm := Farm.new()
+	var eater = Model.new()
+	eater.glycogen = 1000.0
+	check(not eater.eat(farm, "Oats", 376) and eater.message.contains("375") and farm.stock.Oats == 8000, "A meal bigger than the 375 g stomach is refused without spending grain")
+	eater.eat(farm, "Oats", 375)
+	eater.advance(farm, DAY, 6.0, 0.625)
+	check(eater.stomach == 375.0 and is_equal_approx(eater.stomach_kcal, 1458.75) and eater.room() == 0, "Cooked porridge fills the stomach with its grain and energy")
+	check(not eater.eat(farm, "Oats", 1), "A full stomach refuses even a gram more")
+	var before: float = eater.glycogen
+	eater.advance(farm, DAY, 6.625, 1.0)
+	check(is_equal_approx(eater.digestion(), 2.5 * 1563.4 / 24.0) and is_equal_approx(eater.stomach_kcal, 1458.75 - eater.digestion()) and is_equal_approx(eater.glycogen, before + eater.digestion() - 1.4 * eater.basal()) and eater.room() == 41, "The gut passes 2.5 times basal metabolism into glycogen and frees stomach room")
+	var feast = Model.new()
+	feast.stomach = 375.0
+	feast.stomach_kcal = 1458.75
+	feast.advance(Farm.new(), DAY, 6.0, 1458.75 / feast.digestion())
+	check(feast.stomach == 0.0 and absf(feast.glycogen - feast.lean * Human.GLYCOGEN_PER_LEAN) < 1.0 and feast.fat > Human.START_FAT and is_equal_approx(feast.fat - Human.START_FAT, 2.0 * (feast.lean - Human.START_LEAN)), "Energy beyond full glycogen is stored, two thirds of the gain as fat")
+	var glutton = Model.new()
+	farm = Farm.new()
+	farm.stock.Oats = 100000
+	for minute in 24 * 60:
+		if not glutton.eating_requested and glutton.room() >= 50:
+			glutton.eat(farm, "Oats", glutton.room())
+		glutton.advance(farm, DAY, minute / 60.0, 1.0 / 60.0)
+	var gained: float = glutton.mass() - 65.0
+	check(gained > 0.1 and gained < 0.2, "Eating at every chance for a resting day adds under 0.2 kg: the gut caps what overeating can store")
+
+func test_starvation() -> void:
+	var person = Model.new()
+	var farm := Farm.new()
+	var hurt := -1
+	var days := 0
+	while person.activity != "Dead" and days < 120:
+		person.advance(farm, DAY, 6.0, 24.0)
+		days += 1
+		if hurt < 0 and person.health < 100.0:
+			hurt = days
+	check(hurt > 20 and days >= 45 and days <= 75 and person.lean < Human.START_LEAN * 0.75, "With no food an idle farmer keeps full health for weeks, then starves after about two months, losing muscle once fat runs low")
+	check(is_equal_approx(person.bmi(), Human.DEATH_BMI) and person.health == 0.0, "Starvation kills exactly at the limit of survival")
+	var thin = Model.new()
+	thin.fat = 3.0
+	thin.lean = 40.0
+	thin.glycogen = 40.0 * Human.GLYCOGEN_PER_LEAN
+	var health: float = thin.health
+	thin.stomach = 375.0
+	thin.stomach_kcal = 1458.75
+	thin.advance(Farm.new(), DAY, 6.0, 1458.75 / 300.0)
+	check(thin.health > health and thin.mass() > 43.0, "Eating after starvation rebuilds weight and health")
+	var dying = Model.new()
+	starving(dying, 10.0)
+	dying.advance(Farm.new(), DAY, 6.0, 1.0)
+	check(dying.activity == "Dead" and dying.advanced_hours < 0.2 and is_equal_approx(dying.bmi(), Human.DEATH_BMI), "Time advancement stops at the exact instant the body reaches the limit of survival")
+
+func test_tired_pace() -> void:
+	var farm := Farm.new()
+	var person = Model.new()
+	person.fatigue = 95.0
+	person.position = Vector2((CELL.x - 7.5) * 10.0, (CELL.y - 7.5) * 10.0)
+	person.order(farm, [CELL], DAY, "Plow")
+	person.advance(farm, DAY, 6.0, 4.99)
+	check(farm.stage(CELL) == "Grass" and person.activity == "Working", "An exhausted farmer still hoes, at 60% pace")
+	person.advance(farm, DAY, 10.99, 0.02)
+	check(farm.stage(CELL) == "Plowed", "Three hours of hoeing take five when exhausted")
+	var walker = Model.new()
+	walker.fatigue = 75.0
+	walker.position = walker.home + Vector2(4500, 0)
+	walker.cancel(Farm.new())
+	walker.advance(Farm.new(), DAY, 6.0, 0.5)
+	check(walker.position.is_equal_approx(walker.home + Vector2(2700, 0)), "Past 70% fatigue the farmer walks at 80% pace")
+	var sleeper = Model.new()
+	sleeper.fatigue = 100.0
+	sleeper.sleep(8.0)
+	sleeper.advance(Farm.new(), DAY, 22.0, 8.0)
+	check(is_zero_approx(sleeper.fatigue) and is_equal_approx(sleeper.glycogen, 1989.0 - 8.0 * sleeper.basal()), "Eight hours' sleep clears full fatigue and burns basal metabolism")
+	var awake = Model.new()
+	awake.advance(Farm.new(), DAY, 6.0, 16.0)
+	check(is_equal_approx(awake.fatigue, 70.0), "Sixteen idle hours awake build 70% fatigue")
 
 func test_orders_and_work() -> void:
 	var farm := Farm.new()
@@ -175,38 +278,37 @@ func test_timed_sleep() -> void:
 	person.sleep(8)
 	person.advance(Farm.new(), DAY, 6, 0.5)
 	person.wake_up()
-	check(person.sleep_remaining == 0 and is_equal_approx(person.fatigue, 90), "Waking early keeps only the recovery actually earned")
+	check(person.sleep_remaining == 0 and is_equal_approx(person.fatigue, 93.75), "Waking early keeps only the recovery actually earned")
 	person.advance(Farm.new(), DAY, 6.5, 1)
-	check(person.activity == "Idle" and is_equal_approx(person.fatigue, 91), "Waking resumes awake needs without further sleep recovery")
+	check(person.activity == "Idle" and is_equal_approx(person.fatigue, 98.125), "Waking resumes awake needs without further sleep recovery")
 	var a = Model.new()
 	var b = Model.new()
 	for sleeper in [a, b]:
 		sleeper.fatigue = 80
-		sleeper.calories = 30
+		sleeper.glycogen = 30
 		sleeper.sleep(1.37)
 	a.advance(Farm.new(), DAY, 23.5, 2)
 	for i in 240:
 		b.advance(Farm.new(), DAY, 23.5 + i / 120.0, 1.0 / 120)
-	check(a.sleep_remaining == 0 and b.sleep_remaining == 0 and is_equal_approx(a.fatigue, b.fatigue) and is_equal_approx(a.calories, b.calories) and is_equal_approx(a.health, b.health), "Non-frame-aligned sleep and waking across midnight are subdivision independent")
+	check(a.sleep_remaining == 0 and b.sleep_remaining == 0 and is_equal_approx(a.fatigue, b.fatigue) and is_equal_approx(a.glycogen, b.glycogen) and is_equal_approx(a.mass(), b.mass()) and is_equal_approx(a.health, b.health), "Non-frame-aligned sleep and waking across midnight are subdivision independent")
 
 func test_sleep_prediction() -> void:
 	var person = Model.new()
 	person.fatigue = 80
 	var preview: Dictionary = person.sleep_prediction(2)
-	check(is_equal_approx(preview.fatigue, 40) and is_equal_approx(preview.calories, 1880) and preview.health == 100 and is_equal_approx(preview.hours, 2), "Two hours of sleep recovers forty fatigue points and burns 120 kcal")
-	check(person.fatigue == 80 and person.calories == 2000 and person.sleep_remaining == 0 and person.activity == "Idle", "Previewing never changes the actual person")
+	check(is_equal_approx(preview.fatigue, 55) and is_equal_approx(preview.glycogen, 1989.0 - 2.0 * person.basal()) and preview.health == 100 and is_equal_approx(preview.hours, 2), "Two hours of sleep recovers 25 fatigue points and burns two hours of basal metabolism")
+	check(person.fatigue == 80 and person.glycogen == 1989.0 and person.sleep_remaining == 0 and person.activity == "Idle", "Previewing never changes the actual person")
 	person.position = person.home + Vector2(4500, 0)
 	preview = person.sleep_prediction(2)
-	check(is_equal_approx(preview.fatigue, 44) and is_equal_approx(preview.calories, 1720) and is_equal_approx(preview.hours, 3), "Preview includes one hour walking home before the full sleep duration")
+	check(is_equal_approx(preview.fatigue, 80.0 + 1.25 * (70.0 / 16.0 + 30.0 / 32.4 * 1.8) - 25.0) and is_equal_approx(preview.hours, 3.25), "At 80% fatigue the walk home takes 1.25 hours before the full sleep")
 	person.sleep(2)
-	person.advance(Farm.new(), DAY, 12, 3)
-	check(is_equal_approx(person.fatigue, preview.fatigue) and is_equal_approx(person.calories, preview.calories) and is_equal_approx(person.health, preview.health) and person.sleep_remaining == 0, "The actual walk and sleep match the preview")
+	person.advance(Farm.new(), DAY, 12, 3.25)
+	check(is_equal_approx(person.fatigue, preview.fatigue) and is_equal_approx(person.glycogen, preview.glycogen) and is_equal_approx(person.mass(), preview.mass) and is_equal_approx(person.health, preview.health) and person.sleep_remaining == 0, "The actual walk and sleep match the preview")
 	person = Model.new()
 	person.fatigue = 80
-	person.calories = 30
-	person.health = 1
+	starving(person, 30.0)
 	preview = person.sleep_prediction(8)
-	check(preview.health == 0 and is_equal_approx(preview.hours, 1) and is_equal_approx(preview.fatigue, 60) and is_equal_approx(preview.calories, -30), "Preview stops recovery at starvation death rather than promising eight hours")
+	check(preview.health == 0 and preview.hours < 1.0 and preview.fatigue > 70.0, "Preview stops recovery at starvation death rather than promising eight hours")
 	person.sleep(8)
 	person.advance(Farm.new(), DAY, 22, 8)
 	check(person.activity == "Dead" and is_equal_approx(person.advanced_hours, preview.hours), "Actual sleep stops at the predicted death time")
@@ -225,8 +327,8 @@ func test_sleep_validation() -> void:
 	person.eat(farm, "Oats", 300)
 	check(not person.sleep(8) and person.sleep_remaining == 0 and person.eating_requested, "A pending meal must finish before sleep can start")
 	person = Model.new()
-	person.health = 0
-	check(not person.sleep(8) and person.sleep_prediction(8).is_empty(), "Zero health refuses sleep before the next advancement")
+	person.lean = 20.0
+	check(not person.sleep(8) and person.sleep_prediction(8).is_empty(), "A starved body refuses sleep before the next advancement")
 
 func test_porridge() -> void:
 	for recipe in [["Barley", 100, 0.166666666666667, 354.0], ["Oats", 100, 0.166666666666667, 389.0], ["Millet", 100, 0.166666666666667, 378.0], ["Wheat", 100, 0.166666666666667, 327.0], ["Rye", 100, 0.166666666666667, 338.0], ["Oats", 1, 0.001666666666667, 3.89], ["Oats", 375, 0.625, 1458.75], ["Millet", 1800, 3.0, 6804.0]]:
@@ -235,15 +337,15 @@ func test_porridge() -> void:
 	check(Model.porridge("Unknown", 300).is_empty() and Model.porridge("Barley", 0).is_empty(), "Unknown grain and empty portions cannot generate a recipe")
 
 func test_grain_meal_calories() -> void:
-	for meal in [["Barley", 2952.0], ["Oats", 3057.0], ["Millet", 3024.0], ["Wheat", 2871.0], ["Rye", 2904.0]]:
+	for meal in [["Barley", 1062.0], ["Oats", 1167.0], ["Millet", 1134.0], ["Wheat", 981.0], ["Rye", 1014.0]]:
 		var farm := Farm.new()
 		var person = Model.new()
 		var before: int = farm.stock[meal[0]]
 		person.eat(farm, meal[0], 300)
 		person.advance(farm, DAY, 6, 0.25)
-		check(is_equal_approx(person.calories, 1945), "Each grain waits for cooking completion before adding calories")
+		check(person.stomach_kcal == 0.0 and person.glycogen < 1989.0, "Each grain waits for cooking completion before reaching the stomach")
 		person.advance(farm, DAY, 6.25, 0.25)
-		check(is_equal_approx(person.calories, meal[1]) and farm.stock[meal[0]] == before - 300 and not person.eating_requested, "%s adds its own dry-grain calories exactly once" % meal[0])
+		check(is_equal_approx(person.stomach_kcal, meal[1]) and person.stomach == 300.0 and farm.stock[meal[0]] == before - 300 and not person.eating_requested, "%s puts its own dry-grain calories in the stomach exactly once" % meal[0])
 
 func test_selected_meal() -> void:
 	var farm := plowed()
@@ -257,26 +359,26 @@ func test_selected_meal() -> void:
 	check(not person.eat(farm, "Millet", 100) and farm.stock.Millet == before.Millet, "A second meal cannot spend another crop while the first awaits camp")
 	check(person.order(farm, [CELL], DAY, "Sow", "Oats") == 0, "Grain reserved for a meal is unavailable to new field orders")
 	person.advance(farm, DAY, 6.0, 1.0)
-	check(person.position == person.home and person.meal_grams == 375 and is_equal_approx(person.calories, 1840.0), "Returning to camp spends walking energy and does not prepare or eat grain early")
+	check(person.position == person.home and person.meal_grams == 375 and is_equal_approx(person.glycogen, 1989.0 - person.basal() - 2.2 * 65.0) and person.stomach == 0.0, "Returning to camp spends walking energy and does not prepare or eat grain early")
 	person.advance(farm, DAY, 7.0, 0.624)
-	check(person.activity == "Cooking" and person.meal_grams == 375 and is_equal_approx(person.calories, 1702.72), "A 375 gram meal remains pending until all 0.625 preparation hours finish")
+	check(person.activity == "Cooking" and person.meal_grams == 375 and person.stomach_kcal == 0.0, "A 375 gram meal remains pending until all 0.625 preparation hours finish")
 	check(not person.eat(farm, "Oats", 1) and farm.stock.Oats == 1500, "Repeated confirmation during cooking cannot reserve another gram")
 	person.advance(farm, DAY, 7.624, 0.001)
-	check(is_equal_approx(person.calories, 3161.25) and farm.stock.Oats == 1500, "Completing chosen porridge adds its 1458.75 kcal once without spending stock again")
+	check(is_equal_approx(person.stomach_kcal, 1458.75) and farm.stock.Oats == 1500, "Completing chosen porridge puts its 1458.75 kcal in the stomach once without spending stock again")
 	check(not person.eating_requested and person.meal_crop == "" and person.meal_grams == 0, "Eating clears the pending meal so another choice becomes possible")
 	person.advance(farm, DAY, 7.625, 0.5)
-	check(is_equal_approx(person.calories, 3116.25) and farm.stock.Oats == 1500, "Further elapsed time cannot repeat a completed meal's energy or stock cost")
+	check(is_equal_approx(person.stomach_kcal, 1458.75 - 0.5 * person.digestion()) and farm.stock.Oats == 1500, "Further time digests the meal without repeating its energy or stock cost")
 
 func test_meal_boundaries() -> void:
-	for recipe in [[1, 0.001666666666667, 2003.4133333333333], [375, 0.625, 3280.0], [1800, 3.0, 8144.0]]:
+	for recipe in [[1, 0.001666666666667, 3.78], [375, 0.625, 1417.5]]:
 		var farm := Farm.new()
 		farm.stock.Millet = recipe[0]
 		var person = Model.new()
 		check(person.eat(farm, "Millet", recipe[0]) and farm.stock.Millet == 0 and farm.stock.Barley == 10000, "A selected millet meal may reserve every available gram, including a one-gram portion")
 		person.advance(farm, DAY, 6.0, recipe[1] / 2.0)
-		check(person.calories < 2000.0 and person.meal_grams == recipe[0], "A partially prepared %d gram portion yields no early energy" % recipe[0])
+		check(person.stomach_kcal == 0.0 and person.meal_grams == recipe[0], "A partially prepared %d gram portion yields no early energy" % recipe[0])
 		person.advance(farm, DAY, 6.0 + recipe[1] / 2.0, recipe[1] / 2.0)
-		check(is_equal_approx(person.calories, recipe[2]) and person.meal_grams == 0 and farm.stock.Millet == 0, "All-stock millet preparation preserves gram precision and proportional energy for %d grams" % recipe[0])
+		check(is_equal_approx(person.stomach_kcal, recipe[2]) and person.meal_grams == 0 and farm.stock.Millet == 0, "All-stock millet preparation preserves gram precision and proportional energy for %d grams" % recipe[0])
 
 func test_invalid_meals() -> void:
 	var farm := Farm.new()
@@ -293,105 +395,101 @@ func test_invalid_meals() -> void:
 	person.carried_crop = "Oats"
 	person.carried = 300
 	check(not person.eat(farm, "Oats", 1) and person.carried == 300, "Grain in transit cannot fund a meal before entering camp stock")
-	person.health = 0.0
-	check(not person.eat(farm, "Millet", 1) and farm.stock.Millet == before.Millet, "Zero health refuses new meal reservations before the next advance")
+	person.lean = 20.0
+	check(not person.eat(farm, "Millet", 1) and farm.stock.Millet == before.Millet, "A starved body refuses new meal reservations before the next advance")
 
 func test_meal_seed_and_cancellation() -> void:
 	var farm := plowed()
-	farm.stock.Oats = 1975
+	farm.stock.Oats = 1900
 	var person = Model.new()
 	person.order(farm, [CELL], DAY, "Sow", "Oats")
 	person.advance(farm, DAY, 6.0, 0.1)
-	check(person.carried == 1600 and farm.stock.Oats == 375, "A field reservation leaves only its unreserved grain available for food")
-	check(not person.eat(farm, "Oats", 376) and person.eat(farm, "Oats", 375), "Food cannot spend reserved seed even when the person carries it")
+	check(person.carried == 1600 and farm.stock.Oats == 300, "A field reservation leaves only its unreserved grain available for food")
+	check(not person.eat(farm, "Oats", 301) and person.eat(farm, "Oats", 300), "Food cannot spend reserved seed even when the person carries it")
 	check(farm.stock.Oats == 0 and person.reserved_seed() == 1600, "Pending food and carried seed reserve distinct grams")
 	person.cancel(farm)
-	check(person.eating_requested and person.meal_grams == 375 and person.carried == 1600 and farm.stock.Oats == 0, "Clear jobs preserves the pending meal and returns carried seed physically")
+	check(person.eating_requested and person.meal_grams == 300 and person.carried == 1600 and farm.stock.Oats == 0, "Clear jobs preserves the pending meal and returns carried seed physically")
 	person.advance(farm, DAY, 6.1, 0.7)
 	check(person.meal_grams == 0 and farm.stock.Oats == 1600 and person.carried == 0 and farm.stage(CELL) == "Plowed", "Returning seed and finishing a meal cannot refund its consumed ingredient or sow cancelled work")
 	check(person.eat(farm, "Oats", 1), "After completing porridge another explicit portion can be chosen")
 
 func test_unfinished_meal_death() -> void:
-	for pending in [[false, 600, 0.5, 0.25], [true, 600, 0.5, 0.25], [false, 300, 1.0, 0.5]]:
+	for away in [false, true]:
 		var farm := Farm.new()
 		var person = Model.new()
-		person.calories = 0.0
-		person.health = pending[2]
-		if pending[0]:
+		starving(person, 10.0)
+		if away:
 			person.position = person.home + Vector2(4500, 0)
-		check(person.eat(farm, "Millet", pending[1]), "A living person can reserve food before starvation ends preparation or travel")
+		check(person.eat(farm, "Millet", 300), "A living person can reserve food before starvation ends preparation or travel")
 		person.advance(farm, DAY, 6.0, 2.0)
-		check(person.activity == "Dead" and is_equal_approx(person.advanced_hours, pending[3]), "Death stops a pending meal at the exact health boundary, including while walking or finishing preparation")
-		check(person.meal_crop == "Millet" and person.meal_grams == pending[1] and farm.stock.Millet + person.meal_grams == 1800 and person.calories < 0.0, "Unfinished meal grain remains accounted for after death and grants no output")
+		check(person.activity == "Dead" and person.advanced_hours < 0.5 and is_equal_approx(person.bmi(), Human.DEATH_BMI), "Death stops a pending meal at the limit of survival, while walking or cooking")
+		check(person.meal_crop == "Millet" and person.meal_grams == 300 and farm.stock.Millet + person.meal_grams == 1800 and person.stomach == 0.0, "Unfinished meal grain remains accounted for after death and grants no output")
 		var before := farm.stock.duplicate()
-		var energy: float = person.calories
+		var energy: float = person.glycogen
 		person.cancel(farm)
 		person.wake_up()
 		check(not person.eat(farm, "Oats", 1) and not person.advance(farm, DAY, 8.0, 12.0), "Death rejects every further meal request and time advance")
-		check(farm.stock == before and person.meal_grams == pending[1] and person.calories == energy, "Game Over cannot spend, refund or complete a pending meal")
+		check(farm.stock == before and person.meal_grams == 300 and person.glycogen == energy, "Game Over cannot spend, refund or complete a pending meal")
 
 func test_food_and_death() -> void:
 	var farm := Farm.new()
 	var person = Model.new()
-	person.calories = 700.0
+	person.glycogen = 700.0
 	var grain := farm.stored()
 	person.advance(farm, DAY, 6.0, 1.0)
-	check(person.activity == "Idle" and is_equal_approx(person.calories, 610.0) and farm.stored() == grain, "Low energy never grants a meal or consumes grain automatically")
-	person.calories = 700.0
+	check(person.activity == "Idle" and is_equal_approx(person.glycogen, 700.0 - 1.4 * person.basal()) and farm.stored() == grain, "Low energy never grants a meal or consumes grain automatically")
+	person.glycogen = 700.0
 	check(person.eat(farm, "Barley", 300) and farm.stock.Barley == 9700, "Confirming a meal reserves its grain before the first advance")
 	person.advance(farm, DAY, 7.0, 0.25)
-	check(person.activity == "Cooking" and farm.stock.Barley == 9700 and person.calories < 700.0, "Cooking consumes 300 g of existing grain, with no starting flour")
+	check(person.activity == "Cooking" and farm.stock.Barley == 9700 and person.glycogen < 700.0, "Cooking consumes 300 g of existing grain, with no starting flour")
 	check(not person.eat(farm, "Barley", 300), "Repeated Eat commands cannot queue duplicate meals")
 	person.advance(farm, DAY, 7.25, 0.25)
-	check(is_equal_approx(person.calories, 1652.0) and farm.stock.Barley == 9700, "A half-hour meal adds energy and consumes grain exactly once")
+	check(is_equal_approx(person.stomach_kcal, 1062.0) and is_equal_approx(person.glycogen, 700.0 - 0.5 * 2.1 * person.basal()) and farm.stock.Barley == 9700, "A half-hour meal fills the stomach and consumes grain exactly once")
 	farm = plowed()
 	for name in Farm.CROPS:
 		farm.stock[name] = 0
 	farm.stock.Barley = 2000
 	farm.stock.Oats = 300
 	person = Model.new()
-	person.calories = 700.0
 	person.order(farm, [CELL], DAY, "Sow", "Barley")
 	person.eat(farm, "Oats", 300)
 	person.advance(farm, DAY, 6.0, 0.5)
-	check(farm.stock.Barley == 0 and farm.stock.Oats == 0 and person.reserved_seed() == 2000 and person.calories > 1500, "Manual meals use free cereal and never reserved sowing seed")
+	check(farm.stock.Barley == 0 and farm.stock.Oats == 0 and person.reserved_seed() == 2000 and is_equal_approx(person.stomach_kcal, 1167.0), "Manual meals use free cereal and never reserved sowing seed")
 	farm = Farm.new()
 	for name in Farm.CROPS:
 		farm.stock[name] = 0
 	person = Model.new()
-	person.calories = 45.0
-	person.health = 10.0
+	person.glycogen = 45.0
 	check(not person.eat(farm, "Oats", 300), "A requested meal without grain is refused without creating food")
 	person.advance(farm, DAY, 6.0, 1.0)
-	check(is_equal_approx(person.health, 9.0) and is_equal_approx(person.calories, -45.0), "Energy can go below zero and health falls only for time spent depleted")
-	person.health = 1.0
+	check(person.glycogen == 0.0 and person.mass() < 65.0 and person.mass() > 64.99 and person.health == 100.0, "Once glycogen is spent, fat and muscle pay the rest of the hour without harming health yet")
+	starving(person, 20.0)
 	person.advance(farm, DAY, 7.0, 1.0)
-	check(person.activity == "Dead" and person.health == 0.0, "Half an hour without energy consumes the final health point and stops the person")
-	check(is_equal_approx(person.advanced_hours, 0.5), "Time advancement stops at the exact instant health reaches zero")
+	check(person.activity == "Dead" and person.health == 0.0 and person.advanced_hours < 0.5, "A body at the limit of survival dies within the hour and stops the person")
 	var before := farm.stock.duplicate()
-	var calories: float = person.calories
+	var energy: float = person.glycogen
 	check(person.order(farm, [CELL], DAY, "Plow") == 0 and not person.advance(farm, DAY, 8.0, 12.0), "A dead person refuses orders and cannot advance")
 	person.cancel(farm)
 	person.wake_up()
-	check(not person.eat(farm, "Oats", 300) and farm.stock == before and person.calories == calories and person.activity == "Dead", "Eating, rest and cancellation after death create or spend no resources")
+	check(not person.eat(farm, "Oats", 300) and farm.stock == before and person.glycogen == energy and person.activity == "Dead", "Eating, rest and cancellation after death create or spend no resources")
 
 func test_subdivision() -> void:
 	var a := plowed([CELL, NEIGHBOUR])
 	var b := plowed([CELL, NEIGHBOUR])
 	var one = Model.new()
 	var frames = Model.new()
-	one.calories = 900.0
-	frames.calories = 900.0
+	one.glycogen = 900.0
+	frames.glycogen = 900.0
 	one.order(a, [CELL, NEIGHBOUR], DAY, "Sow", "Barley")
 	frames.order(b, [CELL, NEIGHBOUR], DAY, "Sow", "Barley")
 	one.advance(a, DAY, 6.0, 8.0)
 	for i in 8 * 120:
 		frames.advance(b, DAY, 6.0 + i / 120.0, 1.0 / 120.0)
 	check(a.plots == b.plots and a.stock == b.stock and one.carried == frames.carried, "A long skip and half-minute frames produce the same crops and mass accounting")
-	check(one.position.is_equal_approx(frames.position) and is_equal_approx(one.calories, frames.calories) and is_equal_approx(one.fatigue, frames.fatigue) and is_equal_approx(one.health, frames.health), "Internal minute subdivision preserves travel, food and needs across frame sizes")
+	check(one.position.is_equal_approx(frames.position) and is_equal_approx(one.glycogen, frames.glycogen) and is_equal_approx(one.mass(), frames.mass()) and is_equal_approx(one.fatigue, frames.fatigue) and is_equal_approx(one.health, frames.health), "Internal minute subdivision preserves travel, food and needs across frame sizes")
 	var unchanged: Vector2 = one.position
-	var energy: float = one.calories
-	check(not one.advance(a, DAY, 14.0, 0.0) and one.position == unchanged and one.calories == energy, "Zero elapsed time advances neither people nor farm state")
+	var energy: float = one.glycogen
+	check(not one.advance(a, DAY, 14.0, 0.0) and one.position == unchanged and one.glycogen == energy, "Zero elapsed time advances neither people nor farm state")
 
 func test_meal_subdivision() -> void:
 	var a := plowed([CELL, NEIGHBOUR])
@@ -400,14 +498,14 @@ func test_meal_subdivision() -> void:
 	var frames = Model.new()
 	for person in [one, frames]:
 		person.position = person.home + Vector2(4500, 0)
-		person.calories = 200.0
+		person.glycogen = 200.0
 		person.fatigue = 95.0
 	one.order(a, [CELL, NEIGHBOUR], DAY, "Sow", "Barley")
 	frames.order(b, [CELL, NEIGHBOUR], DAY, "Sow", "Barley")
-	one.eat(a, "Oats", 377)
-	frames.eat(b, "Oats", 377)
+	one.eat(a, "Oats", 359)
+	frames.eat(b, "Oats", 359)
 	one.advance(a, DAY, 6.0, 8.0)
 	for i in 8 * 120:
 		frames.advance(b, DAY, 6.0 + i / 120.0, 1.0 / 120.0)
-	check(a.stock == b.stock and a.plots == b.plots and a.stock.Oats == 7623 and one.meal_grams == 0 and frames.meal_grams == 0, "Frame size cannot change a non-frame-aligned meal's reserved grams or resumed field work")
-	check(one.position.is_equal_approx(frames.position) and is_equal_approx(one.calories, frames.calories) and is_equal_approx(one.fatigue, frames.fatigue) and is_equal_approx(one.health, frames.health), "Cooking across depleted energy and full fatigue preserves needs across frame subdivisions")
+	check(a.stock == b.stock and a.plots == b.plots and a.stock.Oats == 7641 and one.meal_grams == 0 and frames.meal_grams == 0, "Frame size cannot change a non-frame-aligned meal's reserved grams or resumed field work")
+	check(one.position.is_equal_approx(frames.position) and is_equal_approx(one.glycogen, frames.glycogen) and is_equal_approx(one.mass(), frames.mass()) and is_equal_approx(one.fatigue, frames.fatigue) and is_equal_approx(one.health, frames.health), "Cooking across depleted energy and full fatigue preserves needs across frame subdivisions")

@@ -104,7 +104,8 @@ func _refresh_recipe() -> void:
 	if _farm == null:
 		return
 	var available: int = _farm.stock.get(selected_crop, 0)
-	quantity.max_value = maxi(1, available)
+	var room: int = _person.room()
+	quantity.max_value = maxi(1, mini(available, room))
 	_selection.text = "%s · %s kg available" % [selected_crop if selected_crop != "" else "No grain", Farm.kg(available)]
 	var valid_amount: bool = is_finite(quantity.value) and quantity.value >= 1 and quantity.value == floor(quantity.value) and quantity.value <= available
 	_reason.text = ""
@@ -118,12 +119,15 @@ func _refresh_recipe() -> void:
 		_reason.text = "Your inventory has no available grain."
 	elif not valid_amount:
 		_reason.text = "Choose an amount from the available grain."
+	elif quantity.value > room:
+		_reason.text = "Too full: the stomach has room for %d g." % room
 	prepare.disabled = _reason.text != ""
+	var now := "Energy now: %d kcal · Stomach room: %d g" % [roundi(_person.glycogen), room]
 	if valid_amount:
 		var recipe: Dictionary = Human.porridge(selected_crop, int(quantity.value))
-		_preview.text = "%d kcal / 100 g dry grain\nMeal: %s kcal · %s min preparation\nFood energy now: %d kcal" % [Farm.CROPS[selected_crop].kcal_per_100g, String.num(recipe.calories, 2).trim_suffix(".0"), String.num(recipe.hours * 60, 1).trim_suffix(".0"), roundi(_person.calories)]
+		_preview.text = "%d kcal / 100 g dry grain\nMeal: %s kcal · %s min preparation\n%s" % [Farm.CROPS[selected_crop].kcal_per_100g, String.num(recipe.calories, 2).trim_suffix(".0"), String.num(recipe.hours * 60, 1).trim_suffix(".0"), now]
 	else:
-		_preview.text = "Energy now: %d kcal" % roundi(_person.calories)
+		_preview.text = now
 	_reason.visible = _reason.text != ""
 
 func _prepare() -> void:

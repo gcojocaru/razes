@@ -48,11 +48,11 @@ func run() -> void:
 		return
 	await click(game._camp_menu._origin + Vector2(0, 132))
 	var window = game._sleep_window
-	check(window.visible and person.sleep_remaining == 0 and person.calories == 2000, "Sleep opens a duration preview without starting or changing needs")
+	check(window.visible and person.sleep_remaining == 0 and person.glycogen == 1989.0, "Sleep opens a duration preview without starting or changing needs")
 	window.hours.get_line_edit().text = "2"
 	window.hours.get_line_edit().text_changed.emit("2")
 	await process_frame
-	check(window._preview.text.contains("60%") and window._preview.text.contains("1880 kcal"), "Typing two hours immediately predicts sixty percent restedness and remaining food energy")
+	check(window._preview.text.contains("45%") and window._preview.text.contains("1859 kcal") and window._preview.text.contains("65.0 kg"), "Typing two hours immediately predicts restedness, remaining energy and weight")
 	var focus: Vector3 = game._focus()
 	await click(Vector2(1000, 600))
 	check(game.selected.keys() == [cell] and game._focus() == focus, "Sleep configuration cannot click through to select land or move the camera")
@@ -77,7 +77,7 @@ func run() -> void:
 	game._process(1)
 	check(person.fatigue == 80 and person.sleep_remaining == 2 and game._day_time == clock, "Pause freezes the sleep clock and recovery")
 	game.advance_time(game.seconds_per_day / 24.0)
-	check(person.activity == "Sleeping" and is_equal_approx(person.sleep_remaining, 1) and is_equal_approx(person.fatigue, 60) and is_equal_approx(person.calories, 1940), "One hour earns exactly its predicted sleep recovery")
+	check(person.activity == "Sleeping" and is_equal_approx(person.sleep_remaining, 1) and is_equal_approx(person.fatigue, 67.5) and is_equal_approx(person.glycogen, 1989.0 - person.basal()), "One hour earns exactly its predicted sleep recovery")
 	game._open_food()
 	check(game._food_window.prepare.disabled, "Food preparation cannot spend grain during a pending sleep")
 	key(KEY_ESCAPE)
@@ -92,8 +92,12 @@ func run() -> void:
 	check(window.visible and window.start.disabled, "A pending meal must finish before Sleep can be confirmed")
 	key(KEY_ESCAPE)
 	game.advance_time(game.seconds_per_day / 48.0)
-	person.calories = 30
-	person.health = 1
+	# A body 50 g above the limit of survival, with no ready energy or food.
+	person.glycogen = 0.0
+	person.stomach = 0.0
+	person.stomach_kcal = 0.0
+	person.fat = 2.0
+	person.lean = Human.DEATH_BMI * Human.HEIGHT * Human.HEIGHT - 1.95
 	person.fatigue = 80
 	key(KEY_R)
 	window.hours.value = 8

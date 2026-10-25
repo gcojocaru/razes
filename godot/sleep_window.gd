@@ -17,7 +17,7 @@ func _init() -> void:
 	offset_top = 110
 	body.add_theme_constant_override("separation", 12)
 	body.minimum_size_changed.connect(_fit)
-	var explanation := _label("Sleep restores fatigue. Eating restores food energy.")
+	var explanation := _label("Sleep clears fatigue. Meals restore energy.")
 	explanation.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	body.add_child(explanation)
 	var duration := HBoxContainer.new()
@@ -66,11 +66,11 @@ func _refresh_prediction() -> void:
 		_reason.text = "Choose hours above zero and up to 24."
 	start.disabled = prediction.is_empty()
 	if not prediction.is_empty():
-		_preview.text = "Restedness: %d%% → %d%%\nFood energy: %d → %d kcal\nHealth: %d%% → %d%%\nTime including walk to camp: %s h" % [roundi(100 - _person.fatigue), roundi(100 - prediction.fatigue), roundi(_person.calories), roundi(prediction.calories), roundi(_person.health), roundi(prediction.health), String.num(prediction.hours, 2).trim_suffix("0").trim_suffix(".")]
+		_preview.text = "Restedness: %d%% → %d%%\nEnergy: %d → %d kcal\nWeight: %.1f → %.1f kg\nHealth: %d%% → %d%%\nTime including walk to camp: %s h" % [roundi(100 - _person.fatigue), roundi(100 - prediction.fatigue), roundi(_person.glycogen), roundi(prediction.glycogen), _person.mass(), prediction.mass, roundi(_person.health), roundi(prediction.health), String.num(prediction.hours, 2).trim_suffix("0").trim_suffix(".")]
 		if prediction.health <= 0:
 			_reason.text = "You will not survive this sleep. Eat before sleeping."
-		elif prediction.calories <= 0:
-			_reason.text = "Food energy will be depleted; health falls without food."
+		elif prediction.glycogen <= 0:
+			_reason.text = "Ready energy will run out; the body will burn fat and muscle."
 	_reason.visible = _reason.text != ""
 	_fit()
 

@@ -95,5 +95,39 @@ The game uses its energy per 100 g edible portion:
 These modern dry-grain references are proxies, not measurements of medieval
 Moldavian cultivars. For calorie accounting, game grams represent dry edible
 grain; dehulling/milling are abstracted without a separate mass or energy loss.
-Porridge water adds no calories. Cooking time and the person's calorie burn
-remain gameplay tuning; nutrients, spoilage and digestibility are not simulated.
+Porridge water adds no calories. Cooking time remains gameplay tuning; the
+person's calorie burn follows the body model below. Nutrients, spoilage and
+digestibility are not simulated.
+
+## Body and needs model — 25 October 2026
+
+The farmer's needs follow from a simulated body in `godot/human.gd`:
+
+| Quantity | Value | Source or reason |
+| --- | --- | --- |
+| Body | 1.718 m, 65 kg, 15% fat, BMI 22 | Game choice: a lean working adult, as tall as the 3D farmer |
+| Basal metabolism | 370 + 21.6 × lean kg kcal a day (1,563 at the start) | Katch–McArdle equation: needs no age or sex, and falls as starvation consumes lean mass |
+| Activity cost (× basal) | sleep 1.0, idle 1.4, cooking 2.1, walking 3.2, sowing and harvesting 4.1 | [FAO/WHO/UNU 2004, *Human energy requirements*, Table 5.1](https://www.fao.org/4/y5686e/y5686e07.htm): idle uses light leisure, sowing and harvesting non-mechanized agricultural work |
+| Hoeing (Plow) | 5.0 × basal | About 5 METs for moderate hoeing and digging in the [Compendium of Physical Activities](https://pacompendium.com/occupation/) |
+| Moving | basal + (ratio − 1) kcal an hour per kg moved, body plus load | One MET is about 1 kcal per kg an hour, so walking and field work cost more for a heavier body or a full sack; for the starting body this equals the ratio × basal |
+| Fat and lean loss | 9,400 and 1,800 kcal per kg; FORBES / fat kg of lean per kg of fat, FORBES = 10.4 kg | Hall, K. D. (2008), "What is the required energy deficit per unit weight loss?", *International Journal of Obesity* 32: 573–576, using Forbes' rule |
+| Fat and lean gain | a third of a surplus lost in storing; two thirds of the gain fat | Calibrated so 84 days of 1,000 kcal surplus add about 8 kg, as in [Bouchard et al. 1990](https://pubmed.ncbi.nlm.nih.gov/2336074/) (mean 8.1 kg); the fat share is a game choice |
+| Glycogen | 9 g per kg of lean mass at 4 kcal a gram (1,989 kcal) | A typical adult store of about half a kilogram in liver and muscle |
+| Stomach | 1.5 L, porridge at 4 ml per g of dry grain, so 375 g | Game interpretation of a hearty meal's volume |
+| Gut absorption | at most 2.5 × basal (163 kcal an hour at the start) | The alimentary limit of [Thurber et al. 2019](https://www.science.org/doi/10.1126/sciadv.aaw0341): sustained expenditure above about 2.5 × BMR must draw on body stores |
+| Health | full at BMI 18.5 or more, zero at 12.5 | 18.5 is the WHO underweight threshold; 12.5 is chosen so total starvation with water lasts about two months, as in the [1981 hunger strike](https://en.wikipedia.org/wiki/1981_Irish_hunger_strike), where Bobby Sands died after 66 days and three others after 60–61 |
+| Sleep and fatigue | 8 hours clear a day; 16 idle hours build 70% and nine hours' hoeing 30% more; 80% pace from 70%, 60% from 90% | Game tuning around the usual 7–9 hour adult need; [Van Dongen et al. 2003](https://pubmed.ncbi.nlm.nih.gov/12683469/) found cumulative deficits on 6 hours a night for two weeks |
+
+Checked in the running model: an idle farmer with no food keeps full health
+until day 26 and dies on day 60 at 36.9 kg (1.45 kg fat, 35.4 kg lean), where
+the previous model killed them 50 hours after 2,000 kcal of "food energy" ran
+out. A day of nine hours' hoeing, an hour each of walking and cooking, five idle
+hours and eight hours' sleep burns about 4,250 kcal, 2.7 times basal: above the
+2.0–2.4 FAO gives as sustainable for non-mechanized labour and above the gut's
+3,900 kcal a day, so even eating at every chance the farmer loses weight until
+lighter days balance it. A resting farmer fed at every chance for a day gains
+about 0.15 kg, two thirds of it fat.
+
+Not modelled: water, hulls (about a quarter of oat weight) and milling losses,
+threshing and dehulling labour, fitness and strength, sex and age, circadian
+timing of sleep, heat and cold, illness and injury.

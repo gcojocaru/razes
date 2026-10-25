@@ -47,12 +47,12 @@ func capture() -> void:
 	root.size = Vector2i(1000, 700)
 	await save("sleep-minimum")
 	root.size = Vector2i(1280, 800)
-	game.human.calories = 30
-	game.human.health = 1
+	starve(game.human)
 	game._sleep_window.hours.value = 8
 	await save("sleep-warning")
-	game.human.calories = 2000
-	game.human.health = 100
+	game.human.glycogen = Human.START_LEAN * Human.GLYCOGEN_PER_LEAN
+	game.human.fat = Human.START_FAT
+	game.human.lean = Human.START_LEAN
 	game._sleep_window.hide()
 	game.human.fatigue = 0
 	var cell := Vector2i(0, 8)
@@ -86,12 +86,18 @@ func capture() -> void:
 	game.advance_time(game.seconds_per_day / 24.0)
 	game.human.cancel(game.farm)
 	game.human.position = game.human.home
-	game.human.calories = 700
+	game.human.glycogen = 700
 	game.human.eat(game.farm, "Barley", 300)
 	game.advance_time(game.seconds_per_day / 24.0 * 0.1)
 	game._focus_person()
 	await save("cooking")
 	game.advance_time(game.seconds_per_day / 24.0 * 0.5)
+	game.toggle(game._body)
+	await save("body")
+	root.size = Vector2i(1000, 700)
+	await save("body-minimum")
+	root.size = Vector2i(1280, 800)
+	game.toggle(game._body)
 	game._day_time = game.seconds_per_day * 22.0 / 24.0
 	game.human.fatigue = 80
 	game.human.sleep(8)
@@ -106,13 +112,20 @@ func capture() -> void:
 	await save("inventory-minimum")
 	game.toggle(game._inventory)
 	game.human.wake_up()
-	game.human.calories = -90
-	game.human.health = 1
-	game.advance_time(game.seconds_per_day / 24.0)
+	starve(game.human)
+	game.advance_time(game.seconds_per_day / 24.0 * 4.0)
 	game._focus_person()
 	await save("dead")
 	print("Captured the human farming loop to " + output)
 	quit()
+
+## A body 50 g above the limit of survival, with no ready energy or food.
+func starve(person) -> void:
+	person.glycogen = 0.0
+	person.stomach = 0.0
+	person.stomach_kcal = 0.0
+	person.fat = 2.0
+	person.lean = Human.DEATH_BMI * Human.HEIGHT * Human.HEIGHT - 1.95
 
 func save(label: String) -> void:
 	current_scene._show_farm()

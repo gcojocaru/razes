@@ -96,36 +96,40 @@ func run() -> void:
 	food.quantity.get_line_edit().text = "450"
 	food.quantity.get_line_edit().text_changed.emit("450")
 	await process_frame
-	check(food._preview.text.contains("1750.5 kcal"), "Typing a portion updates its recipe before confirmation")
+	check(food.prepare.disabled and food._reason.text.contains("room for 375 g"), "A portion bigger than the stomach explains its room instead of preparing")
+	food.quantity.get_line_edit().text = "360"
+	food.quantity.get_line_edit().text_changed.emit("360")
+	await process_frame
+	check(food._preview.text.contains("1400.4 kcal") and not food.prepare.disabled, "Typing a portion updates its recipe before confirmation")
 	await click(food.prepare.get_global_rect().get_center())
-	check(not food.visible and game.human.eating_requested and game.human.meal_crop == "Oats" and game.human.meal_grams == 450, "Prepare commits the typed quantity and the chosen grain")
-	check(game.farm.stock.Oats == 7550 and game.farm.stock.Barley == 10000, "Exactly 450 g of oats is reserved without substituting barley")
+	check(not food.visible and game.human.eating_requested and game.human.meal_crop == "Oats" and game.human.meal_grams == 360, "Prepare commits the typed quantity and the chosen grain")
+	check(game.farm.stock.Oats == 7640 and game.farm.stock.Barley == 10000, "Exactly 360 g of oats is reserved without substituting barley")
 	key(KEY_G)
 	key(KEY_ENTER)
 	await process_frame
 	check(food.prepare.disabled, "A pending meal cannot be confirmed twice")
 	key(KEY_ESCAPE)
 	game.advance_time(game.seconds_per_day / 24.0 * 0.25)
-	check(is_equal_approx(game.human.calories, 1945.0), "Cooking takes time before adding food energy")
+	check(game.human.eating_requested and game.human.stomach_kcal == 0.0, "Cooking takes time before the porridge reaches the stomach")
 	game.advance_time(game.seconds_per_day / 24.0 * 0.5)
-	check(not game.human.eating_requested and is_equal_approx(game.human.calories, 3585.5), "450 g produces 1750.5 kcal after 45 game minutes of preparation")
+	check(not game.human.eating_requested and is_equal_approx(game.human.stomach_kcal, 1400.4 - 0.15 * game.human.digestion()), "360 g reaches the stomach as 1400.4 kcal after 36 game minutes, then digests")
 	key(KEY_G)
 	key(KEY_ENTER)
 	await process_frame
 	game.farm.stock.Oats = 100
 	game._show_farm()
-	check(food.quantity.value == 450 and food.prepare.disabled, "Stock changes invalidate the requested amount without silently shrinking the meal")
+	check(food.quantity.value == 360 and food.prepare.disabled, "Stock changes invalidate the requested amount without silently shrinking the meal")
 	await click(food.prepare.get_global_rect().get_center())
 	check(game.farm.stock.Oats == 100 and not game.human.eating_requested, "An unavailable portion cannot consume resources")
-	food.quantity.get_line_edit().text = "50"
-	food.quantity.get_line_edit().text_changed.emit("50")
+	food.quantity.get_line_edit().text = "20"
+	food.quantity.get_line_edit().text_changed.emit("20")
 	await process_frame
-	check(not food.prepare.disabled and food._preview.text.contains("194.5 kcal"), "Typing a smaller valid portion immediately enables preparation")
+	check(not food.prepare.disabled and food._preview.text.contains("77.8 kcal"), "Typing a smaller portion that fits the stomach immediately enables preparation")
 	for crop in Farm.CROPS:
 		game.farm.stock[crop] = 0
 	game._show_farm()
 	check(food.prepare.disabled and food.grain_buttons.is_empty(), "An empty inventory offers no phantom food")
-	game.human.health = 0
+	game.human.lean = 20.0
 	game.advance_time(game.seconds_per_day / 1440.0)
 	key(KEY_G)
 	check(game._game_over.visible and not food.visible and not game._camp_menu.visible, "Game Over closes and blocks both new camp controls")
