@@ -2,11 +2,19 @@ extends Node3D
 ## Original low-poly clothing and camp, interpreted rather than reconstructed.
 ## Geometry is in metres; only this root and the separate camp convert units.
 
+## Looks the creation screen offers; the farmer starts with the first of each.
+const SKINS := {"Tanned": Color("b6805c"), "Fair": Color("e0b89a"), "Rosy": Color("d39a7e"), "Olive": Color("9d7651"), "Brown": Color("7a523a")}
+const HAIRS := {"Dark brown": Color("382a23"), "Black": Color("1c1917"), "Chestnut": Color("6b3f26"), "Fair": Color("b08d58"), "Red": Color("8a3a1e"), "Grey": Color("8d877d")}
+const BEARDS := ["None", "Moustache", "Beard"]
+const CLOTHES := {"Undyed linen": Color("c4b393"), "Bleached linen": Color("e4ddc9"), "Grey wool": Color("8b877b"), "Brown wool": Color("6d5844"), "Madder red": Color("8f3d2f"), "Woad blue": Color("4d6275")}
+
 var _metres_to_units: float
 var _time := 0.0
 var _body: Node3D
 var _tunic: MeshInstance3D
 var _head: Node3D
+var _moustache: MeshInstance3D
+var _beard: MeshInstance3D
 var _left_arm: Node3D
 var _right_arm: Node3D
 var _left_forearm: Node3D
@@ -19,10 +27,11 @@ var _sickle: Node3D
 var _label: Label3D
 
 var _linen := _material(Color("c4b393"))
+var _clothes := _material(CLOTHES.values()[0])
 var _trousers := _material(Color("484b40"))
 var _leather := _material(Color("493427"))
-var _skin := _material(Color("b6805c"))
-var _hair := _material(Color("382a23"))
+var _skin := _material(SKINS.values()[0])
+var _hair := _material(HAIRS.values()[0])
 var _wood := _material(Color("775336"))
 var _iron := _material(Color("606665"))
 var _burlap := _material(Color("a78c60"))
@@ -32,7 +41,7 @@ func _init(metres_to_units: float) -> void:
 	name = "Farmer"
 	scale = Vector3.ONE * metres_to_units
 	_body = _pivot(self, "Body", Vector3.ZERO)
-	_tunic = _part(_body, _cylinder(0.23, 0.28, 0.64), _linen, Vector3(0, 1.08, 0))
+	_tunic = _part(_body, _cylinder(0.23, 0.28, 0.64), _clothes, Vector3(0, 1.08, 0))
 	_tunic.scale.z = 0.65
 	var belt := _part(_body, _cylinder(0.266, 0.266, 0.06), _leather, Vector3(0, 0.95, 0))
 	belt.scale.z = 0.66
@@ -43,9 +52,13 @@ func _init(metres_to_units: float) -> void:
 	var hair := _part(_head, _sphere(0.132, 0.18), _hair, Vector3(0, 0.068, 0.014))
 	hair.scale.z = 0.94
 	_part(_head, _box(Vector3(0.07, 0.075, 0.06)), _skin, Vector3(0, -0.005, -0.12))
+	_moustache = _part(_head, _box(Vector3(0.1, 0.022, 0.03)), _hair, Vector3(0, -0.045, -0.118))
+	_beard = _part(_head, _sphere(0.1, 0.16), _hair, Vector3(0, -0.09, -0.055))
+	_moustache.visible = false
+	_beard.visible = false
 	for side in [-1, 1]:
 		var arm := _pivot(_body, "LeftArm" if side < 0 else "RightArm", Vector3(side * 0.265, 1.34, 0))
-		_part(arm, _cylinder(0.095, 0.078, 0.25), _linen, Vector3(0, -0.12, 0))
+		_part(arm, _cylinder(0.095, 0.078, 0.25), _clothes, Vector3(0, -0.12, 0))
 		var forearm := _pivot(arm, "Forearm", Vector3(0, -0.24, 0))
 		_part(forearm, _cylinder(0.058, 0.042, 0.22), _skin, Vector3(0, -0.11, 0))
 		_part(forearm, _box(Vector3(0.085, 0.105, 0.07)), _skin, Vector3(0, -0.255, 0))
@@ -82,7 +95,6 @@ func _init(metres_to_units: float) -> void:
 	locator.scale.y = 0.25
 	_label = Label3D.new()
 	_label.name = "Name"
-	_label.text = "Farmer"
 	_label.font_size = 32
 	_label.pixel_size = 0.003
 	_label.fixed_size = true
@@ -93,12 +105,26 @@ func _init(metres_to_units: float) -> void:
 	_label.outline_modulate = Color("2c281f")
 	add_child(_label)
 
+## Colours the farmer and grows the beard chosen on the creation screen.
+func dress(peasant: Dictionary) -> void:
+	_skin.albedo_color = SKINS[peasant.skin]
+	_hair.albedo_color = HAIRS[peasant.hair]
+	_clothes.albedo_color = CLOTHES[peasant.clothes]
+	_moustache.visible = peasant.beard != "None"
+	_beard.visible = peasant.beard == "Beard"
+
 func show_person(person, seconds: float) -> void:
 	_time += maxf(seconds, 0.0)
 	position = Vector3(person.position.x, 0, person.position.y) * _metres_to_units
 	if person.facing.length_squared() > 0.0001:
 		rotation.y = atan2(-person.facing.x, -person.facing.y)
 	var swing := sin(_time * 7.5)
+	# The mesh is the default body; mass grows with height and the square of width.
+	var tall: float = person.height / Human.HEIGHT
+	var wide := sqrt(person.mass() / (Human.START_FAT + Human.START_LEAN) / tall)
+	_body.scale = Vector3(wide, tall, wide)
+	_label.text = person.name
+	_label.position.y = person.height + 0.43
 	_body.position = Vector3.ZERO
 	_body.rotation = Vector3.ZERO
 	_tunic.scale.z = 0.65
@@ -144,7 +170,7 @@ func show_person(person, seconds: float) -> void:
 					_left_arm.rotation.x = 1.0 + swing * 0.15
 					_left_forearm.rotation.x = 0.25
 		"Resting", "Cooking":
-			_body.position.y = -0.68
+			_body.position.y = -0.68 * tall
 			_tunic.scale.z += sin(_time * 2.0) * 0.009
 			_left_leg.rotation.x = PI / 2
 			_right_leg.rotation.x = PI / 2
@@ -175,7 +201,8 @@ func create_camp() -> Node3D:
 	var soil := _material(Color("75674c"))
 	_part(camp, _cylinder(2.2, 2.2, 0.018, 20), soil, Vector3(0, 0.009, 0))
 	var blanket := _material(Color("71715a"))
-	var bedroll := _part(camp, _box(Vector3(0.78, 0.08, 1.9)), blanket, Vector3(0, 0.06, 0.85))
+	# Long and wide enough for the tallest and heaviest peasant the creation screen allows.
+	var bedroll := _part(camp, _box(Vector3(0.9, 0.08, 2.0)), blanket, Vector3(0, 0.06, 0.9))
 	bedroll.name = "Bedroll"
 	_part(camp, _box(Vector3(0.64, 0.12, 0.28)), _linen, Vector3(0, 0.13, 1.56))
 	var rolled := _part(camp, _cylinder(0.12, 0.12, 0.78), blanket, Vector3(0, 0.17, -0.08))
