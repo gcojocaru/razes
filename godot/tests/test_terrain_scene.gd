@@ -47,7 +47,20 @@ func run() -> void:
 				var picked: Vector2i = game.cell_at_screen(game._camera.unproject_position(world))
 				check(picked == cell, "Picking finds %s at %s after camera rotation; got %s" % [cell, world, picked])
 		tested += 1
-	var hill: Vector2i = land.filter(func(cell: Vector2i) -> bool: return game.cell_center(cell).y > 0.5)[0]
+	var pond: Vector2 = game.terrain.ponds[0].center
+	game._place_camera(game._surface_point(pond))
+	game._start_camp_placement()
+	var before: Vector2 = game.terrain.camp
+	check(not game.place_camp(game._camera.unproject_position(game._surface_point(pond))) and game.terrain.camp == before and game.placing_camp, "A camp cannot move into a pond and the old camp stays")
+	game.placing_camp = false
+	var spot: Vector3 = game.cell_center(land[0])
+	game._zoom = 8.0
+	game._place_camera(spot)
+	game._start_camp_placement()
+	check(game.placing_camp and game.place_camp(game._camera.unproject_position(spot)), "Move places the camp on clicked dry ground")
+	check(not game.placing_camp and game.human.home == game.terrain.camp / game.METRES_TO_UNITS and Vector2(game._camp.position.x, game._camp.position.z).is_equal_approx(Vector2(spot.x, spot.z)), "The camp moves to the centre of the clicked plot")
+	check(game.terrain.cell_reason(land[0]) == "Camp" and game.farm.action(land[0], game.day).reason == "Camp", "The camp's plot cannot be farmed")
+	var hill: Vector2i = land.filter(func(cell: Vector2i) -> bool: return cell != land[0] and game.cell_center(cell).y > 0.5)[0]
 	var at: Vector3 = game.cell_center(hill)
 	game.human.position = Vector2(at.x, at.z) / game.METRES_TO_UNITS
 	game._show_person()
@@ -82,7 +95,7 @@ func run() -> void:
 	game.work("Plow")
 	check(game.human.queue.size() == 1, "The player can queue work on an elevated dry plot")
 	game._zoom = 6.0
-	var camp: Vector3 = game._surface_point(Vector2(-17, 0))
+	var camp: Vector3 = game._surface_point(game.terrain.camp)
 	game._place_camera(camp)
 	check(game._camp_at(game._camera.unproject_position(camp)), "The camp remains clickable on its compact dry clearing")
 	var camp_view = load("res://game.tscn").instantiate()

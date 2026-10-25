@@ -2,6 +2,9 @@
 
 Godot 4.7.2.stable.official.ed1daf0bf, macOS, Apple M4, Compatibility renderer.
 
+Run every suite with `./run_tests.sh` (set `GODOT_BIN` if `godot` is not on the path).
+The per-feature notes below record suite counts at their time.
+
 ## Land presets — 25 October 2026
 
 - The creation screen's **Land** section offers Steppe (hills up to 7 m, one

@@ -50,7 +50,7 @@ func run() -> void:
 		current_scene.free()
 		quit(1)
 		return
-	await click(game._camp_menu._origin + Vector2(0, 132))
+	await click(game._camp_menu._origin + Vector2.from_angle(game._camp_menu._angle(1)) * 132)
 	var window = game._sleep_window
 	check(window.visible and person.sleep_remaining == 0 and person.glycogen == 1989.0, "Sleep opens a duration preview without starting or changing needs")
 	window.hours.get_line_edit().text = "2"

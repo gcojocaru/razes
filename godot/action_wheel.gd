@@ -13,6 +13,8 @@ const ICONS := {
 	"Harvest": preload("res://assets/actions/harvest.svg"),
 	"Eat": preload("res://assets/actions/eat.svg"),
 	"Sleep": preload("res://assets/actions/sleep.svg"),
+	# shortcut: reuses the generic actions icon, until a camp-move icon is drawn.
+	"Move": preload("res://assets/actions/actions.svg"),
 	"Barley": preload("res://assets/actions/barley.svg"),
 	"Oats": preload("res://assets/actions/oats.svg"),
 	"Millet": preload("res://assets/actions/millet.svg"),

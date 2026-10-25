@@ -25,8 +25,8 @@ farmland), **Hills** (18 m, two ponds; the default), **Lakeland** (11 m, four
 ponds: the least farmland) or **Custom** (0–24 m and 0–4 ponds). Farm dry,
 gentle slopes as usual; water, wet banks and steep plots show why they cannot
 be worked. The farmer follows dry routes around ponds for jobs, hauling, meals
-and sleep. The camp keeps a small clearing, level at its own ground height,
-while people, crops, picking and the camera follow the terrain. The ledger lists
+and sleep. A new game first pauses for you to click dry, gentle ground for the camp;
+the camp menu's **Move** shifts it later (Escape cancels). People, crops, picking and the camera follow the terrain. The ledger lists
 usable plots and water; the field covers 2.56 hectares, with its farmable area
 varying by land and seed. Each start uses a fresh seed, with repeatable terrain
 for a given seed and land; **Restart** keeps the land on a fresh seed.

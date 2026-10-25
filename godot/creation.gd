@@ -262,6 +262,7 @@ func _begin() -> void:
 	if begin.disabled:
 		return
 	Human.peasant = peasant.duplicate()
+	preload("res://game.gd").choose_camp = true
 	Terrain.land = land.duplicate()
 	var error := get_tree().change_scene_to_file("res://game.tscn")
 	if error != OK:

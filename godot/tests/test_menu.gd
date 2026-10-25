@@ -161,6 +161,14 @@ func run() -> void:
 			await process_frame
 			check(current_scene.human.name == "Ion" and current_scene._human_actor._beard.visible and is_equal_approx(current_scene.human.mass(), 65.0), "Restart begins again with the same peasant")
 			check(current_scene.terrain.hills == 11.0 and current_scene.terrain.ponds.size() == 4 and current_scene.terrain.seed != first_seed, "Restart keeps the land with a fresh field")
+		check(current_scene.placing_camp and current_scene.speed == 0, "A new game first pauses to choose the camp's place")
+		for cell in 256:
+			if current_scene.terrain.cell_reason(Vector2i(cell % 16, cell / 16)) == "":
+				var spot: Vector3 = current_scene.cell_center(Vector2i(cell % 16, cell / 16))
+				current_scene._place_camera(spot)
+				if current_scene.place_camp(current_scene._camera.unproject_position(spot)):
+					break
+		check(not current_scene.placing_camp and current_scene.human.position == current_scene.human.home and current_scene.speed == 1, "Clicking dry ground pitches camp with the peasant and resumes time")
 		check(current_scene.has_node("Field"), "Game shows the grid field")
 		check(current_scene.cell_at_world(Vector3(-15.9, 0, -15.9)) == Vector2i(0, 0), "Field corner is cell 0,0")
 		check(current_scene.cell_at_world(current_scene.cell_center(Vector2i(5, 9))) == Vector2i(5, 9), "Cell centre maps back to its cell")

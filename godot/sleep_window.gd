@@ -8,6 +8,8 @@ var start := Button.new()
 var _preview := Label.new()
 var _reason := Label.new()
 var _person: Human
+## What the shown forecast was made from; the 24-hour forecast is too slow to redo every frame.
+var _forecast_key := []
 
 func _init() -> void:
 	super("Sleep at camp", "Escape", 420, 300)
@@ -48,7 +50,10 @@ func _init() -> void:
 
 func show_sleep(person: Human) -> void:
 	_person = person
-	_refresh_prediction()
+	var key := [hours.value, person.position, snappedf(person.fatigue, 0.1), roundi(person.glycogen), person.sleep_remaining, person.eating_requested, person.activity]
+	if key != _forecast_key:
+		_forecast_key = key
+		_refresh_prediction()
 
 func _refresh_prediction() -> void:
 	if _person == null:

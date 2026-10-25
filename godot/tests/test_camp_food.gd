@@ -54,7 +54,7 @@ func run() -> void:
 		current_scene.free()
 		quit(1)
 		return
-	check(game._camp_menu.entries.map(func(entry): return entry.action) == ["Eat", "Sleep"], "Camp has Eat and Sleep wheel segments")
+	check(game._camp_menu.entries.map(func(entry): return entry.action) == ["Eat", "Sleep", "Move"], "Camp has Eat, Sleep and Move wheel segments")
 	for action in ["Eat", "Sleep"]:
 		check(game._camp_menu.ICONS[action].get_size() == Vector2(64, 64), action + " has a matching wheel icon")
 	key(KEY_ENTER)

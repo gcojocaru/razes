@@ -119,7 +119,7 @@ func order(farm: Farm, cells: Array, day: int, action := "", crop := "") -> int:
 		var next := farm.action(cell, day, crop)
 		if next.reason != "" or (action != "" and action != next.name):
 			continue
-		var destination := Vector2(cell) * 10.0 - Vector2.ONE * 75.0
+		var destination := plot_centre(cell)
 		if not _reachable(home, destination) or not _reachable(position, home):
 			message = "No dry route to this plot and camp"
 			continue
@@ -131,6 +131,10 @@ func order(farm: Farm, cells: Array, day: int, action := "", crop := "") -> int:
 	if added:
 		message = "%d job%s queued" % [added, "" if added == 1 else "s"]
 	return added
+
+## Where the farmer stands to work a plot, in metres.
+static func plot_centre(cell: Vector2i) -> Vector2:
+	return (Vector2(cell) - Vector2.ONE * 7.5) * 10.0
 
 func reserved_seed() -> int:
 	var total: int = job.get("seed", 0)
@@ -318,7 +322,7 @@ func _step(farm: Farm, day: int, _hour: float, hours: float) -> float:
 		carried_crop = job.crop
 		carried = job.seed
 		_carrying_seed = true
-	var destination := Vector2((job.cell.x - 7.5) * 10.0, (job.cell.y - 7.5) * 10.0)
+	var destination := plot_centre(job.cell)
 	if position.distance_to(destination) > EPSILON:
 		return _walk(farm, destination, hours)
 	position = destination

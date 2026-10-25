@@ -13,7 +13,7 @@ func _initialize() -> void:
 
 ## Plots counted by reason ("" is usable), and whether camp has a route to every usable plot.
 func survey(terrain) -> Dictionary:
-	var plots := {"": 0, "Water": 0, "Too steep": 0, "Unreachable": 0, "routed": true}
+	var plots := {"": 0, "Water": 0, "Too steep": 0, "Unreachable": 0, "Camp": 0, "routed": true}
 	for x in 16:
 		for z in 16:
 			var reason: String = terrain.cell_reason(Vector2i(x, z))
@@ -73,10 +73,7 @@ func run() -> void:
 		check(terrain.hills == 18.0 and terrain.ponds.size() == 2, "Seed %d makes the Hills preset's land by default" % terrain_seed)
 		for pond in terrain.ponds:
 			check(absf(pond.center.x) < 11.0 and absf(pond.center.y) < 11.0 and terrain.height_at(pond.center) < terrain.WATER_LEVEL, "Seed %d keeps real pond basins inside the playing field" % terrain_seed)
-		var camp_level: bool = terrain.height_at(terrain.CAMP) > terrain.WATER_LEVEL
-		for direction in 16:
-			camp_level = camp_level and terrain.height_at(terrain.CAMP + Vector2.from_angle(direction * TAU / 16.0)) == terrain.height_at(terrain.CAMP)
-		check(camp_level, "Seed %d leaves a compact level dry camp" % terrain_seed)
+		check(terrain.height_at(terrain.CAMP) > terrain.WATER_LEVEL, "Seed %d leaves the default camp dry" % terrain_seed)
 		var farmable := 0
 		var water := 0
 		var low := INF
@@ -175,6 +172,10 @@ func run() -> void:
 	check(vertex_picking, "Rotated oblique rays pick lattice vertices and edges without precision misses")
 	check(first.ray_hit(Vector3(0, 20, 0), Vector3.UP) == null and first.ray_hit(Vector3(0, 20, 0), Vector3.ZERO) == null, "Rays pointing away or with no direction miss")
 	check(first.path(first.CAMP, Vector2(-30, 0)).is_empty(), "Walking stays inside the playable navigation area")
+	var moved = Terrain.new(3, {"hills": 0.0, "ponds": 0})
+	check(not moved.set_camp(Vector2(-30, 0)) and moved.camp == moved.CAMP, "A camp cannot move off the playable area")
+	check(moved.set_camp(Vector2(10.4, 9.6)) and moved.camp == Vector2(10, 10) and survey(moved).Unreachable == 0, "A moved camp snaps to the lattice and reaches the flat field")
+	check(moved.set_camp(Vector2(11, 11)) and moved.cell_reason(Vector2i(13, 13)) == "Camp" and moved.cell_reason(Vector2i(12, 12)) == "" and survey(moved).Camp == 1, "Only the plot under the camp is closed to farming")
 	if failures.is_empty():
-		print("PASS: 30 seeded landscapes, in-field ponds and farmable hills, level camps on high ground, three presets and custom extremes, validated walking edges and route resumption, exact rendered heights and terrain/water picking")
+		print("PASS: 30 seeded landscapes, in-field ponds and farmable hills, camps on high ground, camp moves, three presets and custom extremes, validated walking edges and route resumption, exact rendered heights and terrain/water picking")
 	quit(0 if failures.is_empty() else 1)

@@ -58,6 +58,14 @@ var _camp_menu: Control
 var _food_window: PanelContainer
 var _sleep_window: PanelContainer
 var _camp_press := Vector2.INF
+var _camp: Node3D
+## Set by the creation screen so each new game starts by choosing the camp's place.
+static var choose_camp := false
+## While true, the next left click on the ground places the camp; _first_camp
+## is true until the camp has been placed once this game.
+var placing_camp := false
+var _first_camp := false
+var _camp_hint: Label
 ## The crop last picked for sowing; see seed_crop().
 var _seed_choice := ""
 var _farm_hud: PanelContainer
@@ -141,10 +149,10 @@ func _ready() -> void:
 		human.create(Human.peasant)
 		_human_actor.dress(Human.peasant)
 	add_child(_human_actor)
-	var camp: Node3D = _human_actor.create_camp()
-	camp.position = _surface_point(human.home * METRES_TO_UNITS)
-	add_child(camp)
-	_weather_effects = preload("res://weather_effects.gd").new(_sun, _environment, _field, camp.get_node("Firelight"))
+	_camp = _human_actor.create_camp()
+	_camp.position = _surface_point(human.home * METRES_TO_UNITS)
+	add_child(_camp)
+	_weather_effects = preload("res://weather_effects.gd").new(_sun, _environment, _field, _camp.get_node("Firelight"))
 	add_child(_weather_effects)
 	_weather_audio = preload("res://weather_audio.gd").new()
 	add_child(_weather_audio)
@@ -207,10 +215,75 @@ func _ready() -> void:
 	_camp_menu = preload("res://camp_menu.gd").new()
 	_camp_menu.eat_selected.connect(_open_food)
 	_camp_menu.sleep_selected.connect(_open_sleep)
+	_camp_menu.move_selected.connect(_start_camp_placement)
 	hud.add_child(_camp_menu)
+	_camp_hint = Label.new()
+	_camp_hint.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
+	_camp_hint.position.y = 90
+	_camp_hint.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	_camp_hint.add_theme_font_override("font", TimeHud.serif_font())
+	_camp_hint.add_theme_font_size_override("font_size", 22)
+	_camp_hint.add_theme_color_override("font_color", TimeHud.PARCHMENT)
+	_camp_hint.add_theme_color_override("font_outline_color", TimeHud.INK)
+	_camp_hint.add_theme_constant_override("outline_size", 6)
+	_camp_hint.hide()
+	hud.add_child(_camp_hint)
 	_game_over = _make_game_over()
 	hud.add_child(_game_over)
 	_start_day()
+	if choose_camp:
+		_first_camp = true
+		_start_camp_placement()
+
+## Pauses and waits for a left click on dry, walkable ground for the camp.
+func _start_camp_placement() -> void:
+	if human.activity == "Dead":
+		return
+	_camp_menu.hide()
+	_farm_hud.action_wheel.hide()
+	placing_camp = true
+	set_speed(0)
+	_camp_hint.text = "Click dry ground to pitch your camp" if _first_camp else "Click dry ground to move your camp (Escape cancels)"
+	_camp_hint.show()
+
+## Moves the camp under the pointer; a first camp also places the peasant there.
+func place_camp(screen_position: Vector2) -> bool:
+	var hit = terrain.ray_hit(_camera.project_ray_origin(screen_position), _camera.project_ray_normal(screen_position))
+	if hit == null:
+		return false
+	var old: Vector2 = terrain.camp
+	# Camps stand in the middle of the plot clicked, not on its corner.
+	var spot := (Vector2(hit.x, hit.z) / CELL_SIZE).floor() * CELL_SIZE + Vector2.ONE * CELL_SIZE / 2.0
+	# The 2.2 m camp disc (0.44 units) must lie flat enough not to sink into the slope.
+	for direction in 8:
+		if absf(terrain.height_at(spot + Vector2.from_angle(direction * TAU / 8.0) * 0.25) - terrain.height_at(spot)) > 0.1:
+			_camp_hint.text = "Too steep for a camp; choose flatter ground"
+			return false
+	var cell := cell_at_world(Vector3(spot.x, 0, spot.y))
+	if farm.stage(cell) in ["Sown", "Ripe"]:
+		_camp_hint.text = "Crops grow there; harvest or choose another plot"
+		return false
+	if not terrain.set_camp(spot):
+		_camp_hint.text = "No one can camp there; choose dry, gentle ground"
+		return false
+	if not _first_camp and terrain.path(human.position * METRES_TO_UNITS, terrain.camp).is_empty():
+		terrain.set_camp(old)
+		_camp_hint.text = "No dry route from the peasant to there"
+		return false
+	human.home = terrain.camp / METRES_TO_UNITS
+	# Queued plots may no longer be reachable from the new camp.
+	if not human.queue.is_empty() or not human.job.is_empty():
+		human.cancel(farm)
+	if _first_camp:
+		human.position = human.home
+	_camp.position = _surface_point(terrain.camp)
+	_first_camp = false
+	placing_camp = false
+	_camp_hint.hide()
+	set_speed(_resume_speed)
+	_show_person()
+	_show_farm()
+	return true
 
 func _make_game_over() -> ColorRect:
 	var overlay := ColorRect.new()
@@ -366,6 +439,8 @@ func choose_crop(crop: String) -> void:
 ## Right-click: offers actions for the land under the pointer, selecting it unless
 ## it is already part of the selection.
 func _open_action_menu(position: Vector2) -> void:
+	if placing_camp:
+		return
 	if _camp_at(position):
 		_open_camp_menu(position)
 		return
@@ -481,6 +556,9 @@ func _stalk_mesh() -> ArrayMesh:
 	return mesh
 
 func set_speed(new_speed: int) -> void:
+	# Time waits for the camp; place_camp clears placing_camp before resuming.
+	if placing_camp and new_speed > 0:
+		return
 	if human.activity == "Dead":
 		speed = 0
 		_show_date()
@@ -555,6 +633,18 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	if _farm_hud.action_wheel.visible or _camp_menu.visible or (_sound_control.panel.visible and event is InputEventKey):
 		return
+	if placing_camp:
+		if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+			place_camp(event.position)
+			return
+		if event is InputEventKey and event.pressed and event.physical_keycode == KEY_ESCAPE and not _first_camp:
+			placing_camp = false
+			_camp_hint.hide()
+			set_speed(_resume_speed)
+			return
+		# Only camera controls while choosing; no plot selection or speed keys.
+		if event is InputEventKey or (event is InputEventMouseButton and event.button_index not in [MOUSE_BUTTON_WHEEL_UP, MOUSE_BUTTON_WHEEL_DOWN, MOUSE_BUTTON_RIGHT]):
+			return
 	if (_food_window.visible or _sleep_window.visible) and not (event is InputEventKey and event.physical_keycode in [KEY_SPACE, KEY_1, KEY_2, KEY_3]):
 		return
 	if event is InputEventMouseMotion and event.button_mask & MOUSE_BUTTON_MASK_RIGHT:

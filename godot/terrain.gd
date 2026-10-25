@@ -15,7 +15,7 @@ const PRESETS := {
 	"Lakeland": {"hills": 11.0, "ponds": 4},
 }
 ## The highest custom hills: with four ponds, 200 seeds still left every dry plot
-## reachable from camp and at least 78 of them farmable.
+## reachable from the default camp and at least 78 of them farmable.
 const MAX_HILLS := 24.0
 
 ## The land chosen on the creation screen. Each new game's terrain is made from
@@ -26,6 +26,8 @@ var seed: int
 ## How many metres the field's hills rise.
 var hills: float
 var ponds: Array[Dictionary] = []
+## Where the camp stands, in world units; see set_camp().
+var camp := CAMP
 var _noise := FastNoiseLite.new()
 var _heights := PackedFloat32Array()
 var _navigation := AStar2D.new()
@@ -45,12 +47,9 @@ func _init(terrain_seed: int, chosen: Dictionary = PRESETS.Hills) -> void:
 	for index in chosen.ponds:
 		ponds.append({"center": (locations[index] + Vector2(random.randf_range(-1.5, 1.5), random.randf_range(-1.5, 1.5))).rotated(rotation), "radii": Vector2(random.randf_range(2.5, 3.5), random.randf_range(2.5, 3.5))})
 	_heights.resize(SAMPLE_WIDTH * SAMPLE_WIDTH)
-	# The camp's compact clearing is level at its own ground height, so no bank walls it in.
-	var camp_level := _generated_height(CAMP)
 	for z in SAMPLE_WIDTH:
 		for x in SAMPLE_WIDTH:
-			var point := Vector2(x - 128, z - 128)
-			_heights[z * SAMPLE_WIDTH + x] = lerpf(camp_level, _generated_height(point), smoothstep(1.5, 4.0, point.distance_to(CAMP)))
+			_heights[z * SAMPLE_WIDTH + x] = _generated_height(Vector2(x - 128, z - 128))
 	for x in range(-18, 19):
 		for z in range(-18, 19):
 			if _walkable(Vector2(x, z)):
@@ -64,8 +63,17 @@ func _init(terrain_seed: int, chosen: Dictionary = PRESETS.Hills) -> void:
 				var next: Vector2i = current + offset
 				if NAV_BOUNDS.has_point(next) and _navigation.has_point(_navigation_id(next)) and _segment_clear(Vector2(current), Vector2(next)):
 					_navigation.connect_points(_navigation_id(current), _navigation_id(next))
-	var pending: Array[Vector2i] = [Vector2i(CAMP)]
-	_reachable[pending[0]] = true
+	set_camp(CAMP)
+
+## Moves the camp to a lattice point and re-floods what is reachable from it.
+## Returns false, changing nothing, when no one could stand there.
+func set_camp(point: Vector2) -> bool:
+	var start := Vector2i(point.round())
+	if not NAV_BOUNDS.has_point(start) or not _navigation.has_point(_navigation_id(start)):
+		return false
+	camp = Vector2(start)
+	_reachable = {start: true}
+	var pending: Array[Vector2i] = [start]
 	while not pending.is_empty():
 		var current: Vector2i = pending.pop_back()
 		for connection in _navigation.get_point_connections(_navigation_id(current)):
@@ -77,6 +85,11 @@ func _init(terrain_seed: int, chosen: Dictionary = PRESETS.Hills) -> void:
 		for z in 16:
 			var cell := Vector2i(x, z)
 			_reasons[cell] = _cell_reason(cell)
+	# The plot the camp stands on is not farmed; off-field camps block nothing.
+	var camp_cell := Vector2i(((camp + Vector2.ONE * 16.0) / 2.0).floor())
+	if _reasons.has(camp_cell):
+		_reasons[camp_cell] = "Camp"
+	return true
 
 func _generated_height(point: Vector2) -> float:
 	# A full 3.6-unit rise is 18 m.
