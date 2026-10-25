@@ -1,6 +1,9 @@
 extends SceneTree
 ## Crop and land rules, deterministic seasons and years, and the game screen wiring.
 
+## The old five-plot seed store, which these checks' seed arithmetic was written for.
+const OLD_STOCK := {"Barley": 10000, "Oats": 8000, "Millet": 1800, "Wheat": 7500, "Rye": 8000}
+
 const SPRING := 35
 const SUMMER := Calendar.DAYS_PER_MONTH * 3 + 10
 const AUTUMN := Calendar.DAYS_PER_SEASON * 2 + 10
@@ -100,9 +103,10 @@ func finish_work(game) -> void:
 
 func run() -> void:
 	var small := Farm.new()
+	small.stock = OLD_STOCK.duplicate()
 	small.act(Vector2i.ZERO, SPRING)
 	small.act(Vector2i.ZERO, SPRING, "Barley")
-	check(small.stock.Barley == 8000, "Sowing 100 m² uses 2 kg from the initial 10 kg of barley, stored as grams")
+	check(small.stock.Barley == 8000, "Sowing 100 m² uses 2 kg of 10 kg of barley, stored as grams")
 	small.plots[Vector2i.ZERO].stage = "Ripe"
 	small.act(Vector2i.ZERO, SPRING)
 	check(small.stock.Barley == 15000 and small.totals(1).gathered == 7000, "A fertile 100 m² barley harvest returns 7 kg and records that mass")
@@ -160,7 +164,7 @@ func run() -> void:
 	check(grown_in.call("Cloudy", "Oats") == Farm.CROPS.Oats.grain and grown_in.call("Rain", "Oats") > Farm.CROPS.Oats.grain and grown_in.call("Clear", "Oats") < Farm.CROPS.Oats.grain, "Cloudy seasons give the full yield, wet ones more and dry ones less")
 	check(1.0 - grown_in.call("Clear", "Millet") / float(Farm.CROPS.Millet.grain) < 1.0 - grown_in.call("Clear", "Oats") / float(Farm.CROPS.Oats.grain), "Drought costs millet less of its harvest than oats")
 	farm.stock.Wheat = 120300
-	check(farm.bags("Wheat") == [55000, 55000, 10300] and farm.bags("Millet") == [1800] and Farm.new().bags("Barley") == [10000], "Physical bag capacities stay the same and a partial bag preserves grams")
+	check(farm.bags("Wheat") == [55000, 55000, 10300] and farm.bags("Millet") == [9000] and Farm.new().bags("Barley") == [45000, 5000], "Physical bag capacities stay the same and a partial bag preserves grams")
 	farm.stock.Wheat = 110000
 	check(farm.bags("Wheat") == [55000, 55000], "Grain that fills its bags leaves no empty bag")
 	farm.stock.Wheat = 0
@@ -238,6 +242,7 @@ func run() -> void:
 	await process_frame
 	await process_frame
 	var game: Node3D = current_scene
+	game.farm.stock = OLD_STOCK.duplicate()
 	# A script error would stop this coroutine before quit() and hang the run.
 	if game == null or game.find_child("FarmHud", true, false) == null:
 		check(false, "The game screen loads")
@@ -250,7 +255,7 @@ func run() -> void:
 	game.weather = Weather.new(7)
 	game.day = SPRING
 	game._start_day()
-	var start_total := Farm.new().stored()
+	var start_total: int = game.farm.stored()
 	var panel_buttons := hud.find_children("*", "Button", true, false)
 	check(panel_buttons.all(func(button: Button) -> bool: return button.text.is_empty() and button.icon != null and not button.tooltip_text.is_empty() and not button.accessibility_name.is_empty()), "Every farm panel button has an icon, tooltip and accessible name")
 	check("Grain" not in "".join(texts(hud)) and "kg" not in "".join(texts(hud)), "The bottom panel has no grain counter or weight labels")
@@ -282,14 +287,14 @@ func run() -> void:
 	await click(game._camera.unproject_position(game.cell_center(extra)), true, true)
 	await click(game._camera.unproject_position(game.cell_center(extra)), false, true)
 	check(game.selected.size() == 7 and game.selected.has(extra), "Shift-click adds a plot to the selection")
-	var seeded: int = mini(6, Farm.STARTING_STOCK.Barley / barley.seed)
+	var seeded: int = mini(6, OLD_STOCK.Barley / barley.seed)
 	check("Sow Barley 5  -10 kg" in hud.buttons.Sow.tooltip_text and "Plow 1" in hud.buttons.Plow.tooltip_text, "Mixed selections explain each icon's action, crop, count and kilograms on hover")
 	check(seeded == 6 or "Seed for %d of 6" % seeded in hud._detail_label.text, "The panel says when seed runs short")
 	check(hud.action_button.visible and "Barley" in hud.buttons.Sow.tooltip_text, "The Sow button explains its crop, beside an actions button")
 	key(KEY_C)
 	var menu = hud.action_wheel
 	check(menu.visible and menu.entries.map(func(e: Dictionary): return e.action) == ["Plow", "Sow", "Sow"], "C opens a wheel with Plow and the two available crops")
-	var oats_sown: int = mini(6, Farm.STARTING_STOCK.Oats / Farm.CROPS.Oats.seed)
+	var oats_sown: int = mini(6, OLD_STOCK.Oats / Farm.CROPS.Oats.seed)
 	check(menu.entries[2].crop == "Oats" and menu.entries[2].plots == oats_sown and menu.entries[2].grain == -Farm.CROPS.Oats.seed * oats_sown, "The oats segment shows what it would sow and cost")
 	key(KEY_RIGHT)
 	for pressed in [true, false]:
@@ -371,7 +376,7 @@ func run() -> void:
 	check(game.farm.stage(Vector2i(12, 3)) == "Ripe" and game.farm.crop(Vector2i(13, 3)) == "Rye", "The debug window sets the selected plots")
 	var fill: Button = debug.find_children("*", "Button", true, false).filter(func(b: Button) -> bool: return b.text.begins_with("Add 100"))[0]
 	fill.pressed.emit()
-	check(game.farm.stock.Rye == Farm.STARTING_STOCK.Rye + 100000, "The debug window adds 100 kg rather than 100 g")
+	check(game.farm.stock.Rye == OLD_STOCK.Rye + 100000, "The debug window adds 100 kg rather than 100 g")
 	check("Harvest 2  +12.8 kg" in hud.buttons.Harvest.tooltip_text, "The Harvest icon explains fractional kilograms on hover")
 	game._start_selection(Vector2i(12, 3), false)
 	check("kg" not in "".join(texts(hud)) and "6.4 kg" in hud._detail_label.tooltip_text, "A ripe plot keeps fractional harvest weight in its tooltip")

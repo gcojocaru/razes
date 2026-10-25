@@ -158,8 +158,9 @@ after it; about one winter in five is cold enough to kill wheat. Each crop has
 its own store: sowing uses that crop's grain as seed and its harvest goes back
 to it. Grain is shown in kilograms, accurate to one gram: a plot is 100 m², sown at
 medieval manor rates of 2–4 bushels an acre (130–215 kg/ha; millet, sown thin,
-30 kg/ha). You start with 10 kg of barley, 8 of oats and rye, 7.5 of wheat and
-1.8 of millet, seed for five plots each and six of millet; the inventory shows
+30 kg/ha). You start with last year's grain: 50 kg of barley, 40 of oats and
+rye, 37.5 of wheat and 9 of millet, seed for 25 plots each and 30 of millet, and
+the food to last until the first barley ripens, about day 110; the inventory shows
 the total and each crop. Harvests vary with the season: each growing
 day's rain or sun counts towards the grain, so most years give 70–110% of the
 table's full harvest and a wet year up to a third more, oats fall to half in a

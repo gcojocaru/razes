@@ -1,6 +1,9 @@
 extends SceneTree
 ## Real terrain routes are shared by field work, carried grain and camp forecasts.
 
+## The old five-plot seed store, which these checks' seed arithmetic was written for.
+const OLD_STOCK := {"Barley": 10000, "Oats": 8000, "Millet": 1800, "Wheat": 7500, "Rye": 8000}
+
 const DAY := 9
 const SCALE := 0.2
 var failures: Array[String] = []
@@ -14,7 +17,7 @@ func _initialize() -> void:
 	call_deferred("run")
 
 func run() -> void:
-	var farm = Farm.new()
+	var farm = _old_farm()
 	var person = Human.new()
 	if not farm.get_property_list().any(func(property: Dictionary) -> bool: return property.name == "terrain") or not person.get_property_list().any(func(property: Dictionary) -> bool: return property.name == "terrain"):
 		check(false, "Farm and Human accept the same optional playable terrain")
@@ -45,7 +48,7 @@ func run() -> void:
 		return
 	var stock: Dictionary = farm.stock.duplicate()
 	check(not farm.act(wet, DAY) and farm.preview([wet], DAY, "Plow").plots == 0 and person.order(farm, [wet], DAY, "Plow") == 0 and farm.stock == stock and farm.plots.is_empty(), "Water refuses direct work, previews and queued work without changing plots or stock")
-	var stale_farm = Farm.new()
+	var stale_farm = _old_farm()
 	stale_farm.act(wet, DAY)
 	stale_farm.terrain = terrain
 	check(stale_farm.preview([wet], DAY, "Sow", "Barley").plots == 0 and person.order(stale_farm, [wet], DAY, "Sow", "Barley") == 0 and stale_farm.stock == stock, "A submerged sowing plot cannot reserve or spend seed, including through previews")
@@ -64,7 +67,7 @@ func run() -> void:
 	quit(0 if failures.is_empty() else 1)
 
 func test_pond_route(terrain, cell: Vector2i) -> void:
-	var farm = Farm.new()
+	var farm = _old_farm()
 	farm.terrain = terrain
 	farm.act(cell, DAY)
 	var person = Human.new()
@@ -101,9 +104,9 @@ func test_sleep_route(terrain, cell: Vector2i) -> void:
 	check(not preview.is_empty() and preview.hours > 2.0 + one.position.distance_to(one.home) / (Human.WALK_SPEED * 0.8), "The sleep forecast includes the longer walk around the pond")
 	one.sleep(2.0)
 	frames.sleep(2.0)
-	one.advance(Farm.new(), DAY, 6, preview.hours)
+	one.advance(_old_farm(), DAY, 6, preview.hours)
 	for step in 400:
-		frames.advance(Farm.new(), DAY, 6 + step * preview.hours / 400.0, preview.hours / 400.0)
+		frames.advance(_old_farm(), DAY, 6 + step * preview.hours / 400.0, preview.hours / 400.0)
 	check(one.position == one.home and one.sleep_remaining == 0 and is_equal_approx(one.fatigue, preview.fatigue) and is_equal_approx(one.glycogen, preview.glycogen) and is_equal_approx(one.mass(), preview.mass), "Actual routed travel and sleep match the needs and duration forecast")
 	check(frames.position == one.position and is_equal_approx(frames.sleep_remaining, one.sleep_remaining) and is_equal_approx(frames.fatigue, one.fatigue) and is_equal_approx(frames.glycogen, one.glycogen) and is_equal_approx(frames.mass(), one.mass()), "Pond routes and sleeping preserve needs across frame subdivisions")
 
@@ -117,7 +120,7 @@ func test_unreachable(terrain, wet: Vector2i) -> void:
 			if terrain.height_at(point) < terrain.WATER_LEVEL:
 				person.position = point / SCALE
 	check(person.position != person.home, "The unreachable-camp fixture starts in an actual pond")
-	var farm = Farm.new()
+	var farm = _old_farm()
 	farm.terrain = terrain
 	var stock: Dictionary = farm.stock.duplicate()
 	check(not person.sleep(2) and person.sleep_prediction(2).is_empty() and not person.eat(farm, "Barley", 300) and farm.stock == stock, "An unreachable camp refuses sleep and meals without hanging or reserving food")
@@ -138,19 +141,19 @@ func test_sleep_during_return() -> void:
 	for person in [one, frames]:
 		person.terrain = terrain
 		person.position = Vector2(1, 9) * 10.0 - Vector2.ONE * 75.0
-		person.cancel(Farm.new())
-		person.advance(Farm.new(), DAY, 6, 0.0041)
+		person.cancel(_old_farm())
+		person.advance(_old_farm(), DAY, 6, 0.0041)
 	var preview: Dictionary = one.sleep_prediction(2.0)
 	one.sleep(2.0)
 	frames.sleep(2.0)
-	one.advance(Farm.new(), DAY, 6, preview.hours)
+	one.advance(_old_farm(), DAY, 6, preview.hours)
 	for step in 400:
-		frames.advance(Farm.new(), DAY, 6 + step * preview.hours / 400.0, preview.hours / 400.0)
+		frames.advance(_old_farm(), DAY, 6 + step * preview.hours / 400.0, preview.hours / 400.0)
 	check(one.position == one.home and one.sleep_remaining == 0 and is_equal_approx(one.fatigue, preview.fatigue) and is_equal_approx(one.glycogen, preview.glycogen) and is_equal_approx(one.mass(), preview.mass), "Sleep requested during a return home finishes at its forecast duration with the predicted needs")
 	check(frames.position == one.position and is_equal_approx(frames.sleep_remaining, one.sleep_remaining) and is_equal_approx(frames.fatigue, one.fatigue) and is_equal_approx(frames.glycogen, one.glycogen) and is_equal_approx(frames.mass(), one.mass()), "An interrupted return route keeps the sleep duration and needs independent of frame subdivisions")
 
 func test_stale_route(terrain, wet: Vector2i) -> void:
-	var farm = Farm.new()
+	var farm = _old_farm()
 	farm.act(wet, DAY)
 	var person = Human.new()
 	person.order(farm, [wet], DAY, "Sow", "Barley")
@@ -158,3 +161,8 @@ func test_stale_route(terrain, wet: Vector2i) -> void:
 	person.terrain = terrain
 	person.advance(farm, DAY, 6, 0.1)
 	check(person.queue.is_empty() and person.job.is_empty() and person.carried == 0 and farm.stock.Barley == 10000 and farm.stage(wet) == "Plowed", "An unreachable stale sowing job is dropped and all reserved and carried seed is refunded once")
+
+func _old_farm() -> Farm:
+	var farm := Farm.new()
+	farm.stock = OLD_STOCK.duplicate()
+	return farm

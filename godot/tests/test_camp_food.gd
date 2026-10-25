@@ -66,7 +66,7 @@ func run() -> void:
 	await process_frame
 	var food = game._food_window
 	check(food.visible and not game._camp_menu.visible and not game.human.eating_requested and game.farm.stock == stock, "Choosing Eat opens inventory selection without spending grain or starting a meal")
-	check(food.grain_buttons.size() == 5, "The food window shows each starting grain bag")
+	check(food.grain_buttons.size() == Farm.CROPS.keys().reduce(func(bags: int, crop: String) -> int: return bags + game.farm.bags(crop).size(), 0), "The food window shows each starting grain bag")
 	food.quantity.value = 375
 	for grain in [["Barley", "1327.5", "354"], ["Oats", "1458.75", "389"], ["Millet", "1417.5", "378"], ["Wheat", "1226.25", "327"], ["Rye", "1267.5", "338"]]:
 		var bag = food.grain_buttons.filter(func(button): return button.crop == grain[0])[0]
@@ -107,7 +107,7 @@ func run() -> void:
 	check(food._preview.text.contains("1400.4 kcal") and not food.prepare.disabled, "Typing a portion updates its recipe before confirmation")
 	await click(food.prepare.get_global_rect().get_center())
 	check(not food.visible and game.human.eating_requested and game.human.meal_crop == "Oats" and game.human.meal_grams == 360, "Prepare commits the typed quantity and the chosen grain")
-	check(game.farm.stock.Oats == 7640 and game.farm.stock.Barley == 10000, "Exactly 360 g of oats is reserved without substituting barley")
+	check(game.farm.stock.Oats == Farm.STARTING_STOCK.Oats - 360 and game.farm.stock.Barley == Farm.STARTING_STOCK.Barley, "Exactly 360 g of oats is reserved without substituting barley")
 	key(KEY_G)
 	key(KEY_ENTER)
 	await process_frame
