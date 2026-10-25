@@ -18,6 +18,7 @@ var _pips := Control.new()
 var _year_bar := Control.new()
 var _buttons: Array[Button] = []
 var _condition := "Clear"
+var _night := false
 var _weather_icon := Control.new()
 var _temperature_label := Label.new()
 var _condition_label := Label.new()
@@ -102,6 +103,7 @@ func _init() -> void:
 func show_time(day: int, speed: int, weather: Dictionary, hour := 0.0) -> void:
 	_day = day
 	_condition = weather.condition
+	_night = Calendar.sun(day, hour).y < 0.0
 	_temperature_label.text = "%d°C" % weather.temperature
 	_condition_label.text = weather.condition
 	var d := Calendar.date(day)
@@ -120,13 +122,19 @@ func _draw_weather() -> void:
 	var sun := Color(0.96, 0.77, 0.3)
 	var cloud := Color(0.8, 0.8, 0.78) if _condition == "Cloudy" else Color(0.55, 0.57, 0.6)
 	if _condition == "Clear":
+		if _night:
+			_draw_moon(c, 10.0)
+			return
 		for i in 8:
 			var dir := Vector2.from_angle(i * TAU / 8)
 			_weather_icon.draw_line(c + dir * 10, c + dir * 15, sun, 2, true)
 		_weather_icon.draw_circle(c, 7, sun)
 		return
 	if _condition == "Cloudy":
-		_weather_icon.draw_circle(c + Vector2(7, -6), 6, sun)
+		if _night:
+			_draw_moon(c + Vector2(7, -6), 6.0)
+		else:
+			_weather_icon.draw_circle(c + Vector2(7, -6), 6, sun)
 	var top := c + Vector2(0, -4)
 	for blob in [[Vector2(-8, 3), 6.0], [Vector2(0, -1), 8.0], [Vector2(8, 3), 6.0]]:
 		_weather_icon.draw_circle(top + blob[0], blob[1], cloud)
@@ -140,6 +148,13 @@ func _draw_weather() -> void:
 		"Snow":
 			for x in [-7, 0, 7]:
 				_weather_icon.draw_circle(c + Vector2(x, 12 + absf(x) * 0.4), 2, Color(0.92, 0.95, 1))
+
+## The full moon that lights the night: pale, with darker seas.
+func _draw_moon(c: Vector2, radius: float) -> void:
+	var moon := Color(0.9, 0.9, 0.82)
+	_weather_icon.draw_circle(c, radius, moon)
+	for sea in [[Vector2(-0.3, -0.25), 0.28], [Vector2(0.3, 0.25), 0.22], [Vector2(0.15, -0.45), 0.15]]:
+		_weather_icon.draw_circle(c + sea[0] * radius, sea[1] * radius, moon.darkened(0.18))
 
 func _draw_icon() -> void:
 	var season: int = Calendar.date(_day).season
