@@ -62,6 +62,7 @@ var _seed_choice := ""
 var _farm_hud: PanelContainer
 var _ledger: PanelContainer
 var _inventory: PanelContainer
+var _body: PanelContainer
 var _wiki: PanelContainer
 ## One texel per cell for the field and crop shaders: R is (Farm.STAGES index +
 ## 8 × crop number, 1 for the first of Farm.CROPS) / 255, G the growth, B 1 when
@@ -158,6 +159,8 @@ func _ready() -> void:
 	hud.add_child(_ledger)
 	_inventory = preload("res://inventory.gd").new()
 	hud.add_child(_inventory)
+	_body = preload("res://body_window.gd").new()
+	hud.add_child(_body)
 	_wiki = preload("res://wiki.gd").new()
 	hud.add_child(_wiki)
 	_food_window = preload("res://food_window.gd").new()
@@ -171,6 +174,7 @@ func _ready() -> void:
 	_farm_hud.ledger_pressed.connect(toggle.bind(_ledger))
 	_farm_hud.inventory_pressed.connect(toggle.bind(_inventory))
 	_farm_hud.wiki_pressed.connect(toggle.bind(_wiki))
+	_human_hud.body_requested.connect(toggle.bind(_body))
 	if OS.is_debug_build():
 		_debug_panel = preload("res://debug_panel.gd").new(seconds_per_day)
 		_debug_panel.day_length_changed.connect(func(seconds: float) -> void:
@@ -232,7 +236,7 @@ func _make_game_over() -> ColorRect:
 func _end_game() -> void:
 	speed = 0
 	_sound_control.set_process_input(false)
-	for window in [_farm_hud.action_wheel, _camp_menu, _food_window, _sleep_window, _inventory, _ledger, _wiki, _sound_control, _debug_panel, _agri_debug]:
+	for window in [_farm_hud.action_wheel, _camp_menu, _food_window, _sleep_window, _inventory, _body, _ledger, _wiki, _sound_control, _debug_panel, _agri_debug]:
 		if is_instance_valid(window):
 			window.hide()
 	get_viewport().gui_release_focus()
@@ -245,7 +249,9 @@ func _show_date() -> void:
 func _show_person(seconds := 0.0) -> void:
 	_human_actor.show_person(human, seconds)
 	_human_hud.show_person(human)
-	_human_hud.visible = not _inventory.visible and not _wiki.visible and not _food_window.visible and not _sleep_window.visible
+	_human_hud.visible = not _inventory.visible and not _wiki.visible and not _food_window.visible and not _sleep_window.visible and not _body.visible
+	if _body.visible:
+		_body.show_body(human)
 	if _food_window.visible:
 		_food_window.show_food(farm, human)
 	if _sleep_window.visible:
@@ -273,6 +279,7 @@ func _open_food() -> void:
 		return
 	_camp_menu.hide()
 	_inventory.hide()
+	_body.hide()
 	_sleep_window.hide()
 	_food_window.show_food(farm, human)
 	_food_window.show()
@@ -289,6 +296,7 @@ func _open_sleep() -> void:
 	_camp_menu.hide()
 	_farm_hud.action_wheel.hide()
 	_inventory.hide()
+	_body.hide()
 	_food_window.hide()
 	_sleep_window.show_sleep(human)
 	_sleep_window.show()
@@ -357,6 +365,11 @@ func toggle(window: Control) -> void:
 	if human.activity == "Dead":
 		return
 	window.visible = not window.visible
+	# Inventory and Body share the left side with the food and sleep windows.
+	if window.visible and window in [_inventory, _body]:
+		for other in [_inventory, _body, _food_window, _sleep_window]:
+			if other != window:
+				other.hide()
 	_show_farm()
 
 ## Redraws crops and selection on the field and refreshes the farm panels.
@@ -539,6 +552,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_C: _farm_hud.open_action_menu()
 			KEY_L: toggle(_ledger)
 			KEY_I: toggle(_inventory)
+			KEY_B: toggle(_body)
 			KEY_H: _focus_person()
 			KEY_R:
 				if human.sleep_remaining > 0:

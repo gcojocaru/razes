@@ -1,6 +1,9 @@
 class_name Human
 extends RefCounted
 ## One farmer; positions are metres and all carried/reserved mass is integer grams.
+## Needs follow from a simulated body: lean mass sets basal metabolism, each activity
+## burns a multiple of it, meals digest into glycogen, and fat and lean tissue store
+## any surplus and pay any deficit. Health follows body mass; tiredness slows work.
 
 const WALK_SPEED := 4500.0
 const WORK_HOURS := {"Plow": 3.0, "Sow": 0.5, "Harvest": 2.0}
@@ -8,9 +11,41 @@ const BAG_CAPACITY := 15000
 const MEAL_GRAMS := 300
 const MEAL_HOURS := 0.5
 const MAX_SLEEP_HOURS := 24.0
-const SLEEP_BURN := 60.0
-const SLEEP_RECOVERY := 20.0
 const EPSILON := 0.00000001
+
+## A lean adult, 1.718 m like the 3D farmer, of 65 kg with 15% body fat (BMI 22).
+const HEIGHT := 1.718
+const START_FAT := 9.75
+const START_LEAN := 55.25
+## Energy use as multiples of basal metabolism: FAO 2004 physical activity ratios,
+## and about 5 METs for hoeing (Compendium of Physical Activities).
+const EFFORT := {"Sleeping": 1.0, "Idle": 1.4, "Cooking": 2.1, "Walking": 3.2, "Sow": 4.1, "Harvest": 4.1, "Plow": 5.0}
+## kcal in a kilogram of fat and of lean tissue, which is mostly water. By Forbes' rule
+## each kilogram of fat lost takes FORBES / fat kilograms of lean with it (Hall 2008).
+const FAT_KCAL := 9400.0
+const LEAN_KCAL := 1800.0
+const FORBES := 10.4
+## Storing a surplus wastes a third of it, and two thirds of the gain is fat, so
+## 84,000 kcal of overeating adds about 8 kg, as in Bouchard et al. 1990.
+const STORE_EFFICIENCY := 2.0 / 3.0
+const GAIN_FAT_SHARE := 2.0 / 3.0
+## Glycogen, the ready energy: about 9 g per kilogram of lean mass at 4 kcal a gram.
+const GLYCOGEN_PER_LEAN := 36.0
+## The stomach holds about 1.5 litres: 375 g of grain cooked as porridge at 4 ml a gram.
+const STOMACH_GRAMS := 375
+## The gut absorbs at most about 2.5 times basal metabolism, the alimentary limit of
+## Thurber et al. 2019; harder work than that runs down the body's stores.
+const ALIMENTARY_LIMIT := 2.5
+## Health is full down to a BMI of 18.5 and gone at 12.5, which total starvation
+## reaches in about two months, as in the 1981 hunger strike (60–66 days).
+const HEALTHY_BMI := 18.5
+const DEATH_BMI := 12.5
+## Eight hours' sleep a day clears a day's fatigue: 16 idle hours awake build 70 and
+## nine hours' hoeing 30 more. From 70 and from 90 work and walking slow down.
+const SLEEP_HOURS := 8.0
+const AWAKE_TIRING := 70.0 / 16.0
+const EFFORT_TIRING := 30.0 / (9.0 * 3.6)
+const TIRED_PACE := {70.0: 0.8, 90.0: 0.6}
 
 var home := Vector2(-85, 0)
 var position := home
@@ -20,9 +55,18 @@ var job: Dictionary = {}
 var queue: Array[Dictionary] = []
 var carried_crop := ""
 var carried := 0
-var calories := 2000.0
+var fat := START_FAT
+var lean := START_LEAN
+## kcal of glycogen, full at the start.
+var glycogen := START_LEAN * GLYCOGEN_PER_LEAN
+## Porridge not yet digested: grams of dry grain and the kcal they still hold.
+var stomach := 0.0
+var stomach_kcal := 0.0
 var fatigue := 0.0
-var health := 100.0
+## 100 down to 0 as the body falls from a BMI of 18.5 to 12.5.
+var health: float:
+	get:
+		return 0.0 if activity == "Dead" else clampf(inverse_lerp(DEATH_BMI, HEALTHY_BMI, bmi()), 0.0, 1.0) * 100.0
 var message := "Ready for work"
 var sleep_remaining := 0.0
 var eating_requested := false
@@ -64,6 +108,44 @@ func reserved_seed() -> int:
 		total += waiting.seed
 	return total
 
+func mass() -> float:
+	return fat + lean
+
+func bmi() -> float:
+	return mass() / (HEIGHT * HEIGHT)
+
+## Basal metabolic rate in kcal an hour, from lean mass (Katch–McArdle).
+func basal() -> float:
+	return (370.0 + 21.6 * lean) / 24.0
+
+## kcal an hour `action` burns. Moving adds about 1 kcal per kilogram moved for each
+## step of effort above basal (one MET), so weight and loads make it dearer.
+func burn(action: String) -> float:
+	var effort: float = EFFORT[action]
+	if action == "Walking" or action in WORK_HOURS:
+		return basal() + (effort - 1.0) * (mass() + carried / 1000.0)
+	return basal() * effort
+
+## Fatigue points an hour `action` adds, or clears when negative.
+func tiring(action: String) -> float:
+	return -100.0 / SLEEP_HOURS if action == "Sleeping" else AWAKE_TIRING + EFFORT_TIRING * (EFFORT[action] - EFFORT.Idle)
+
+## kcal an hour the gut absorbs while there is food in it.
+func digestion() -> float:
+	return ALIMENTARY_LIMIT * basal()
+
+## Share of normal working and walking pace that tiredness leaves.
+func pace() -> float:
+	var result := 1.0
+	for tired in TIRED_PACE:
+		if fatigue >= tired - EPSILON:
+			result = TIRED_PACE[tired]
+	return result
+
+## Grams of dry grain the stomach has room for.
+func room() -> int:
+	return floori(STOMACH_GRAMS - stomach + EPSILON)
+
 func cancel(farm: Farm) -> void:
 	if activity == "Dead":
 		return
@@ -96,15 +178,18 @@ func wake_up() -> void:
 
 func sleep_prediction(hours: Variant) -> Dictionary:
 	var forecast := Human.new()
-	forecast.position = position
-	forecast.home = home
-	forecast.calories = calories
-	forecast.fatigue = fatigue
-	forecast.health = health
+	for property in ["position", "home", "carried", "carried_crop", "fat", "lean", "glycogen", "stomach", "stomach_kcal", "fatigue"]:
+		forecast.set(property, get(property))
 	if not forecast.sleep(hours):
 		return {}
-	forecast.advance(Farm.new(), 0, 0, position.distance_to(home) / WALK_SPEED + float(hours))
-	return {"fatigue": forecast.fatigue, "calories": forecast.calories, "health": forecast.health, "hours": forecast.advanced_hours}
+	var farm := Farm.new()
+	var elapsed := 0.0
+	# Tiredness can slow the walk home, so walk until there before sleeping.
+	while forecast.position != forecast.home and forecast.activity != "Dead":
+		forecast.advance(farm, 0, 0, forecast.position.distance_to(forecast.home) / (WALK_SPEED * forecast.pace()))
+		elapsed += forecast.advanced_hours
+	forecast.advance(farm, 0, 0, float(hours))
+	return {"fatigue": forecast.fatigue, "glycogen": forecast.glycogen, "mass": forecast.mass(), "health": forecast.health, "hours": elapsed + forecast.advanced_hours}
 
 static func porridge(crop: String, grams: int) -> Dictionary:
 	# shortcut: water, fuel, milling losses and weather exposure are abstracted; model them before expanding survival.
@@ -117,6 +202,9 @@ func eat(farm: Farm, crop: String, grams: Variant) -> bool:
 		return false
 	if crop not in Farm.CROPS or typeof(grams) != TYPE_INT or grams <= 0:
 		message = "Choose grain and a positive whole-gram quantity"
+		return false
+	if grams > room():
+		message = "Too full: room for %d g" % room()
 		return false
 	if farm.stock[crop] < grams:
 		message = "Not enough unreserved %s" % crop.to_lower()
@@ -160,10 +248,11 @@ func _step(farm: Farm, day: int, _hour: float, hours: float) -> float:
 		return _walk(farm, home, hours)
 	if eating_requested:
 		activity = "Cooking"
-		var used := _spend(minf(hours, _cooking_remaining), 220.0, 8.0)
+		var used := _spend(minf(hours, _cooking_remaining), "Cooking")
 		_cooking_remaining = maxf(0.0, _cooking_remaining - used)
 		if _cooking_remaining <= EPSILON and activity != "Dead":
-			calories += porridge(meal_crop, meal_grams).calories
+			stomach += meal_grams
+			stomach_kcal += porridge(meal_crop, meal_grams).calories
 			eating_requested = false
 			meal_crop = ""
 			meal_grams = 0
@@ -171,7 +260,7 @@ func _step(farm: Farm, day: int, _hour: float, hours: float) -> float:
 		return used
 	if sleep_remaining > 0.0:
 		activity = "Sleeping"
-		var used := _spend(minf(hours, sleep_remaining), SLEEP_BURN, -SLEEP_RECOVERY)
+		var used := _spend(minf(hours, sleep_remaining), "Sleeping")
 		sleep_remaining = maxf(0.0, sleep_remaining - used)
 		if sleep_remaining <= EPSILON and activity != "Dead":
 			sleep_remaining = 0.0
@@ -182,7 +271,7 @@ func _step(farm: Farm, day: int, _hour: float, hours: float) -> float:
 		job = queue.pop_front()
 	if job.is_empty():
 		activity = "Idle"
-		return _spend(hours, 90.0, 1.0)
+		return _spend(hours, "Idle")
 	if job.seed and not _carrying_seed:
 		if position != home:
 			return _walk(farm, home, hours)
@@ -194,8 +283,9 @@ func _step(farm: Farm, day: int, _hour: float, hours: float) -> float:
 		return _walk(farm, destination, hours)
 	position = destination
 	activity = "Working"
-	var used := _spend(minf(hours, job.remaining), 220.0, 8.0)
-	job.remaining = maxf(0.0, job.remaining - used)
+	var rate := pace()
+	var used := _spend(minf(hours, job.remaining / rate), job.action)
+	job.remaining = maxf(0.0, job.remaining - used * rate)
 	if job.remaining <= EPSILON and activity != "Dead":
 		_finish_job(farm, day)
 	return used
@@ -204,30 +294,65 @@ func _walk(farm: Farm, destination: Vector2, hours: float) -> float:
 	activity = "Walking"
 	var distance := position.distance_to(destination)
 	facing = position.direction_to(destination)
-	var used := _spend(minf(hours, distance / WALK_SPEED), 160.0, 4.0)
-	position = position.move_toward(destination, used * WALK_SPEED)
+	var speed := WALK_SPEED * pace()
+	var used := _spend(minf(hours, distance / speed), "Walking")
+	position = position.move_toward(destination, used * speed)
 	if position.distance_to(destination) < EPSILON:
 		position = destination
 		if position == home and activity != "Dead":
 			_deposit(farm)
 	return used
 
-## Split at need thresholds as well as job/travel boundaries, independent of frame size.
-func _spend(hours: float, burn: float, tired: float) -> float:
+## Spends up to `hours` on `action` and returns the hours used. Stops where pace,
+## digestion or survival change, so frame size never changes the outcome.
+func _spend(hours: float, action: String) -> float:
+	var cost := burn(action)
+	var tired_rate := tiring(action)
+	var digesting := digestion() if stomach_kcal > EPSILON else 0.0
 	var used := hours
-	if calories > EPSILON:
-		used = minf(used, calories / burn)
-	else:
-		used = minf(used, health / 2.0)
-	if tired > 0.0 and fatigue < 100.0 - EPSILON:
-		used = minf(used, (100.0 - fatigue) / tired)
-	if calories <= EPSILON:
-		health = maxf(0.0, health - used * 2.0)
-	calories -= used * burn
-	fatigue = clampf(fatigue + used * tired, 0.0, 100.0)
-	if health <= EPSILON:
+	if digesting > 0.0:
+		used = minf(used, stomach_kcal / digesting)
+	for tired in TIRED_PACE.keys() + [100.0]:
+		if tired_rate > 0.0 and fatigue < tired - EPSILON:
+			used = minf(used, (tired - fatigue) / tired_rate)
+			break
+	var starved := INF
+	if cost > digesting:
+		starved = (glycogen + _reserve()) / (cost - digesting)
+		used = minf(used, starved)
+	var absorbed := digesting * used
+	if absorbed > 0.0:
+		stomach -= stomach * absorbed / stomach_kcal
+		stomach_kcal -= absorbed
+		if stomach_kcal <= EPSILON:
+			stomach = 0.0
+			stomach_kcal = 0.0
+	fatigue = clampf(fatigue + used * tired_rate, 0.0, 100.0)
+	_store(absorbed - cost * used)
+	if used >= starved - EPSILON:
 		_die()
 	return used
+
+## Adds kcal to the body, or takes them when negative: glycogen first, then fat and
+## lean tissue, gained mostly as fat and lost by Forbes' rule.
+func _store(kcal: float) -> void:
+	glycogen += kcal
+	var change := maxf(0.0, glycogen - lean * GLYCOGEN_PER_LEAN) + minf(0.0, glycogen)
+	glycogen -= change
+	if change > 0.0:
+		var kg := change * STORE_EFFICIENCY / (GAIN_FAT_SHARE * FAT_KCAL + (1.0 - GAIN_FAT_SHARE) * LEAN_KCAL)
+		fat += kg * GAIN_FAT_SHARE
+		lean += kg * (1.0 - GAIN_FAT_SHARE)
+		return
+	var lean_per_fat := FORBES / maxf(fat, 0.001)
+	var fat_change := change / (FAT_KCAL + LEAN_KCAL * lean_per_fat)
+	fat += fat_change
+	lean += fat_change * lean_per_fat
+
+## kcal of tissue the body can still lose before starving to death, at today's fat.
+func _reserve() -> float:
+	var lean_per_fat := FORBES / maxf(fat, 0.001)
+	return maxf(0.0, mass() - DEATH_BMI * HEIGHT * HEIGHT) / (1.0 + lean_per_fat) * (FAT_KCAL + LEAN_KCAL * lean_per_fat)
 
 func _finish_job(farm: Farm, day: int) -> void:
 	# Temporarily restore held seed so Farm validates and consumes the same reserved grams.
@@ -269,6 +394,5 @@ func _deposit(farm: Farm) -> void:
 	_carrying_seed = false
 
 func _die() -> void:
-	health = 0.0
 	activity = "Dead"
 	message = "Game Over. Health reached zero."

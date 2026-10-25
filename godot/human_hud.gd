@@ -2,6 +2,7 @@ extends PanelContainer
 ## One person's current work, needs and supplies; field orders still use the farm panel.
 
 signal focus_requested
+signal body_requested
 signal wake_requested
 signal cancel_requested
 
@@ -38,7 +39,7 @@ func _init() -> void:
 		label.custom_minimum_size.x = 250
 		column.add_child(label)
 	column.add_child(_buttons)
-	for choice in [["Focus", "Find the farmer (H)", focus_requested], ["Wake up", "End the chosen sleep early (R)", wake_requested], ["Clear jobs", "Cancel work and return carried grain (Backspace)", cancel_requested]]:
+	for choice in [["Focus", "Find the farmer (H)", focus_requested], ["Body", "Weight, energy stores and effort (B)", body_requested], ["Wake up", "End the chosen sleep early (R)", wake_requested], ["Clear jobs", "Cancel work and return carried grain (Backspace)", cancel_requested]]:
 		var button := _button(choice[0], choice[1])
 		var requested: Signal = choice[2]
 		button.pressed.connect(requested.emit)
@@ -67,8 +68,8 @@ func show_person(person) -> void:
 			_activity.text += " " + person.job.crop
 		_activity.text += " · %s h left" % String.num(person.job.remaining, 1).trim_suffix(".0")
 	_activity.text += "\n%d job%s queued" % [waiting, "" if waiting == 1 else "s"]
-	_needs.text = "Food energy: %d kcal\nFatigue: %d%%  ·  Health: %d%%" % [roundi(person.calories), roundi(person.fatigue), roundi(person.health)]
-	_needs.tooltip_text = "Click camp for Eat or Sleep. Sleep restores fatigue for the chosen hours; eating restores food energy. Health falls when food energy is depleted."
+	_needs.text = "Energy: %d kcal  ·  Stomach: %d%%\nWeight: %.1f kg  ·  BMI %.1f\nFatigue: %d%%  ·  Health: %d%%" % [roundi(person.glycogen), roundi(person.stomach / Human.STOMACH_GRAMS * 100.0), person.mass(), person.bmi(), roundi(person.fatigue), roundi(person.health)]
+	_needs.tooltip_text = "Click camp for Eat or Sleep. Meals fill the stomach and digest into ready energy. Without it the body burns fat and muscle: weight falls, and health drops below a BMI of 18.5 and is gone at 12.5. Sleep clears fatigue, which slows work and walking from 70%."
 	_supplies.text = "Reserved seed: %s kg" % Farm.kg(person.reserved_seed())
 	_wake_button.visible = person.sleep_remaining > 0
 	_carried.text = "Carrying: %s kg %s" % [Farm.kg(person.carried), person.carried_crop.to_lower()] if person.carried else "Bag empty"
