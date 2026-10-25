@@ -153,7 +153,7 @@ func run() -> void:
 			check(farmer.name == "Ion" and is_equal_approx(farmer.mass(), 65.0) and current_scene.terrain.hills == 18.0 and current_scene.terrain.ponds.size() == 2, "A new creation screen offers the default peasant and land again")
 		else:
 			var actor: Node3D = current_scene._human_actor
-			check(actor._hair.albedo_color == actor.HAIRS.Red and actor._skin.albedo_color == actor.SKINS.Olive and actor._clothes.albedo_color == actor.CLOTHES["Woad blue"] and actor._beard.visible, "The farmer wears the chosen looks")
+			check(actor._hair[0].albedo_color == actor.HAIRS.Red * 1.6 and actor._hands.albedo_color == actor.SKINS.Olive and actor._clothes[0].albedo_color == actor._ratio(actor.CLOTHES["Woad blue"], actor.CLOTHES["Undyed linen"]) and actor._beard.visible, "The farmer wears the chosen looks")
 			check(current_scene.terrain.hills == 11.0 and current_scene.terrain.ponds.size() == 4, "The field is made from the chosen preset")
 			var first_seed: int = current_scene.terrain.seed
 			reload_current_scene()
