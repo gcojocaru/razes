@@ -99,14 +99,15 @@ func _init() -> void:
 	_year_bar.draw.connect(_draw_year_bar)
 	column.add_child(_year_bar)
 
-func show_time(day: int, speed: int, weather: Dictionary) -> void:
+func show_time(day: int, speed: int, weather: Dictionary, hour := 0.0) -> void:
 	_day = day
 	_condition = weather.condition
 	_temperature_label.text = "%d°C" % weather.temperature
 	_condition_label.text = weather.condition
 	var d := Calendar.date(day)
 	_season_label.text = Calendar.SEASONS[d.season]
-	_detail_label.text = "Month %d  ·  Week %d  ·  Year %d" % [d.month, d.week, d.year]
+	var minute := floori(hour * 60) % (24 * 60)
+	_detail_label.text = "Month %d  ·  Week %d  ·  Year %d  ·  %02d:%02d" % [d.month, d.week, d.year, minute / 60, minute % 60]
 	for i in _buttons.size():
 		_buttons[i].set_pressed_no_signal(SPEEDS[i] == speed)
 	_icon.queue_redraw()

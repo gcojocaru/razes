@@ -37,7 +37,7 @@ func _init(owner_game: Node3D) -> void:
 	fill.text = "Add 100 kg of each crop"
 	fill.pressed.connect(func() -> void:
 		for name in Farm.CROPS:
-			game.farm.stock[name] += 100
+			game.farm.stock[name] += 100000
 		game._show_farm())
 	column.add_child(fill)
 	var skips := HBoxContainer.new()

@@ -77,3 +77,23 @@ All accessed **22 October 2026**. These are source notes, not a claim of a compl
 The library homepage at `biblioteca-digitala.ro` returned a Cloudflare challenge during this pass; no challenged content was accessed. The linked `clasate.cimec.ro` catalogue record returned a proxy denial; no alternate route was attempted. Source access to CIMEC’s main site, dexonline, and the museum succeeded. The environment configuration tool continued to report policy state as unknown, so successful individual fetches establish access only to those fetched pages; they do not prove that the saved network draft was published.
 
 Still needed: a specialist review of rural tenure and women’s inheritance/property rights, exact local building and clothing evidence, and agricultural material culture. Do not infer those details from the few sources above. No taxes, military service, land sales or new legal mechanics are introduced into this MVP.
+
+## Grain calorie reference — 25 October 2026
+
+Inspected the primary [USDA National Nutrient Database for Standard Reference,
+Release 28 (2015), Cereal Grains and Pasta report](https://www.ars.usda.gov/ARSUserFiles/80400535/Data/SR/SR28/reports/sr28fg20.pdf).
+The game uses its energy per 100 g edible portion:
+
+| Game grain | USDA food | NDB record | PDF page | kcal / 100 g |
+| --- | --- | --- | --- | --- |
+| Barley | Barley, hulled | 20004 | 15 | 354 |
+| Oats | Oats | 20038 | 183 | 389 |
+| Millet | Millet, raw | 20031 | 130 | 378 |
+| Wheat | Wheat, hard red winter | 20072 | 507 | 327 |
+| Rye | Rye grain | 20062 | 372 | 338 |
+
+These modern dry-grain references are proxies, not measurements of medieval
+Moldavian cultivars. For calorie accounting, game grams represent dry edible
+grain; dehulling/milling are abstracted without a separate mass or energy loss.
+Porridge water adds no calories. Cooking time and the person's calorie burn
+remain gameplay tuning; nutrients, spoilage and digestibility are not simulated.

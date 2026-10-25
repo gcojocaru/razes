@@ -69,7 +69,7 @@ func _show_fields(farm: Farm) -> void:
 			crop_soil += farm.fertility(cell)
 			harvest += farm.harvest_yield(cell)
 		var count := "%d growing" % (cells.size() - ripe) + ("  ·  %d ripe" % ripe if ripe else "")
-		_row([Farm.CROPS[name].color, name, count, _bar(growth / cells.size(), Farm.CROPS[name].color, 90), "%d%%" % roundi(crop_soil / cells.size() * 100), "%d kg" % harvest], widths, body.get_child_count() % 2 == 1, TimeHud.PARCHMENT, "Harvest: what the plots give if harvested when ripe, from their soil and the weather so far")
+		_row([Farm.CROPS[name].color, name, count, _bar(growth / cells.size(), Farm.CROPS[name].color, 90), "%d%%" % roundi(crop_soil / cells.size() * 100), "%s kg" % Farm.kg(harvest)], widths, body.get_child_count() % 2 == 1, TimeHud.PARCHMENT, "Harvest: what the plots give if harvested when ripe, from their soil and the weather so far")
 	var worked: int = farm.plots.values().filter(func(plot: Dictionary) -> bool: return plot.stage != "Grass").size()
 	var summary := PackedStringArray()
 	for stage in ["Plowed", "Stubble", "Withered"]:
@@ -92,9 +92,9 @@ func _show_years(farm: Farm, day: int) -> void:
 		var detail := PackedStringArray()
 		for name in farm.years.get(year, {}):
 			var result: Dictionary = farm.years[year][name]
-			detail.append("%s: %d sown, %d lost, %d harvested, %d kg" % [name, result.sown, result.frost, result.harvested, result.gathered])
+			detail.append("%s: %d sown, %d lost, %d harvested, %s kg" % [name, result.sown, result.frost, result.harvested, Farm.kg(result.gathered)])
 		var bar := _bar(absf(net) / largest, Color(0.55, 0.75, 0.35) if net >= 0 else Color(0.85, 0.35, 0.25), 70)
-		_row(["%d%s" % [year, " now" if year == current else ""], sum.sown, sum.frost, sum.harvested, sum.gathered, "%+d" % net, bar], widths, (current - year) % 2 == 1, TimeHud.PARCHMENT, "\n".join(detail) if detail else "Nothing sown or harvested")
+		_row(["%d%s" % [year, " now" if year == current else ""], sum.sown, sum.frost, sum.harvested, Farm.kg(sum.gathered), ("+" if net >= 0 else "") + Farm.kg(net), bar], widths, (current - year) % 2 == 1, TimeHud.PARCHMENT, "\n".join(detail) if detail else "Nothing sown or harvested")
 
 func _show_crops() -> void:
 	var widths := [12, 54, 210, 120, 46, 84]
@@ -102,5 +102,5 @@ func _show_crops() -> void:
 	for name in Farm.CROPS:
 		var kind: Dictionary = Farm.CROPS[name]
 		var water := "likes rain" if kind.water > 1.2 else ("hardy in drought" if kind.water < 0.6 else "")
-		var tooltip := "Grows above %d°C, best at %d°C%s. Harvest takes %d%% of the soil's fertility; poor soil costs it %s. Kg sown and harvested on a fertile plot in an average season; a bag holds %d kg." % [kind.base, kind.best, (", " + water) if water else "", roundi(kind.wear * 100), "little" if kind.soil < 0.6 else "much", kind.bag]
-		_row([kind.color, name, Farm.sowing_window(name), "%d days%s" % [kind.ripe, " + winter" if kind.winter else ""], "%d°C" % kind.frost, "%d → %d" % [kind.seed, kind.grain]], widths, body.get_child_count() % 2 == 0, TimeHud.PARCHMENT, tooltip)
+		var tooltip := "Grows above %d°C, best at %d°C%s. Harvest takes %d%% of the soil's fertility; poor soil costs it %s. Kg sown and harvested on a fertile %d m² plot in an average season; a bag holds %s kg." % [kind.base, kind.best, (", " + water) if water else "", roundi(kind.wear * 100), "little" if kind.soil < 0.6 else "much", Farm.PLOT_AREA_M2, Farm.kg(kind.bag)]
+		_row([kind.color, name, Farm.sowing_window(name), "%d days%s" % [kind.ripe, " + winter" if kind.winter else ""], "%d°C" % kind.frost, "%s → %s" % [Farm.kg(kind.seed), Farm.kg(kind.grain)]], widths, body.get_child_count() % 2 == 0, TimeHud.PARCHMENT, tooltip)

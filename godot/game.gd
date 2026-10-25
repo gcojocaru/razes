@@ -3,20 +3,22 @@ extends Node3D
 
 const GRID_SIZE := 16
 const CELL_SIZE := 2.0
+const TimeHud := preload("res://time_hud.gd")
+const METRES_TO_UNITS := CELL_SIZE / 10.0
 const PAN_SPEED := 18.0
 const ZOOM_STEP := 2.0
-const ZOOM_MIN := 8.0
+const ZOOM_MIN := 2.0
 const ZOOM_MAX := 40.0
 const ROTATE_SPEED := 1.8
 const DRAG_ROTATE_SPEED := 0.008
 
 ## Real seconds per game day at 1×; tunable from the debug panel.
-var seconds_per_day := 2.0
+var seconds_per_day := 600.0
 var day := 0
 ## Game-time multiplier; 0 is paused.
 var speed := 1
 var _resume_speed := 1
-var _day_time := 0.0
+var _day_time := seconds_per_day / 4.0
 var _time_hud: PanelContainer
 var _debug_panel: PanelContainer
 var _agri_debug: PanelContainer
@@ -47,6 +49,14 @@ var _kept := {}
 var _right_from := Vector2.INF
 
 var farm := Farm.new()
+var human = preload("res://human.gd").new()
+var _human_actor: Node3D
+var _human_hud: PanelContainer
+var _game_over: ColorRect
+var _camp_menu: Control
+var _food_window: PanelContainer
+var _sleep_window: PanelContainer
+var _camp_press := Vector2.INF
 ## The crop last picked for sowing; see seed_crop().
 var _seed_choice := ""
 var _farm_hud: PanelContainer
@@ -92,21 +102,29 @@ func _ready() -> void:
 	var tall := PackedFloat32Array([0.8])
 	var ripe := PackedVector3Array([Vector3(0.88, 0.69, 0.3)])
 	for kind in Farm.CROPS.values():
-		tall.append(kind.height)
+		tall.append(kind.height * METRES_TO_UNITS)
 		ripe.append(Vector3(kind.color.r, kind.color.g, kind.color.b))
 	_stalks.set_shader_parameter("tall", tall)
 	_stalks.set_shader_parameter("ripe", ripe)
+	_stalks.set_shader_parameter("metres_to_units", METRES_TO_UNITS)
 	for material in [_field, _stalks]:
 		material.set_shader_parameter("grid_size", float(GRID_SIZE))
 		material.set_shader_parameter("crops", _crop_texture)
 	var plane := PlaneMesh.new()
-	plane.size = Vector2.ONE * GRID_SIZE * CELL_SIZE
+	# A ten-metre grass margin grounds the camp beside the selectable field.
+	plane.size = Vector2.ONE * (GRID_SIZE + 2) * CELL_SIZE
 	var ground := MeshInstance3D.new()
 	ground.name = "Field"
 	ground.mesh = plane
 	ground.material_override = _field
 	add_child(ground)
 	add_child(_crop_stalks())
+	_human_actor = preload("res://human_actor.gd").new(METRES_TO_UNITS)
+	_human_actor.name = "HumanActor"
+	add_child(_human_actor)
+	var camp: Node3D = _human_actor.create_camp()
+	camp.position = Vector3(human.home.x, 0, human.home.y) * METRES_TO_UNITS
+	add_child(camp)
 	_weather_effects = preload("res://weather_effects.gd").new(_sun, _environment, _field)
 	add_child(_weather_effects)
 	_weather_audio = preload("res://weather_audio.gd").new()
@@ -120,11 +138,18 @@ func _ready() -> void:
 
 	var hud := CanvasLayer.new()
 	add_child(hud)
-	_time_hud = preload("res://time_hud.gd").new()
+	_time_hud = TimeHud.new()
 	_time_hud.speed_selected.connect(set_speed)
 	hud.add_child(_time_hud)
 	_sound_control = preload("res://sound_control.gd").new()
 	hud.add_child(_sound_control)
+	_human_hud = preload("res://human_hud.gd").new()
+	_human_hud.focus_requested.connect(_focus_person)
+	_human_hud.wake_requested.connect(_wake_up)
+	_human_hud.cancel_requested.connect(func() -> void:
+		human.cancel(farm)
+		_show_farm())
+	hud.add_child(_human_hud)
 	_farm_hud = preload("res://farm_hud.gd").new()
 	_farm_hud.action_pressed.connect(work)
 	_farm_hud.crop_chosen.connect(choose_crop)
@@ -135,21 +160,148 @@ func _ready() -> void:
 	hud.add_child(_inventory)
 	_wiki = preload("res://wiki.gd").new()
 	hud.add_child(_wiki)
+	_food_window = preload("res://food_window.gd").new()
+	_food_window.prepare_requested.connect(_prepare_porridge)
+	hud.add_child(_food_window)
+	_sleep_window = preload("res://sleep_window.gd").new()
+	_sleep_window.sleep_requested.connect(_start_sleep)
+	hud.add_child(_sleep_window)
+	for window in [_food_window, _sleep_window]:
+		window.visibility_changed.connect(_show_person)
 	_farm_hud.ledger_pressed.connect(toggle.bind(_ledger))
 	_farm_hud.inventory_pressed.connect(toggle.bind(_inventory))
 	_farm_hud.wiki_pressed.connect(toggle.bind(_wiki))
 	if OS.is_debug_build():
 		_debug_panel = preload("res://debug_panel.gd").new(seconds_per_day)
-		_debug_panel.day_length_changed.connect(func(seconds: float) -> void: seconds_per_day = seconds)
+		_debug_panel.day_length_changed.connect(func(seconds: float) -> void:
+			var fraction := _day_time / seconds_per_day
+			seconds_per_day = seconds
+			_day_time = fraction * seconds_per_day)
 		hud.add_child(_debug_panel)
 		_agri_debug = preload("res://agri_debug.gd").new(self)
 		hud.add_child(_agri_debug)
 	# GUI input follows sibling order, so the modal wheel must follow every HUD window.
 	hud.add_child(_farm_hud.action_wheel)
+	_camp_menu = preload("res://camp_menu.gd").new()
+	_camp_menu.eat_selected.connect(_open_food)
+	_camp_menu.sleep_selected.connect(_open_sleep)
+	hud.add_child(_camp_menu)
+	_game_over = _make_game_over()
+	hud.add_child(_game_over)
 	_start_day()
 
+func _make_game_over() -> ColorRect:
+	var overlay := ColorRect.new()
+	overlay.name = "GameOver"
+	overlay.color = Color(0, 0, 0, 0.7)
+	overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	overlay.z_index = 100
+	overlay.hide()
+	var centre := CenterContainer.new()
+	centre.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	overlay.add_child(centre)
+	var card := PanelContainer.new()
+	card.add_theme_stylebox_override("panel", TimeHud.box(TimeHud.INK, TimeHud.GOLD, 10, 2, Vector2(30, 24)))
+	centre.add_child(card)
+	var column := VBoxContainer.new()
+	column.custom_minimum_size.x = 320
+	column.add_theme_constant_override("separation", 18)
+	card.add_child(column)
+	var title := Label.new()
+	title.name = "GameOverTitle"
+	title.text = "Game Over"
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.add_theme_font_override("font", preload("res://assets/fonts/CormorantUnicase-Bold.ttf"))
+	title.add_theme_font_size_override("font_size", 40)
+	title.add_theme_color_override("font_color", TimeHud.GOLD)
+	column.add_child(title)
+	var explanation := Label.new()
+	explanation.text = "Your health has reached zero."
+	explanation.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	explanation.add_theme_font_override("font", TimeHud.serif_font())
+	explanation.add_theme_color_override("font_color", TimeHud.PARCHMENT)
+	column.add_child(explanation)
+	var restart := Button.new()
+	restart.text = "Restart (Enter)"
+	restart.focus_mode = Control.FOCUS_NONE
+	TimeHud.style_button(restart, TimeHud.serif_font())
+	restart.pressed.connect(func() -> void: get_tree().reload_current_scene())
+	column.add_child(restart)
+	return overlay
+
+func _end_game() -> void:
+	speed = 0
+	_sound_control.set_process_input(false)
+	for window in [_farm_hud.action_wheel, _camp_menu, _food_window, _sleep_window, _inventory, _ledger, _wiki, _sound_control, _debug_panel, _agri_debug]:
+		if is_instance_valid(window):
+			window.hide()
+	get_viewport().gui_release_focus()
+	_game_over.show()
+	_show_date()
+
 func _show_date() -> void:
-	_time_hud.show_time(day, speed, today)
+	_time_hud.show_time(day, speed, today, _day_time / seconds_per_day * 24.0)
+
+func _show_person(seconds := 0.0) -> void:
+	_human_actor.show_person(human, seconds)
+	_human_hud.show_person(human)
+	_human_hud.visible = not _inventory.visible and not _wiki.visible and not _food_window.visible and not _sleep_window.visible
+	if _food_window.visible:
+		_food_window.show_food(farm, human)
+	if _sleep_window.visible:
+		_sleep_window.show_sleep(human)
+
+func _focus_person() -> void:
+	_zoom = minf(_zoom, 8.0)
+	_place_camera(Vector3(human.position.x, 0, human.position.y) * METRES_TO_UNITS)
+
+func _open_camp_menu(at := Vector2(-1, -1)) -> void:
+	if human.activity == "Dead":
+		return
+	_farm_hud.action_wheel.hide()
+	_drag_from = Vector2i(-1, -1)
+	_camp_press = Vector2.INF
+	if at == Vector2(-1, -1):
+		var camp := Vector3(human.home.x, 0, human.home.y) * METRES_TO_UNITS
+		_zoom = minf(_zoom, 8.0)
+		_place_camera(camp)
+		at = _camera.unproject_position(camp)
+	_camp_menu.open_at(at)
+
+func _open_food() -> void:
+	if human.activity == "Dead":
+		return
+	_camp_menu.hide()
+	_inventory.hide()
+	_sleep_window.hide()
+	_food_window.show_food(farm, human)
+	_food_window.show()
+	_food_window.quantity.get_line_edit().grab_focus()
+
+func _prepare_porridge(crop: String, grams: int) -> void:
+	if human.eat(farm, crop, grams):
+		_food_window.hide()
+	_show_farm()
+
+func _open_sleep() -> void:
+	if human.activity == "Dead":
+		return
+	_camp_menu.hide()
+	_farm_hud.action_wheel.hide()
+	_inventory.hide()
+	_food_window.hide()
+	_sleep_window.show_sleep(human)
+	_sleep_window.show()
+	_sleep_window.hours.get_line_edit().grab_focus()
+
+func _start_sleep(hours: float) -> void:
+	if human.sleep(hours):
+		_sleep_window.hide()
+	_show_person()
+
+func _wake_up() -> void:
+	human.wake_up()
+	_show_person()
 
 ## Rolls the weather for the current day and applies it to the sky and field.
 func _start_day() -> void:
@@ -167,25 +319,27 @@ func _start_day() -> void:
 	_show_farm()
 	_show_date()
 
-## Does `action` (every ready action when empty) on the selected plots.
+## Orders `action` (every ready action when empty) on the selected plots.
 func work(action := "") -> void:
-	if farm.work(selected.keys(), day, action, seed_crop()) > 0:
-		_show_farm()
+	human.order(farm, selected.keys(), day, action, seed_crop())
+	_show_farm()
 
 ## The crop to sow: the one last picked if it can be sown today, else the first that can.
 func seed_crop() -> String:
 	var open := Farm.sowable(day)
 	return _seed_choice if _seed_choice in open else (open[0] if not open.is_empty() else "")
 
-## Picks the crop to sow and sows it on the selected plowed plots.
+## Picks the crop to sow and orders it on the selected plowed plots.
 func choose_crop(crop: String) -> void:
 	_seed_choice = crop
-	farm.work(selected.keys(), day, "Sow", crop)
-	_show_farm()
+	work("Sow")
 
 ## Right-click: offers actions for the land under the pointer, selecting it unless
 ## it is already part of the selection.
 func _open_action_menu(position: Vector2) -> void:
+	if _camp_at(position):
+		_open_camp_menu(position)
+		return
 	var cell := cell_at_screen(position)
 	if cell == Vector2i(-1, -1):
 		return
@@ -196,12 +350,12 @@ func _open_action_menu(position: Vector2) -> void:
 
 ## Debug: runs `days` whole days at once.
 func skip_days(days: int) -> void:
-	for i in days:
-		day += 1
-		_start_day()
+	advance_time(maxi(days, 0) * seconds_per_day)
 
 ## Shows or hides a HUD window, refreshing what the windows show.
 func toggle(window: Control) -> void:
+	if human.activity == "Dead":
+		return
 	window.visible = not window.visible
 	_show_farm()
 
@@ -213,13 +367,17 @@ func _show_farm() -> void:
 			var packed: int = Farm.STAGES.find(farm.stage(cell)) + 8 * (Farm.CROPS.keys().find(farm.crop(cell)) + 1)
 			_crops.set_pixelv(cell, Color(packed / 255.0, farm.growth(cell), float(selected.has(cell)), farm.fertility(cell)))
 	_crop_texture.update(_crops)
-	_farm_hud.show_farm(farm, selected.keys(), day, seed_crop())
+	var queued: Array = human.queue.map(func(job: Dictionary): return job.cell)
+	if not human.job.is_empty():
+		queued.append(human.job.cell)
+	_farm_hud.show_farm(farm, selected.keys(), day, seed_crop(), queued)
 	if _ledger.visible:
 		_ledger.show_ledger(farm, day)
 	if _inventory.visible:
 		_inventory.show_inventory(farm, day)
 	if _agri_debug and _agri_debug.visible:
 		_agri_debug.refresh()
+	_show_person()
 
 ## Selects `cell` and starts a drag there; `add` keeps the current selection.
 func _start_selection(cell: Vector2i, add: bool) -> void:
@@ -269,8 +427,8 @@ func _stalk_mesh() -> ArrayMesh:
 	var vertices := PackedVector3Array()
 	for blade in 3:
 		var out := Vector3.FORWARD.rotated(Vector3.UP, blade * TAU / 3)
-		var side := out.cross(Vector3.UP) * 0.022
-		var tip := Vector3.UP * (1.0 - blade * 0.12) + out * 0.18
+		var side := out.cross(Vector3.UP) * 0.022 * METRES_TO_UNITS
+		var tip := Vector3.UP * (1.0 - blade * 0.12) + out * 0.18 * METRES_TO_UNITS
 		vertices.append_array([-side, side, tip + side * 0.15, -side, tip + side * 0.15, tip - side * 0.15])
 	var uvs := PackedVector2Array()
 	var normals := PackedVector3Array()
@@ -287,6 +445,10 @@ func _stalk_mesh() -> ArrayMesh:
 	return mesh
 
 func set_speed(new_speed: int) -> void:
+	if human.activity == "Dead":
+		speed = 0
+		_show_date()
+		return
 	if new_speed > 0:
 		_resume_speed = new_speed
 	speed = new_speed
@@ -294,11 +456,30 @@ func set_speed(new_speed: int) -> void:
 
 ## Advances game time; whole days roll over and update the date display.
 func advance_time(seconds: float) -> void:
-	_day_time += seconds
-	while _day_time >= seconds_per_day:
-		_day_time -= seconds_per_day
-		day += 1
-		_start_day()
+	if human.activity == "Dead" or not is_finite(seconds) or seconds <= 0.0:
+		return
+	var left := seconds
+	var changed := false
+	var jobs_before: int = human.queue.size() + int(not human.job.is_empty())
+	while left > 0.0000001:
+		var step := minf(left, seconds_per_day - _day_time)
+		changed = human.advance(farm, day, _day_time / seconds_per_day * 24.0, step / seconds_per_day * 24.0) or changed
+		var advanced: float = human.advanced_hours / 24.0 * seconds_per_day
+		_day_time += advanced
+		left -= advanced
+		if _day_time >= seconds_per_day - 0.0000001:
+			_day_time = 0.0
+			day += 1
+			_start_day()
+		if human.activity == "Dead":
+			_end_game()
+			break
+		if advanced <= 0.0:
+			break
+	if changed or jobs_before != human.queue.size() + int(not human.job.is_empty()):
+		_show_farm()
+	else:
+		_show_person()
 	_show_date()
 
 func _process(delta: float) -> void:
@@ -307,7 +488,8 @@ func _process(delta: float) -> void:
 		_stalks.set_shader_parameter("wind", _weather_audio.wind_direction * _weather_audio.wind_strength)
 	if speed > 0:
 		advance_time(delta * speed)
-	if _sound_control.panel.visible or _farm_hud.action_wheel.visible:
+		_show_person(delta * speed)
+	if human.activity == "Dead" or _sound_control.panel.visible or _farm_hud.action_wheel.visible or _camp_menu.visible or _food_window.visible or _sleep_window.visible:
 		return
 	var input := Input.get_vector("ui_left", "ui_right", "ui_up", "ui_down")
 	for key in [[KEY_A, Vector2.LEFT], [KEY_D, Vector2.RIGHT], [KEY_W, Vector2.UP], [KEY_S, Vector2.DOWN]]:
@@ -317,7 +499,7 @@ func _process(delta: float) -> void:
 		# Pan along the ground relative to the camera's facing, not world axes.
 		var basis := Basis(Vector3.UP, _camera.rotation.y)
 		var move := basis * Vector3(input.x, 0, input.y).limit_length(1.0) * PAN_SPEED * delta
-		var half := GRID_SIZE * CELL_SIZE / 2.0
+		var half := (GRID_SIZE + 2) * CELL_SIZE / 2.0
 		var target := (_focus() + move).clamp(Vector3(-half, 0, -half), Vector3(half, 0, half))
 		_place_camera(target)
 	var turn := float(Input.is_physical_key_pressed(KEY_E)) - float(Input.is_physical_key_pressed(KEY_Q))
@@ -331,7 +513,13 @@ func rotate_camera(radians: float) -> void:
 	_place_camera(focus)
 
 func _unhandled_input(event: InputEvent) -> void:
-	if _farm_hud.action_wheel.visible or (_sound_control.panel.visible and event is InputEventKey):
+	if human.activity == "Dead":
+		if event is InputEventKey and event.pressed and not event.echo and event.physical_keycode in [KEY_ENTER, KEY_KP_ENTER]:
+			get_tree().reload_current_scene()
+		return
+	if _farm_hud.action_wheel.visible or _camp_menu.visible or (_sound_control.panel.visible and event is InputEventKey):
+		return
+	if (_food_window.visible or _sleep_window.visible) and not (event is InputEventKey and event.physical_keycode in [KEY_SPACE, KEY_1, KEY_2, KEY_3]):
 		return
 	if event is InputEventMouseMotion and event.button_mask & MOUSE_BUTTON_MASK_RIGHT:
 		rotate_camera(-event.relative.x * DRAG_ROTATE_SPEED)
@@ -345,11 +533,22 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_2: set_speed(2)
 			KEY_3: set_speed(4)
 			# Keyboard alternative to clicking: WASD moves the view, Enter selects its centre plot.
-			KEY_ENTER, KEY_KP_ENTER: _start_selection(cell_at_world(_focus()), event.shift_pressed)
+			KEY_ENTER, KEY_KP_ENTER:
+				_start_selection(cell_at_world(_focus()), event.shift_pressed)
 			KEY_F: work()
 			KEY_C: _farm_hud.open_action_menu()
 			KEY_L: toggle(_ledger)
 			KEY_I: toggle(_inventory)
+			KEY_H: _focus_person()
+			KEY_R:
+				if human.sleep_remaining > 0:
+					_wake_up()
+				else:
+					_open_sleep()
+			KEY_G: _open_camp_menu()
+			KEY_BACKSPACE:
+				human.cancel(farm)
+				_show_farm()
 			KEY_F1: toggle(_wiki)
 			KEY_F4:
 				if _agri_debug:
@@ -371,6 +570,9 @@ func _unhandled_input(event: InputEvent) -> void:
 			_select_to(hovered_cell)
 	elif event is InputEventMouseButton and not event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
 		_drag_from = Vector2i(-1, -1)
+		if event.position.distance_to(_camp_press) < 6.0 and _camp_at(event.position):
+			_open_camp_menu(event.position)
+		_camp_press = Vector2.INF
 	elif event is InputEventMouseButton and not event.pressed and event.button_index == MOUSE_BUTTON_RIGHT:
 		# A right click, not the end of a camera-rotating drag.
 		if event.position.distance_to(_right_from) < 6.0:
@@ -382,7 +584,12 @@ func _unhandled_input(event: InputEvent) -> void:
 			MOUSE_BUTTON_WHEEL_UP, MOUSE_BUTTON_WHEEL_DOWN:
 				zoom_by(ZOOM_STEP if event.button_index == MOUSE_BUTTON_WHEEL_DOWN else -ZOOM_STEP)
 			MOUSE_BUTTON_LEFT:
-				_start_selection(cell_at_screen(event.position), event.shift_pressed)
+				if _camp_at(event.position):
+					_camp_press = event.position
+					_drag_from = Vector2i(-1, -1)
+				else:
+					_camp_press = Vector2.INF
+					_start_selection(cell_at_screen(event.position), event.shift_pressed)
 			MOUSE_BUTTON_RIGHT:
 				_right_from = event.position
 
@@ -396,6 +603,12 @@ func zoom_by(amount: float) -> void:
 func cell_at_screen(screen_position: Vector2) -> Vector2i:
 	var hit = Plane.PLANE_XZ.intersects_ray(_camera.project_ray_origin(screen_position), _camera.project_ray_normal(screen_position))
 	return cell_at_world(hit) if hit != null else Vector2i(-1, -1)
+
+func _camp_at(screen_position: Vector2) -> bool:
+	var hit = Plane.PLANE_XZ.intersects_ray(_camera.project_ray_origin(screen_position), _camera.project_ray_normal(screen_position))
+	var camp := Vector3(human.home.x, 0, human.home.y) * METRES_TO_UNITS
+	# The 2.2 m clearing has 0.3 m of picking padding.
+	return hit != null and hit.distance_to(camp) <= 2.5 * METRES_TO_UNITS
 
 func cell_at_world(point: Vector3) -> Vector2i:
 	var cell := Vector2i(floori(point.x / CELL_SIZE + GRID_SIZE / 2.0), floori(point.z / CELL_SIZE + GRID_SIZE / 2.0))

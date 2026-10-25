@@ -1,5 +1,5 @@
 extends Control
-## Contextual field actions. Native buttons use annular hit targets; the overlay
+## Contextual action wheel. Native buttons use annular hit targets; the overlay
 ## consumes outside clicks so dismissing it cannot change the field selection.
 
 signal activated(action: String, crop: String)
@@ -11,6 +11,8 @@ const MARGIN := 12.0
 const ICONS := {
 	"Plow": preload("res://assets/actions/plow.svg"),
 	"Harvest": preload("res://assets/actions/harvest.svg"),
+	"Eat": preload("res://assets/actions/eat.svg"),
+	"Sleep": preload("res://assets/actions/sleep.svg"),
 	"Barley": preload("res://assets/actions/barley.svg"),
 	"Oats": preload("res://assets/actions/oats.svg"),
 	"Millet": preload("res://assets/actions/millet.svg"),
@@ -70,16 +72,16 @@ func _init() -> void:
 func _ready() -> void:
 	get_viewport().size_changed.connect(func() -> void: size = get_viewport_rect().size)
 
-func show_farm(farm: Farm, cells: Array, day: int, seed_crop: String) -> void:
+func show_farm(farm: Farm, cells: Array, day: int, seed_crop: String, queued: Array = []) -> void:
 	_farm = farm
-	_cells = cells.duplicate()
+	_cells = cells.filter(func(cell): return cell not in queued)
 	_day = day
 	_seed_crop = seed_crop
 	var next: Array[Dictionary] = []
 	for action in Farm.ACTIONS:
 		var crops: Array = Farm.sowable(day) if action == "Sow" else [""]
 		for crop: String in crops:
-			var result := farm.preview(cells, day, action, crop)
+			var result := farm.preview(_cells, day, action, crop)
 			if result.plots > 0:
 				next.append({"action": action, "crop": crop, "plots": result.plots, "grain": result.grain})
 	_title = "Fields"
@@ -98,7 +100,7 @@ func show_farm(farm: Farm, cells: Array, day: int, seed_crop: String) -> void:
 		if next.is_empty():
 			var reasons := PackedStringArray()
 			for cell: Vector2i in cells:
-				var reason: String = farm.action(cell, day, seed_crop).reason
+				var reason: String = "Work already queued" if cell in queued else farm.action(cell, day, seed_crop).reason
 				if reason != "" and reason not in reasons:
 					reasons.append(reason)
 			_detail = "\n".join(reasons)
@@ -147,9 +149,7 @@ func _build_buttons() -> void:
 		button.position = wheel_rect().position
 		button.size = Vector2.ONE * RADIUS * 2
 		button.text = _label(entry) + ": " + _effect(entry)
-		button.tooltip_text = button.text
-		if entry.crop != "":
-			button.tooltip_text += "\n" + "Sown " + Farm.sowing_window(entry.crop)
+		button.tooltip_text = _tooltip(entry)
 		for style in ["normal", "hover", "pressed", "hover_pressed", "focus"]:
 			button.add_theme_stylebox_override(style, StyleBoxEmpty.new())
 		for state in ["font_color", "font_hover_color", "font_pressed_color", "font_hover_pressed_color", "font_focus_color", "font_outline_color"]:
@@ -159,7 +159,7 @@ func _build_buttons() -> void:
 		button.focus_entered.connect(_focus_entry.bind(i))
 		add_child(button)
 		_buttons.append(button)
-		if button.text == previous or (previous == "" and entry.crop == _seed_crop):
+		if button.text == previous or (previous == "" and _seed_crop != "" and entry.crop == _seed_crop):
 			_focused = i
 	if not _buttons.is_empty():
 		_buttons[_focused].grab_focus()
@@ -228,7 +228,13 @@ func _label(entry: Dictionary) -> String:
 	return "Sow " + entry.crop if entry.action == "Sow" else entry.action
 
 func _effect(entry: Dictionary) -> String:
-	return "%d plot%s" % [entry.plots, "s" if entry.plots != 1 else ""] + ("\n%+d kg %s" % [entry.grain, entry.crop.to_lower() + " seed" if entry.action == "Sow" else "grain"] if entry.grain != 0 else "\nPrepare for sowing")
+	return "%d plot%s" % [entry.plots, "s" if entry.plots != 1 else ""] + ("\n%s%s kg %s" % ["+" if entry.grain > 0 else "", Farm.kg(entry.grain), entry.crop.to_lower() + " seed" if entry.action == "Sow" else "grain"] if entry.grain != 0 else "\nPrepare for sowing")
+
+func _tooltip(entry: Dictionary) -> String:
+	return _label(entry) + ": " + _effect(entry) + "\nQueue this work for the farmer" + ("\nSown " + Farm.sowing_window(entry.crop) if entry.crop != "" else "")
+
+func _summary(entry: Dictionary) -> String:
+	return "%d plot%s" % [entry.plots, "s" if entry.plots != 1 else ""] + (" · %s%s kg" % ["+" if entry.grain > 0 else "", Farm.kg(entry.grain)] if entry.grain != 0 else "")
 
 func _draw() -> void:
 	draw_circle(_origin + Vector2(0, 5), (RADIUS if not entries.is_empty() else HUB) + 5, Color(0, 0, 0, 0.25))
@@ -250,10 +256,7 @@ func _draw() -> void:
 		var icon: Texture2D = ICONS[entries[i].crop if entries[i].crop != "" else entries[i].action]
 		draw_texture_rect(icon, Rect2(at + Vector2(-23, -46), Vector2(46, 46)), false)
 		_text(at + Vector2(0, 20), _label(entries[i]), 17, TimeHud.PARCHMENT)
-		var cost := "%d plot%s" % [entries[i].plots, "s" if entries[i].plots != 1 else ""]
-		if entries[i].grain != 0:
-			cost += " · %+d kg" % entries[i].grain
-		_text(at + Vector2(0, 37), cost, 12, TimeHud.GOLD)
+		_text(at + Vector2(0, 37), _summary(entries[i]), 12, TimeHud.GOLD)
 	draw_arc(_origin, HUB, 0, TAU, 96, TimeHud.GOLD, 1.5, true)
 
 func _text(at: Vector2, text: String, font_size: int, color: Color) -> void:

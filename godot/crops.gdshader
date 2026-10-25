@@ -8,6 +8,7 @@ uniform float cell_size = 2.0;
 uniform vec2 hovered = vec2(-1.0);
 uniform vec2 wind = vec2(0.2, 0.06);
 uniform float snow = 0.0;
+uniform float metres_to_units = 0.2;
 // Same per-cell texture as the field shader: R (stage index + 8 × crop number) / 255, G growth, B selected.
 uniform sampler2D crops : filter_nearest;
 
@@ -31,13 +32,13 @@ void vertex() {
 	float height = 0.0;
 	tint = vec3(0.0);
 	if (stage == 2) { // sown: green, yellowing as it nears ripe
-		height = mix(0.08, tall[kind], crop.g);
+		height = mix(0.08 * metres_to_units, tall[kind], crop.g);
 		tint = mix(vec3(0.3, 0.58, 0.15), mix(vec3(0.5, 0.6, 0.2), ripe[kind], 0.35), crop.g * crop.g);
 	} else if (stage == 3) { // ripe
 		height = tall[kind];
 		tint = ripe[kind];
 	} else if (stage == 4) { // stubble
-		height = 0.1;
+		height = 0.1 * metres_to_units;
 		tint = mix(ripe[kind], vec3(0.8, 0.7, 0.46), 0.5);
 	} else if (stage == 5) { // withered
 		height = 0.45 * tall[kind];

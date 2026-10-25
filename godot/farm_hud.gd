@@ -64,7 +64,7 @@ func _init() -> void:
 	row.add_child(text)
 
 	for action in Farm.ACTIONS:
-		buttons[action] = _button(serif, action, "Key F does every ready action", action_wheel.ICONS.Barley if action == "Sow" else action_wheel.ICONS[action])
+		buttons[action] = _button(serif, action, "Key F queues every ready action", action_wheel.ICONS.Barley if action == "Sow" else action_wheel.ICONS[action])
 		buttons[action].pressed.connect(action_pressed.emit.bind(action))
 		row.add_child(buttons[action])
 		if action == "Sow":
@@ -101,18 +101,19 @@ func _button(font: Font, label: String, tooltip: String, icon: Texture2D) -> But
 	return button
 
 ## Shows what the selected plots allow on this day, sowing `seed_crop`.
-func show_farm(farm: Farm, cells: Array, day: int, seed_crop: String) -> void:
+func show_farm(farm: Farm, cells: Array, day: int, seed_crop: String, queued: Array = []) -> void:
+	var available := cells.filter(func(cell): return cell not in queued)
 	var sowable := 0
 	for action in buttons:
-		var result := farm.preview(cells, day, action, seed_crop)
+		var result := farm.preview(available, day, action, seed_crop)
 		if action == "Sow":
 			sowable = result.plots
 		var verb: String = "Sow " + seed_crop if action == "Sow" else action
 		buttons[action].visible = result.plots > 0
 		buttons[action].accessibility_name = verb
-		buttons[action].tooltip_text = "%s %d" % [verb, result.plots] + ("" if result.grain == 0 else "  %+d kg" % result.grain) + "\nKey F does every ready action"
+		buttons[action].tooltip_text = "%s %d" % [verb, result.plots] + ("" if result.grain == 0 else "  %s%s kg" % ["+" if result.grain > 0 else "", Farm.kg(result.grain)]) + "\nQueues work for the farmer; F queues every ready action"
 	action_button.visible = not cells.is_empty()
-	action_wheel.show_farm(farm, cells, day, seed_crop)
+	action_wheel.show_farm(farm, cells, day, seed_crop, queued)
 	if seed_crop != "":
 		buttons.Sow.icon = action_wheel.ICONS[seed_crop]
 		buttons.Sow.tooltip_text += "\n" + _facts(seed_crop)
@@ -125,6 +126,10 @@ func show_farm(farm: Farm, cells: Array, day: int, seed_crop: String) -> void:
 	var ready_to_sow := 0
 	var soil := 0.0
 	for cell in cells:
+		soil += farm.fertility(cell)
+		if cell in queued:
+			reasons["Work already queued"] = reasons.get("Work already queued", 0) + 1
+			continue
 		var next := farm.action(cell, day, seed_crop)
 		if next.reason != "":
 			_detail_label.tooltip_text = next.reason
@@ -132,7 +137,6 @@ func show_farm(farm: Farm, cells: Array, day: int, seed_crop: String) -> void:
 			reasons[reason] = reasons.get(reason, 0) + 1
 		elif next.name == "Sow":
 			ready_to_sow += 1
-		soil += farm.fertility(cell)
 	if sowable < ready_to_sow:
 		reasons["Seed for %d of %d" % [sowable, ready_to_sow]] = 1
 	var notes := PackedStringArray()
@@ -150,18 +154,19 @@ func show_farm(farm: Farm, cells: Array, day: int, seed_crop: String) -> void:
 				_plot_label.text = stage
 		notes.append(reasons.keys()[0] if reasons else NOTES[stage])
 		if stage in ["Sown", "Ripe"]:
-			_detail_label.tooltip_text = ("Expected harvest: about %d kg" if stage == "Sown" else "Harvest: %d kg") % farm.harvest_yield(cell)
+			_detail_label.tooltip_text = ("Expected harvest: about %s kg" if stage == "Sown" else "Harvest: %s kg") % Farm.kg(farm.harvest_yield(cell))
 	else:
 		_plot_label.text = "%d plots" % cells.size()
 		for reason in reasons:
 			notes.append(reason if reasons[reason] == 1 else "%s ×%d" % [reason, reasons[reason]])
 	notes.append("soil %d%%" % roundi(soil / cells.size() * 100))
 	_detail_label.text = "  ·  ".join(notes)
+	_detail_label.tooltip_text += "\nArea: %d m² (%d m² per plot)" % [cells.size() * Farm.PLOT_AREA_M2, Farm.PLOT_AREA_M2]
 
 ## One line on what a crop needs and gives.
 func _facts(crop: String) -> String:
 	var kind: Dictionary = Farm.CROPS[crop]
-	return "%s: sown %s, needs about %d warm days%s, dies at %d°C, %d kg seed a plot for about %d kg" % [crop, Farm.sowing_window(crop), kind.ripe, " and a winter" if kind.winter else "", kind.frost, kind.seed, kind.grain]
+	return "%s: sown %s, needs about %d warm days%s, dies at %d°C, %s kg seed per %d m² plot for about %s kg" % [crop, Farm.sowing_window(crop), kind.ripe, " and a winter" if kind.winter else "", kind.frost, Farm.kg(kind.seed), Farm.PLOT_AREA_M2, Farm.kg(kind.grain)]
 
 ## Opens contextual actions at the pointer, or above the farm panel for C/the button.
 func open_action_menu(at := Vector2(-1, -1)) -> void:

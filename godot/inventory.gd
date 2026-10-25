@@ -4,15 +4,13 @@ extends "res://hud_window.gd"
 ## crop's kg, bags, the plots it seeds and what this year has sown and harvested.
 
 const COLUMNS := 7
+const GrainSlot := preload("res://grain_slot.gd")
 ## A slot is a square for its bag over a strip for its kg.
-const SLOT := 60
-const LABEL := 16
+const SLOT := GrainSlot.SIZE
 const GAP := 4
 
 ## Whether the per-crop stats show under the bags.
 var stats := false
-var _slot_box := TimeHud.box(Color(0, 0, 0, 0.35), Color(TimeHud.GOLD, 0.25), 4, 1, Vector2.ZERO)
-var _hover_box := TimeHud.box(Color(TimeHud.GOLD, 0.12), TimeHud.GOLD, 4, 1, Vector2.ZERO)
 var _icons := preload("res://bag_icons.gd").new()
 var _premultiplied := CanvasItemMaterial.new()
 ## What the inventory last showed, so toggling stats can redraw it.
@@ -45,8 +43,8 @@ func show_inventory(farm: Farm, day: int) -> void:
 	grid.add_theme_constant_override("v_separation", GAP)
 	body.add_child(grid)
 	for crop in Farm.CROPS:
-		for kg in farm.bags(crop):
-			grid.add_child(_slot(crop, kg, grid.get_child_count()))
+		for grams in farm.bags(crop):
+			grid.add_child(_slot(crop, grams, grid.get_child_count()))
 	var bags := grid.get_child_count()
 	# Empty slots fill out the last row, and at least two rows show.
 	for i in maxi(2 * COLUMNS, ceili(bags / float(COLUMNS)) * COLUMNS) - bags:
@@ -65,39 +63,14 @@ func show_inventory(farm: Farm, day: int) -> void:
 			var plots: int = amount / kind.seed
 			var year := PackedStringArray()
 			if result.seed:
-				year.append("−%d sown" % result.seed)
+				year.append("−%s sown" % Farm.kg(result.seed))
 			if result.gathered:
-				year.append("+%d harvested" % result.gathered)
-			_row([kind.color, crop, "%d kg" % amount, farm.bags(crop).size(), "%d plot%s" % [plots, "" if plots == 1 else "s"], "  ·  ".join(year) if year else "—"], widths, body.get_child_count() % 2 == 1, TimeHud.PARCHMENT, "A bag holds %d kg of %s; %d kg sows one plot" % [kind.bag, crop.to_lower(), kind.seed])
-	_row(["", "Total", "%d kg" % farm.stored(), "%d bag%s" % [bags, "" if bags == 1 else "s"], "", ""], widths, false, MUTED)
+				year.append("+%s harvested" % Farm.kg(result.gathered))
+			_row([kind.color, crop, "%s kg" % Farm.kg(amount), farm.bags(crop).size(), "%d plot%s" % [plots, "" if plots == 1 else "s"], "  ·  ".join(year) if year else "—"], widths, body.get_child_count() % 2 == 1, TimeHud.PARCHMENT, "A bag holds %s kg of %s; %s kg sows one %d m² plot" % [Farm.kg(kind.bag), crop.to_lower(), Farm.kg(kind.seed), Farm.PLOT_AREA_M2])
+	_row(["", "Total", "%s kg" % Farm.kg(farm.stored()), "%d bag%s" % [bags, "" if bags == 1 else "s"], "", ""], widths, false, MUTED)
 	_fit()
 
-## One slot holding a bag of `kg` of `crop`, the `number`th bag shown, or an empty
+## One slot holding a bag of `grams` of `crop`, the `number`th bag shown, or an empty
 ## slot when `crop` is "". The bag is a 3D render from bag_icons.gd.
-func _slot(crop: String, kg: int, number: int) -> Control:
-	var slot := Control.new()
-	slot.custom_minimum_size = Vector2(SLOT, SLOT + LABEL)
-	slot.mouse_filter = Control.MOUSE_FILTER_PASS
-	slot.draw.connect(_draw_slot.bind(slot, crop, kg))
-	slot.mouse_entered.connect(slot.queue_redraw)
-	slot.mouse_exited.connect(slot.queue_redraw)
-	if crop == "":
-		return slot
-	var kind: Dictionary = Farm.CROPS[crop]
-	slot.tooltip_text = "%s: %d kg%s" % [crop, kg, " (full bag)" if kg == kind.bag else " of %d" % kind.bag]
-	var bag := TextureRect.new()
-	bag.texture = _icons.icon(crop, float(kg) / kind.bag, number)
-	bag.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	bag.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
-	bag.material = _premultiplied
-	bag.size = Vector2(SLOT, SLOT)
-	bag.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	slot.add_child(bag)
-	return slot
-
-## The slot's frame, lit on hover, and the bag's kg: gold when part-filled.
-func _draw_slot(slot: Control, crop: String, kg: int) -> void:
-	var rect := Rect2(Vector2.ZERO, slot.size)
-	slot.draw_style_box(_hover_box if rect.has_point(slot.get_local_mouse_position()) else _slot_box, rect)
-	if crop:
-		slot.draw_string(_serif, Vector2(0, slot.size.y - 4), "%d kg" % kg, HORIZONTAL_ALIGNMENT_CENTER, slot.size.x, 13, TimeHud.PARCHMENT if kg == Farm.CROPS[crop].bag else TimeHud.GOLD)
+func _slot(crop: String, grams: int, number: int) -> Control:
+	return GrainSlot.new(crop, grams, number, _icons, _premultiplied)
