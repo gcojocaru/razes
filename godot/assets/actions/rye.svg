@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+  <defs><linearGradient id="gold" x2=".7" y2="1"><stop stop-color="#f4e7af"/><stop offset="1" stop-color="#af924e"/></linearGradient></defs>
+  <!-- Rye has a taller, slimmer ear and short fine awns. -->
+  <path d="m29 61 6-53" stroke="#dec17f" stroke-width="2.4" stroke-linecap="round"/>
+  <g fill="none" stroke="#dbc58a" stroke-width="1.1" stroke-linecap="round">
+    <path d="m32 17-7-12m12 10 9-12M31 26l-9-13m15 12L48 11M30 36l-10-13m16 11 12-13M29 45 19 33m16 11 12-12"/>
+  </g>
+  <g fill="url(#gold)" stroke="#927536" stroke-width=".6">
+    <path d="M34 17c-4-4-3-9 3-14 3 7 1 11-3 14Z"/>
+    <path d="M33 25c-6-2-9-7-7-13 6 3 8 7 7 13Z"/>
+    <path d="M35 30c7-2 10-7 8-13-6 3-9 8-8 13Z"/>
+    <path d="M32 36c-7-2-10-8-8-14 7 3 9 8 8 14Z"/>
+    <path d="M34 41c7-2 10-8 8-14-6 3-9 8-8 14Z"/>
+    <path d="M31 47c-7-2-10-8-8-14 7 3 9 8 8 14Z"/>
+    <path d="M33 51c7-2 10-8 8-14-6 3-9 8-8 14Z"/>
+  </g>
+</svg>

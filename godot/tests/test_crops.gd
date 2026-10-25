@@ -1,0 +1,427 @@
+extends SceneTree
+## Crop and land rules, deterministic seasons and years, and the game screen wiring.
+
+const SPRING := 35
+const SUMMER := Calendar.DAYS_PER_MONTH * 3 + 10
+const AUTUMN := Calendar.DAYS_PER_SEASON * 2 + 10
+const WINTER := Calendar.DAYS_PER_SEASON * 3 + 10
+const WARM := {"temperature": 20, "condition": "Rain"}
+
+var failures: Array[String] = []
+
+func check(condition: bool, message: String) -> void:
+	if not condition:
+		failures.append(message)
+		push_error(message)
+
+func _initialize() -> void:
+	call_deferred("run")
+
+## Plows and sows `name` on sow_day, then grows with weather until it ripens or
+## dies. Returns [final stage, day it ended].
+func season(weather: Weather, name: String, sow_day: int) -> Array:
+	var farm := Farm.new()
+	farm.work([Vector2i.ZERO, Vector2i.ZERO], sow_day, "", name)
+	var day := sow_day
+	while farm.stage(Vector2i.ZERO) == "Sown":
+		day += 1
+		farm.grow(weather.on(day), day)
+	return [farm.stage(Vector2i.ZERO), day]
+
+## The middle of a crop's sowing months.
+func mid_window(name: String) -> int:
+	var months: Array = Farm.CROPS[name].sow
+	return (months[0] + months[-1] + 1) * Calendar.DAYS_PER_MONTH / 2
+
+## Grain gathered each year from one plot cropped with `name` in the years
+## `pattern` marks true (repeating), sowing early in its window and harvesting when ripe.
+func yields(name: String, pattern: Array, years: int) -> Array:
+	var farm := Farm.new()
+	farm.stock[name] = 9999
+	var weather := Weather.new(7)
+	var sow_at: int = Farm.CROPS[name].sow[0] * Calendar.DAYS_PER_MONTH + 10
+	for day in Calendar.DAYS_PER_YEAR * years:
+		farm.grow(weather.on(day), day)
+		if day % Calendar.DAYS_PER_YEAR == sow_at and pattern[day / Calendar.DAYS_PER_YEAR % pattern.size()]:
+			farm.work([Vector2i.ZERO, Vector2i.ZERO], day, "", name)
+		if farm.stage(Vector2i.ZERO) == "Ripe":
+			farm.act(Vector2i.ZERO, day)
+	return range(1, years + 1).map(func(year: int) -> int: return farm.totals(year).gathered)
+
+func click(position: Vector2, pressed: bool, shift := false) -> void:
+	var event := InputEventMouseButton.new()
+	event.button_index = MOUSE_BUTTON_LEFT
+	event.pressed = pressed
+	event.shift_pressed = shift
+	event.position = position
+	root.push_input(event, true)
+	await process_frame
+
+func press(button: Button) -> void:
+	await click(button.get_global_rect().get_center(), true)
+	await click(button.get_global_rect().get_center(), false)
+
+## A right-button press at `from`, dragged through `path`, released at `to`.
+func right_click(from: Vector2, to: Vector2, path := []) -> void:
+	var event := InputEventMouseButton.new()
+	event.button_index = MOUSE_BUTTON_RIGHT
+	event.pressed = true
+	event.position = from
+	root.push_input(event, true)
+	await process_frame
+	for point in path:
+		var motion := InputEventMouseMotion.new()
+		motion.button_mask = MOUSE_BUTTON_MASK_RIGHT
+		motion.position = point
+		root.push_input(motion, true)
+		await process_frame
+	event = event.duplicate()
+	event.pressed = false
+	event.position = to
+	root.push_input(event, true)
+	await process_frame
+
+func key(code: Key, shift := false) -> void:
+	var event := InputEventKey.new()
+	event.physical_keycode = code
+	event.pressed = true
+	event.shift_pressed = shift
+	root.push_input(event, true)
+
+func texts(node: Node) -> Array:
+	return node.find_children("*", "Label", true, false).map(func(label: Label) -> String: return label.text)
+
+func finish_work(game) -> void:
+	for i in 24 * 12 * 7:
+		if game.human.queue.is_empty() and game.human.job.is_empty() and game.human.carried == 0:
+			return
+		game.advance_time(game.seconds_per_day / (24.0 * 12))
+	check(false, "The farmer completes the queued UI fixture within one week")
+
+func run() -> void:
+	var small := Farm.new()
+	small.act(Vector2i.ZERO, SPRING)
+	small.act(Vector2i.ZERO, SPRING, "Barley")
+	check(small.stock.Barley == 8000, "Sowing 100 m² uses 2 kg from the initial 10 kg of barley, stored as grams")
+	small.plots[Vector2i.ZERO].stage = "Ripe"
+	small.act(Vector2i.ZERO, SPRING)
+	check(small.stock.Barley == 15000 and small.totals(1).gathered == 7000, "A fertile 100 m² barley harvest returns 7 kg and records that mass")
+	check(Farm.kg(0) == "0" and Farm.kg(300) == "0.3" and Farm.kg(1600) == "1.6" and Farm.kg(-1) == "-0.001", "Kilograms retain gram precision without trailing zeroes")
+	var millet_day := Calendar.DAYS_PER_MONTH * 2
+	var beds: Array = [Vector2i(0, 0), Vector2i(1, 0), Vector2i(2, 0), Vector2i(3, 0), Vector2i(4, 0), Vector2i(5, 0), Vector2i(6, 0)]
+	small.work(beds, millet_day, "Plow")
+	check(small.preview(beds, millet_day, "Sow", "Millet") == {"plots": 6, "grain": -1800}, "Six millet beds cost exactly 1.8 kg; a seventh is unaffordable")
+	check(small.work(beds, millet_day, "Sow", "Millet") == 6 and small.stock.Millet == 0 and small.stage(beds[-1]) == "Plowed", "The last 300 g of millet seed sows a bed without rounding or overdraft")
+	var worn: Dictionary = small.plots[beds[0]]
+	worn.fertility = 0.1
+	worn.days = 1
+	worn.moisture = 0.8
+	check(small.harvest_yield(beds[0]) == 1, "The harvest minimum is one gram rather than one kilogram")
+	worn.moisture = 0.9
+	check(small.harvest_yield(beds[0]) == 740, "A poor, dry 100 m² millet plot can yield less than one kilogram")
+	var farm := Farm.new()
+	var cell := Vector2i(3, 4)
+	var barley: Dictionary = Farm.CROPS.Barley
+	check(farm.stage(cell) == "Grass" and farm.fertility(cell) == 1.0 and farm.stock == Farm.STARTING_STOCK, "Plots start as fertile grass, with seed of each crop in store")
+	check(Farm.sowable(SPRING) == ["Barley", "Oats"] and Farm.sowable(SUMMER) == ["Millet"] and Farm.sowable(AUTUMN) == ["Wheat", "Rye"] and Farm.sowable(WINTER).is_empty(), "Each crop has its own sowing months")
+	check(not farm.act(cell, WINTER) and farm.plots.is_empty(), "Frozen winter ground cannot be plowed")
+	check(farm.act(cell, SUMMER) and farm.stage(cell) == "Plowed", "Grass can be plowed outside winter")
+	check(not farm.act(cell, SUMMER, "Barley") and farm.stock == Farm.STARTING_STOCK, "Sowing a crop outside its months changes nothing")
+	check(farm.action(cell, SUMMER, "Barley").reason == "Barley is sown in Spring months 1–2", "Unavailable sowing says when that crop is sown")
+	check(farm.action(cell, WINTER).reason == "Next sowing: Spring month 1 (Barley, Oats)", "Winter says when sowing opens next")
+	check(farm.act(cell, SPRING, "Barley") and farm.stage(cell) == "Sown" and farm.crop(cell) == "Barley", "Sowing in its months plants the crop")
+	check(farm.stock.Barley == Farm.STARTING_STOCK.Barley - barley.seed and farm.stock.Oats == Farm.STARTING_STOCK.Oats and farm.record(SPRING, "Barley").sown == 1, "Sowing uses that crop's own seed and is recorded")
+	check(not farm.act(cell, SPRING) and farm.stage(cell) == "Sown", "Unripe crops cannot be harvested")
+
+	check(Farm.daily_growth("Barley", {"temperature": barley.base, "condition": "Rain"}) == 0.0, "Crops do not grow at their base temperature")
+	check(Farm.daily_growth("Barley", {"temperature": 20, "condition": "Snow"}) == 0.0, "Crops do not grow on snow days")
+	check(Farm.daily_growth("Millet", {"temperature": 9, "condition": "Cloudy"}) == 0.0 and Farm.daily_growth("Barley", {"temperature": 9, "condition": "Cloudy"}) > 0.0, "Millet needs more warmth than barley")
+	var rain_over_sun := func(name: String) -> float:
+		return Farm.daily_growth(name, {"temperature": 20, "condition": "Rain"}) / Farm.daily_growth(name, {"temperature": 20, "condition": "Clear"})
+	check(rain_over_sun.call("Oats") > rain_over_sun.call("Barley") and rain_over_sun.call("Barley") > rain_over_sun.call("Millet"), "Oats gain most from rain and millet least")
+
+	var weather := Weather.new(7)
+	var day := SPRING
+	while farm.stage(cell) == "Sown":
+		day += 1
+		farm.grow(weather.on(day), day)
+	check(farm.stage(cell) == "Ripe" and Calendar.date(day).season == 1, "Spring barley ripens in summer")
+	var harvest := farm.harvest_yield(cell)
+	check(absi(harvest - barley.grain) < barley.grain * 0.2, "A season of mixed weather yields near the full kg on fertile soil")
+	check(farm.act(cell, day) and farm.stage(cell) == "Stubble", "Harvest leaves stubble")
+	check(farm.stock.Barley == Farm.STARTING_STOCK.Barley - barley.seed + harvest, "Harvest adds its kg to that crop's store")
+	check(farm.record(day, "Barley").harvested == 1 and farm.totals(1).gathered == harvest, "The year records the harvest")
+	var grown_in := func(condition: String, name: String) -> int:
+		var trial := Farm.new()
+		trial.work([cell, cell], mid_window(name), "", name)
+		while trial.stage(cell) == "Sown":
+			trial.grow({"temperature": 15, "condition": condition}, mid_window(name))
+		return trial.harvest_yield(cell)
+	check(grown_in.call("Cloudy", "Oats") == Farm.CROPS.Oats.grain and grown_in.call("Rain", "Oats") > Farm.CROPS.Oats.grain and grown_in.call("Clear", "Oats") < Farm.CROPS.Oats.grain, "Cloudy seasons give the full yield, wet ones more and dry ones less")
+	check(1.0 - grown_in.call("Clear", "Millet") / float(Farm.CROPS.Millet.grain) < 1.0 - grown_in.call("Clear", "Oats") / float(Farm.CROPS.Oats.grain), "Drought costs millet less of its harvest than oats")
+	farm.stock.Wheat = 120300
+	check(farm.bags("Wheat") == [55000, 55000, 10300] and farm.bags("Millet") == [1800] and Farm.new().bags("Barley") == [10000], "Physical bag capacities stay the same and a partial bag preserves grams")
+	farm.stock.Wheat = 110000
+	check(farm.bags("Wheat") == [55000, 55000], "Grain that fills its bags leaves no empty bag")
+	farm.stock.Wheat = 0
+	check(farm.bags("Wheat").is_empty(), "An empty stock has no bag")
+	farm.stock.Wheat = Farm.STARTING_STOCK.Wheat
+	check(is_equal_approx(farm.fertility(cell), 1.0 - barley.wear), "Harvest wears the soil")
+	check(farm.action(cell, SPRING + Calendar.DAYS_PER_YEAR).name == "Plow", "Stubble must be plowed again before sowing")
+
+	for i in ceili(barley.wear / Farm.YEARLY_REST * Calendar.DAYS_PER_YEAR):
+		farm.grow({"temperature": 0, "condition": "Snow"}, day)
+	check(is_equal_approx(farm.fertility(cell), 1.0), "Rest restores worn soil")
+	check(farm.stage(cell) == "Stubble", "Grass does not return on cold days")
+	for i in Farm.WILD_AT - 1:
+		farm.grow(WARM, day)
+	check(farm.stage(cell) == "Stubble", "Grass needs many warm days to return")
+	farm.grow(WARM, day)
+	check(farm.stage(cell) == "Grass", "Untended stubble goes back to grass")
+	farm.act(cell, SPRING)
+	for i in Farm.WILD_AT * 3:
+		farm.grow(WARM, SPRING)
+	check(farm.stage(cell) == "Plowed", "Plowed land stays plowed")
+
+	farm.act(cell, SPRING, "Barley")
+	farm.plots[cell].stage = "Ripe"
+	farm.grow({"temperature": barley.frost + 1, "condition": "Snow"}, SPRING)
+	check(farm.stage(cell) == "Ripe", "A crop survives frost above its limit")
+	farm.grow({"temperature": barley.frost, "condition": "Snow"}, SPRING)
+	check(farm.stage(cell) == "Withered" and farm.record(SPRING, "Barley").frost == 1, "Frost at a crop's limit kills it and is recorded")
+	check(farm.action(cell, SPRING).name == "Plow", "Dead crops are plowed under")
+
+	var wheat := Vector2i(9, 9)
+	farm.work([wheat, wheat], AUTUMN, "", "Wheat")
+	for i in 200:
+		farm.grow(WARM, AUTUMN)
+	check(farm.stage(wheat) == "Sown" and farm.growth(wheat) == Farm.BEFORE_WINTER, "Winter wheat waits for winter before ripening")
+	farm.grow({"temperature": 0, "condition": "Cloudy"}, WINTER)
+	for i in 200:
+		farm.grow(WARM, SPRING + Calendar.DAYS_PER_YEAR)
+	check(farm.stage(wheat) == "Ripe", "After a winter, wheat ripens")
+
+	var field: Array = [Vector2i(0, 0), Vector2i(1, 0), Vector2i(2, 0), Vector2i(3, 0)]
+	farm.stock.Barley = barley.seed * 2 + 1
+	check(farm.preview(field, SPRING, "Sow", "Barley").plots == 0, "Sowing grass does nothing")
+	check(farm.work(field, SPRING, "Plow") == 4 and farm.stage(field[3]) == "Plowed", "Work plows every selected plot")
+	var forecast := farm.preview(field, SPRING, "", "Barley")
+	check(forecast == {"plots": 2, "grain": -barley.seed * 2} and farm.stage(field[0]) == "Plowed", "Preview forecasts sowing as far as grain lasts, changing nothing")
+	check(farm.work(field, SPRING, "", "Barley") == forecast.plots and farm.stock.Barley == 1, "Work matches its preview")
+	check(farm.stage(field[1]) == "Sown" and farm.stage(field[2]) == "Plowed", "Sowing stops in order when that crop's seed runs out")
+	check(farm.action(field[2], SPRING, "Barley").reason == "Needs 2 kg barley seed" and farm.action(field[2], SPRING, "Oats").reason == "", "Each crop needs its own seed")
+
+	var ripe_day := {}
+	for name in Farm.CROPS:
+		var outcomes := range(50).map(func(seed: int) -> Array: return season(Weather.new(seed), name, mid_window(name)))
+		var ripe := outcomes.filter(func(outcome: Array) -> bool: return outcome[0] == "Ripe")
+		ripe_day[name] = ripe.map(func(outcome: Array) -> int: return outcome[1]).reduce(func(a: int, b: int) -> int: return a + b) / ripe.size()
+		if name == "Wheat":
+			check(ripe.size() >= 35 and ripe.size() < 50, "Wheat sown mid-autumn usually ripens but hard winters can kill it")
+		else:
+			check(ripe.size() == 50, "%s sown mid-window ripens in all 50 weather seeds" % name)
+	check(ripe_day.Barley < ripe_day.Oats and ripe_day.Oats < ripe_day.Millet, "Spring crops ripen barley first, then oats, then late-sown millet")
+	check(ripe_day.Rye < ripe_day.Wheat and Calendar.date(ripe_day.Rye).year == 2, "Autumn rye ripens the next summer, before wheat")
+	var every_year := yields("Barley", [true], 9)
+	var rested := yields("Barley", [true, true, false], 9)
+	var sum := func(values: Array) -> int: return values.reduce(func(a: int, b: int) -> int: return a + b, 0)
+	check(every_year[-1] < every_year[0] / 2.0, "Cropping barley every year halves its yield within nine years")
+	# Per sown year, over the six years after the first cycle (four sown), against the first two.
+	check(sum.call(rested.slice(3)) / 4.0 > sum.call(rested.slice(0, 3)) / 2.0 * 0.8, "Resting one year in three keeps barley's yield, give or take the weather")
+
+	var field_scene = load("res://game.tscn").instantiate()
+	# These farming fixtures use dry plots on a repeatable hilly map.
+	field_scene.terrain_seed = 67
+	root.add_child(field_scene)
+	field_scene.set_speed(0)
+	current_scene = field_scene
+	await process_frame
+	await process_frame
+	var game: Node3D = current_scene
+	# A script error would stop this coroutine before quit() and hang the run.
+	if game == null or game.find_child("FarmHud", true, false) == null:
+		check(false, "The game screen loads")
+		quit(1)
+		return
+	var hud: PanelContainer = game.find_child("FarmHud", true, false)
+	var ledger: PanelContainer = game.find_child("Ledger", true, false)
+	var debug: PanelContainer = game.find_child("AgricultureDebug", true, false)
+	game.set_speed(0)
+	game.weather = Weather.new(7)
+	game.day = SPRING
+	game._start_day()
+	var start_total := Farm.new().stored()
+	var panel_buttons := hud.find_children("*", "Button", true, false)
+	check(panel_buttons.all(func(button: Button) -> bool: return button.text.is_empty() and button.icon != null and not button.tooltip_text.is_empty() and not button.accessibility_name.is_empty()), "Every farm panel button has an icon, tooltip and accessible name")
+	check("Grain" not in "".join(texts(hud)) and "kg" not in "".join(texts(hud)), "The bottom panel has no grain counter or weight labels")
+	check(hud.buttons.values().all(func(button: Button) -> bool: return not button.visible), "No action shows before plots are selected")
+	var shortage := Farm.new()
+	shortage.act(Vector2i.ZERO, 0)
+	shortage.stock.Barley = 0
+	hud.show_farm(shortage, [Vector2i.ZERO], 0, "Barley")
+	check(not hud.buttons.Sow.visible and "seed" in hud._detail_label.text and "kg" not in hud._detail_label.text and "2 kg" in hud._detail_label.tooltip_text, "Seed shortages explain the problem while keeping weights on hover")
+	check("Area: 100 m²" in hud._detail_label.tooltip_text, "The selected plot explains its real area")
+	game._show_farm()
+	var start: Vector2i = game.cell_at_screen(root.get_visible_rect().get_center())
+	var end := start + Vector2i(2, 1)
+	await click(game._camera.unproject_position(game.cell_center(start)), true)
+	var motion := InputEventMouseMotion.new()
+	motion.button_mask = MOUSE_BUTTON_MASK_LEFT
+	motion.position = game._camera.unproject_position(game.cell_center(end))
+	root.push_input(motion, true)
+	await process_frame
+	await click(motion.position, false)
+	check(game.selected.size() == 6 and game.selected.has(start) and game.selected.has(end), "Dragging selects a rectangle of plots")
+	check(game._crops.get_pixelv(end).b == 1.0, "The field texture marks selected plots")
+	check(hud.buttons.Plow.visible and "Plow 6" in hud.buttons.Plow.tooltip_text and not hud.buttons.Sow.visible, "The panel offers to plow all six")
+	key(KEY_F)
+	check(game.human.queue.size() == 6 and game.selected.keys().all(func(plot: Vector2i) -> bool: return game.farm.stage(plot) == "Grass"), "F queues the selection without instant plowing")
+	finish_work(game)
+	check(game.selected.keys().all(func(plot: Vector2i) -> bool: return game.farm.stage(plot) == "Plowed"), "The farmer plows every selected plot")
+	var extra := start + Vector2i(0, -2)
+	await click(game._camera.unproject_position(game.cell_center(extra)), true, true)
+	await click(game._camera.unproject_position(game.cell_center(extra)), false, true)
+	check(game.selected.size() == 7 and game.selected.has(extra), "Shift-click adds a plot to the selection")
+	var seeded: int = mini(6, Farm.STARTING_STOCK.Barley / barley.seed)
+	check("Sow Barley 5  -10 kg" in hud.buttons.Sow.tooltip_text and "Plow 1" in hud.buttons.Plow.tooltip_text, "Mixed selections explain each icon's action, crop, count and kilograms on hover")
+	check(seeded == 6 or "Seed for %d of 6" % seeded in hud._detail_label.text, "The panel says when seed runs short")
+	check(hud.action_button.visible and "Barley" in hud.buttons.Sow.tooltip_text, "The Sow button explains its crop, beside an actions button")
+	key(KEY_C)
+	var menu = hud.action_wheel
+	check(menu.visible and menu.entries.map(func(e: Dictionary): return e.action) == ["Plow", "Sow", "Sow"], "C opens a wheel with Plow and the two available crops")
+	var oats_sown: int = mini(6, Farm.STARTING_STOCK.Oats / Farm.CROPS.Oats.seed)
+	check(menu.entries[2].crop == "Oats" and menu.entries[2].plots == oats_sown and menu.entries[2].grain == -Farm.CROPS.Oats.seed * oats_sown, "The oats segment shows what it would sow and cost")
+	key(KEY_RIGHT)
+	for pressed in [true, false]:
+		var enter := InputEventKey.new()
+		enter.keycode = KEY_ENTER
+		enter.physical_keycode = KEY_ENTER
+		enter.pressed = pressed
+		Input.parse_input_event(enter)
+		await process_frame
+	check(not menu.visible and game.farm.stage(start) == "Plowed" and game.human.reserved_seed() == 8000, "Choosing a crop reserves its seed and queues sowing")
+	finish_work(game)
+	check(game.farm.stage(start) == "Sown" and game.farm.crop(start) == "Oats" and game.farm.stage(extra) == "Grass", "The farmer sows the selected plowed plots only")
+	check(game.seed_crop() == "Oats", "The chosen crop is remembered")
+	var packed := roundi(game._crops.get_pixelv(start).r * 255)
+	check(packed % 8 == Farm.STAGES.find("Sown") and packed / 8 == Farm.CROPS.keys().find("Oats") + 1, "The field texture carries each plot's stage and crop")
+	check(game.farm.stored() == start_total - Farm.CROPS.Oats.seed * oats_sown, "The store updates after sowing")
+	check(hud.buttons.Sow.icon == hud.action_wheel.ICONS.Oats, "The sow icon follows the remembered crop")
+	await click(game._camera.unproject_position(game.cell_center(extra)), true)
+	await click(game._camera.unproject_position(game.cell_center(extra)), false)
+	check(game.selected.keys() == [extra], "A plain click replaces the selection")
+	var start_screen: Vector2 = game._camera.unproject_position(game.cell_center(start))
+	await right_click(start_screen + Vector2(40, 0), start_screen)
+	check(not menu.visible and game.selected.keys() == [extra], "A right-drag rotates the view without opening the menu")
+	await right_click(start_screen, start_screen + Vector2(2, 0), [start_screen + Vector2(80, 0), start_screen + Vector2(2, 0)])
+	check(not menu.visible and game.selected.keys() == [extra], "A right-drag that comes back to where it began does not open the menu")
+	await right_click(start_screen, start_screen)
+	check(menu.visible and game.selected.keys() == [start], "Right-clicking a plot selects it and opens the action wheel")
+	check(menu.entries.is_empty() and "ripe" in menu.hub_detail.text.to_lower(), "Right-clicking a growing crop shows status, not sowing options")
+	menu.hide()
+	game.selected = {start: true, extra: true}
+	game._show_farm()
+	await right_click(start_screen, start_screen)
+	check(menu.visible and game.selected.size() == 2 and menu.entries[0].action == "Plow", "Right-clicking an existing group keeps it and offers its available work")
+	var outside := Vector2(15, root.get_visible_rect().size.y / 2)
+	await click(outside, true)
+	var outside_drag := InputEventMouseMotion.new()
+	outside_drag.position = start_screen
+	outside_drag.button_mask = MOUSE_BUTTON_MASK_LEFT
+	root.push_input(outside_drag, true)
+	await click(start_screen, false)
+	check(not menu.visible and game.selected == {start: true, extra: true}, "Outside dismissal and dragging do not leak through to the selection")
+	await right_click(start_screen, start_screen)
+	var segment: Vector2 = menu._origin + Vector2(0, -132)
+	await click(segment, true)
+	await click(segment, false)
+	check(not menu.visible and game.farm.stage(extra) == "Grass", "Clicking Plow queues work and dismisses the wheel")
+	finish_work(game)
+	check(game.farm.stage(extra) == "Plowed" and game.farm.stage(start) == "Sown", "The farmer works only the eligible plots")
+	game._place_camera(game.cell_center(Vector2i(12, 3)))
+	key(KEY_ENTER)
+	check(game.selected.keys() == [Vector2i(12, 3)], "Enter selects the plot at the centre of the view")
+	game._place_camera(game.cell_center(Vector2i(13, 3)))
+	key(KEY_ENTER, true)
+	check(game.selected.keys() == [Vector2i(12, 3), Vector2i(13, 3)], "Shift+Enter adds the centre plot")
+
+	check(not ledger.visible, "The ledger starts hidden")
+	for plot in game.farm.plots.values():
+		plot.days = 0
+		plot.moisture = 0.0
+	key(KEY_L)
+	check(ledger.visible and "Oats" in texts(ledger.body) and "%d growing" % oats_sown in texts(ledger.body), "L shows what is growing by crop")
+	check("28 kg" in texts(ledger.body), "The Fields tab adds five oat plots to 28 kg rather than showing grams")
+	for tab in ["Years", "Crops"]:
+		var button: Button = ledger.find_children("*", "Button", true, false).filter(func(b: Button) -> bool: return b.text == tab)[0]
+		await press(button)
+	check("Autumn months 1–2" in texts(ledger.body) and "Wheat" in texts(ledger.body), "The Crops tab lists each crop's sowing months")
+	check("1.6 → 5.6" in texts(ledger.body), "The crop ledger preserves fractional seed and harvest kilograms")
+	ledger.tab = "Years"
+	ledger.show_ledger(game.farm, game.day)
+	check("1 now" in texts(ledger.body), "The Years tab lists this year")
+	check("-8" in texts(ledger.body), "The year ledger shows eight kilograms spent sowing oats")
+
+	check(debug != null and not debug.visible, "The agriculture debug window starts hidden")
+	key(KEY_F4)
+	check(debug.visible, "F4 shows the agriculture debug window")
+	debug.crop.select(Farm.CROPS.keys().find("Rye") + 1)
+	debug.stage.select(Farm.STAGES.find("Ripe"))
+	debug.apply_to_selected()
+	check(game.farm.stage(Vector2i(12, 3)) == "Ripe" and game.farm.crop(Vector2i(13, 3)) == "Rye", "The debug window sets the selected plots")
+	var fill: Button = debug.find_children("*", "Button", true, false).filter(func(b: Button) -> bool: return b.text.begins_with("Add 100"))[0]
+	fill.pressed.emit()
+	check(game.farm.stock.Rye == Farm.STARTING_STOCK.Rye + 100000, "The debug window adds 100 kg rather than 100 g")
+	check("Harvest 2  +12.8 kg" in hud.buttons.Harvest.tooltip_text, "The Harvest icon explains fractional kilograms on hover")
+	game._start_selection(Vector2i(12, 3), false)
+	check("kg" not in "".join(texts(hud)) and "6.4 kg" in hud._detail_label.tooltip_text, "A ripe plot keeps fractional harvest weight in its tooltip")
+
+	var inventory: PanelContainer = game.find_child("Inventory", true, false)
+	check(not inventory.visible, "The inventory starts hidden")
+	key(KEY_I)
+	var stored := texts(inventory.body)
+	check(inventory.visible and "527.3 kg" in stored and "%d plots" % (game.farm.stock.Barley / barley.seed) not in stored, "I shows the bags and total in kilograms, with stats hidden")
+	var stats_button: Button = inventory.find_children("*", "Button", true, false).filter(func(b: Button) -> bool: return b.text == "Stats")[0]
+	# The window was just shown; its header lays out on the next frame.
+	await process_frame
+	await press(stats_button)
+	stored = texts(inventory.body)
+	check(inventory.stats and "100 kg" in stored and "%d plots" % (game.farm.stock.Barley / barley.seed) in stored, "Stats shows each crop's kg and the plots it can sow")
+	check("−8 sown" in stored and "—" in stored, "Stats shows this year's sowing in kilograms and a dash for none")
+	var slots: Array = inventory.body.get_child(0).get_children()
+	for name in Farm.CROPS:
+		var held := slots.filter(func(slot: Control) -> bool: return slot.tooltip_text.begins_with(name + ":"))
+		check(held.size() == game.farm.bags(name).size(), "The inventory draws one bag for each bag of %s" % name)
+	check(slots.size() % inventory.COLUMNS == 0 and slots.any(func(slot: Control) -> bool: return slot.tooltip_text == ""), "Empty slots fill out the bag grid")
+	var icons: Node = inventory._icons
+	check(icons.icon("Wheat", 1.0, 0) == icons.icon("Wheat", 1.0, icons.VARIANTS) and icons.icon("Wheat", 1.0, 0) != icons.icon("Wheat", 0.2, 0) and icons.icon("Wheat", 1.0, 0) != icons.icon("Rye", 1.0, 0), "Each crop, fill level and variant of bag renders once and is shared")
+	check(slots.any(func(slot: Control) -> bool: return slot.tooltip_text.get_slice("\n", 0) == "Barley: 20 kg of 45") and slots.any(func(slot: Control) -> bool: return slot.tooltip_text.get_slice("\n", 0) == "Barley: 45 kg (full bag)") and slots.any(func(slot: Control) -> bool: return slot.tooltip_text.get_slice("\n", 0) == "Millet: 1.8 kg of 50"), "Full and partial bags say how many kilograms they hold")
+	var inventory_close: Button = inventory.find_children("*", "Button", true, false).filter(func(b: Button) -> bool: return b.text == "×")[0]
+	var close_at := inventory_close.get_global_rect().get_center()
+	menu.open_at(close_at + Vector2(132, 0))
+	await press(inventory_close)
+	check(inventory.visible and not menu.visible, "The action wheel consumes clicks over an underlying inventory control")
+	inventory.hide()
+
+	var Wiki := preload("res://wiki.gd")
+	var bb: String = Wiki.to_bbcode("<head><title>Hidden</title></head><h2>Crops</h2>\n<p>Sow <b>barley</b> [early]&amp;<kbd>F</kbd></p><ul>\n<li>one</li> <li>two</li></ul><table><tr><th>A</th><th>B</th></tr><tr><td>1</td><td><i>2</i></td></tr></table>")
+	check("Hidden" not in bb and "[ul]one\ntwo[/ul]" in bb and "[b]barley[/b] [lb]early[rb]&" in bb, "The wiki converter keeps text, lists and bold, escapes brackets and drops the head")
+	check("[table=2][cell][color=%s]A[/color][/cell]" % Wiki.GOLD_HEX in bb and "[cell][i]2[/i][/cell][/table]" in bb, "Wiki tables become BBCode tables with gold headers")
+	var page := FileAccess.get_file_as_string(Wiki.PAGE)
+	for name in Farm.CROPS:
+		var kind: Dictionary = Farm.CROPS[name]
+		check(Farm.sowing_window(name) in page and "%d°C" % kind.frost in page and "%s → %s kg" % [Farm.kg(kind.seed), Farm.kg(kind.grain)] in page and "<td>%s kg</td>" % Farm.kg(kind.bag) in page, "The wiki's %s row matches the game" % name)
+	var wiki: PanelContainer = game.find_child("Wiki", true, false)
+	key(KEY_F1)
+	var shown: String = wiki.text.get_parsed_text()
+	check(wiki.visible and "Barley" in shown and "Plow grass" in shown and "<" not in shown and "[" not in shown, "F1 shows the wiki as formatted text, with no tags left over")
+	game.weather = Weather.new(7)
+	game.day = SUMMER
+	game.skip_days(1)
+	check(game.day == SUMMER + 1 and game.farm.growth(start) > 0.0, "Skipping a day grows sown crops")
+	if failures.is_empty():
+		print("PASS: five crops with own months, warmth, rain, frost and winter needs; plow, sow, harvest in kg by soil and season, bags, stubble, plowed land kept, regrowing grass, soil wear and rest, year records, previews; 50-seed ripening per crop and 9-year rotation; selection, F/C/Enter keys, action wheel, ledger tabs, bag inventory, wiki page and window, agriculture debug and field texture")
+	current_scene.free()
+	# Let the audio server release stopped playback before the test process exits.
+	await create_timer(0.2).timeout
+	quit(0 if failures.is_empty() else 1)

@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+  <defs><linearGradient id="gold" x2=".7" y2="1"><stop stop-color="#fff0be"/><stop offset="1" stop-color="#baa05c"/></linearGradient></defs>
+  <!-- Open branching panicle, with hanging pointed hulls rather than a wheat ear. -->
+  <path d="M30 61c3-15 3-31 1-55M32 16c-9-5-16-3-18 4m18 2c9-9 17-5 19 2M33 31c-12-8-21-6-24 1m24 5c10-10 18-6 19 1M33 45c-9-5-15-2-17 4" fill="none" stroke="#e3c782" stroke-width="2" stroke-linecap="round"/>
+  <g fill="url(#gold)" stroke="#978044" stroke-width=".8">
+    <path d="M14 16c7 6 7 14 0 20-6-7-6-13 0-20Z"/>
+    <path d="M50 20c7 6 7 14 1 20-6-7-7-13-1-20Z"/>
+    <path d="M9 29c7 5 8 13 2 20-7-6-8-13-2-20Z"/>
+    <path d="M51 35c7 6 6 14-1 20-6-7-5-14 1-20Z"/>
+    <path d="M17 45c6 4 7 11 1 17-6-6-6-11-1-17Z"/>
+  </g>
+  <path d="M14 20v12m36-8 1 12M9 33l2 12m40-6-1 12M17 48l1 10" fill="none" stroke="#fff0bf" stroke-width="1" stroke-linecap="round"/>
+</svg>
