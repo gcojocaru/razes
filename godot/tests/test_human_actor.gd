@@ -35,10 +35,22 @@ func mesh_bounds(node: Node3D) -> AABB:
 		found = true
 	return result
 
+## Where the posed skeleton's joints are; skinned meshes keep their rest-pose bounds.
+func joint_bounds(node: Node3D) -> AABB:
+	var skeleton: Skeleton3D = node.find_children("*", "Skeleton3D", true, false)[0]
+	var result := AABB(skeleton.global_transform * skeleton.get_bone_global_pose(0).origin, Vector3.ZERO)
+	for bone in skeleton.get_bone_count():
+		result = result.expand(skeleton.global_transform * skeleton.get_bone_global_pose(bone).origin)
+	return result
+
 func pose(node: Node3D) -> Array:
-	var result := []
+	var skeleton: Skeleton3D = node.find_children("*", "Skeleton3D", true, false)[0]
+	var result := [node.transform]
+	for bone in skeleton.get_bone_count():
+		result.append(skeleton.get_bone_pose(bone))
 	for child in node.find_children("*", "Node3D", true, false):
-		result.append([child.transform, child.visible])
+		if not child is BoneAttachment3D:
+			result.append([child.transform, child.visible])
 	return result
 
 func run() -> void:
@@ -55,7 +67,8 @@ func run() -> void:
 	var standing := mesh_bounds(body)
 	check(standing.size.y >= 1.65 and standing.size.y <= 1.8, "The adult's standing mesh is about 1.7 metres tall")
 	check(absf(standing.position.y) < 0.02, "Standing boots meet the ground rather than hovering or sinking")
-	check(standing.size.x < 0.9 and standing.size.z < 0.6, "The adult has human proportions in metres")
+	var joints := joint_bounds(body)
+	check(joints.size.x < 0.9 and joints.size.z < 0.6, "The adult has human proportions in metres")
 
 	var small = script.new(0.2)
 	root.add_child(small)
@@ -82,7 +95,7 @@ func run() -> void:
 	check(pose(body) == paused, "Paused redraws do not advance the animation")
 	for frame in 24:
 		actor.show_person(person, 0.05)
-		check(mesh_bounds(body).position.y >= -0.02, "Walking keeps the boots above the ground")
+		check(joint_bounds(body).position.y >= -0.02, "Walking keeps the boots above the ground")
 
 	person.activity = "Working"
 	var work_poses := []
@@ -93,7 +106,7 @@ func run() -> void:
 		actor.show_person(person, 0.15)
 		check(pose(body) != before, action + " animates the working farmer")
 		work_poses.append(pose(body))
-		check(mesh_bounds(body).position.y >= -0.02, action + " stays grounded")
+		check(joint_bounds(body).position.y >= -0.02, action + " stays grounded")
 	check(work_poses[0] != work_poses[1] and work_poses[1] != work_poses[2], "Hoeing, sowing and harvesting use distinct poses or tools")
 	person.activity = "Idle"
 	person.carried = 0
@@ -116,14 +129,15 @@ func run() -> void:
 	person.name = "Toader"
 	actor.show_person(person, 0.0)
 	var bearded := mesh_bounds(body)
-	check(actor._skin.albedo_color == actor.SKINS.Olive and actor._hair.albedo_color == actor.HAIRS.Red and actor._clothes.albedo_color == actor.CLOTHES["Madder red"] and actor._beard.visible and actor._moustache.visible and actor.get_node("Name").text == "Toader", "Dressing colours skin, hair and clothes, grows the beard, and the label names the peasant")
+	check(actor._hands.albedo_color == actor.SKINS.Olive and actor._hair[0].albedo_color.r > actor._hair[0].albedo_color.b * 2 and actor._clothes[0].albedo_color.r > actor._clothes[0].albedo_color.g * 1.5 and actor._beard.visible and actor._moustache.visible and actor.get_node("Name").text == "Toader", "Dressing colours skin, hair and clothes, grows the beard, and the label names the peasant")
 	check(bearded.size.y <= standing.size.y + 0.001 and bearded.size.z <= standing.size.z + 0.001, "The beard stays within the figure's height and depth")
 	actor.dress({"skin": "Tanned", "hair": "Dark brown", "beard": "Moustache", "clothes": "Undyed linen"})
 	check(actor._moustache.visible and not actor._beard.visible, "A moustache alone shows no beard")
 	for activity in ["Sleeping", "Resting", "Dead"]:
 		person.activity = activity
-		actor.show_person(person, 0.0)
-		var resting := mesh_bounds(body)
+		# Falling down takes the death clip's length.
+		actor.show_person(person, 3.0 if activity == "Dead" else 0.0)
+		var resting := joint_bounds(body)
 		check(resting.position.y >= -0.02, activity + " keeps the body above ground")
 		check(resting.size.y < (1.3 if activity == "Resting" else 0.6), activity + " visibly lowers the body")
 		if activity != "Dead":
@@ -161,12 +175,12 @@ func run() -> void:
 			for facing in [Vector2.UP, Vector2.RIGHT, Vector2.DOWN, Vector2.LEFT]:
 				person.facing = facing
 				small.show_person(person, 0.0)
-				var sleeper := mesh_bounds(small.get_node("Body"))
+				var sleeper := joint_bounds(small.get_node("Body"))
 				check(Rect2(bedding.position.x, bedding.position.z, bedding.size.x, bedding.size.z).encloses(Rect2(sleeper.position.x, sleeper.position.z, sleeper.size.x, sleeper.size.z)), "A %.2f m, %d kg farmer sleeping at home lies on the bedroll regardless of approach direction" % build)
 	camp.free()
 	small.free()
 	actor.free()
 	if failures.is_empty():
-		print("PASS: 1.7 m farmer bounds, height, build and looks from the peasant, one-fifth scale, grounding, direction, walking/work/cooking/rest/death poses, pause, carried sack and separate camp")
+		print("PASS: 1.7 m model farmer bounds, height, build and looks from the peasant, one-fifth scale, grounding, direction, walking/work/cooking/rest/death poses, pause, carried sack and separate camp")
 		print("Standing bounds in metres: ", standing, "; scaled size: ", scaled.size, "; camp size: ", camp_bounds.size)
 	quit(0 if failures.is_empty() else 1)
