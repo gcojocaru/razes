@@ -76,15 +76,12 @@ var _zoom := 24.0
 
 func _ready() -> void:
 	_sun = DirectionalLight3D.new()
-	_sun.rotation_degrees = Vector3(-55, -35, 0)
 	_sun.shadow_enabled = true
 	add_child(_sun)
 
 	_environment = Environment.new()
 	_environment.background_mode = Environment.BG_COLOR
 	_environment.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	_environment.ambient_light_color = Color(0.75, 0.78, 0.8)
-	_environment.ambient_light_energy = 0.6
 	var world := WorldEnvironment.new()
 	world.environment = _environment
 	add_child(world)
@@ -125,7 +122,7 @@ func _ready() -> void:
 	var camp: Node3D = _human_actor.create_camp()
 	camp.position = Vector3(human.home.x, 0, human.home.y) * METRES_TO_UNITS
 	add_child(camp)
-	_weather_effects = preload("res://weather_effects.gd").new(_sun, _environment, _field)
+	_weather_effects = preload("res://weather_effects.gd").new(_sun, _environment, _field, camp.get_node("Firelight"))
 	add_child(_weather_effects)
 	_weather_audio = preload("res://weather_audio.gd").new()
 	add_child(_weather_audio)
@@ -240,7 +237,9 @@ func _end_game() -> void:
 	_show_date()
 
 func _show_date() -> void:
-	_time_hud.show_time(day, speed, today, _day_time / seconds_per_day * 24.0)
+	var hour := _day_time / seconds_per_day * 24.0
+	_time_hud.show_time(day, speed, today, hour)
+	_weather_effects.show_time(day, hour)
 
 func _show_person(seconds := 0.0) -> void:
 	_human_actor.show_person(human, seconds)

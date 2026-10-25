@@ -189,6 +189,12 @@ func create_camp() -> Node3D:
 	ember.emission = Color("c75d26")
 	ember.emission_energy_multiplier = 0.5
 	_part(camp, _cylinder(0.0, 0.15, 0.18), ember, fire_at + Vector3(0, 0.15, 0))
+	var firelight := OmniLight3D.new()
+	firelight.name = "Firelight"
+	firelight.light_color = Color(1.0, 0.6, 0.3)
+	firelight.omni_range = 9.0
+	firelight.position = fire_at + Vector3(0, 0.6, 0)
+	camp.add_child(firelight)
 	var pot := _material(Color("353938"))
 	_part(camp, _cylinder(0.19, 0.14, 0.25), pot, fire_at + Vector3(0, 0.32, 0))
 	var rim := TorusMesh.new()

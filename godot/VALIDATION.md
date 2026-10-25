@@ -38,6 +38,33 @@ Not checked: long-term survival balance, full accessibility, other platforms
 or exports. Modern dry edible grain proxies do not establish medieval cultivar
 nutrition; dehulling/milling losses and digestibility remain abstracted.
 
+## Day and night — 25 October 2026
+
+- `Calendar.sun` gives the sun's direction at 47°N with the equinox on the first
+  day of spring: sunrise 06:00 at the equinoxes, 04:10–19:51 (15.7 hours) at
+  midsummer and 07:51–16:10 (8.3 hours) at midwinter.
+- `weather_effects.gd` now composes each weather look with the time of day: the
+  sky is tinted by sun elevation through night, blue hour, twilight, sunrise and
+  golden hour; ambient light shifts from day grey to night blue; one directional
+  light is the sun by day and a full moon opposite it by night, kept at least
+  11° up so shadows stay on the field; low sun turns golden. Lightning is a
+  flash pulse over whatever light there is. The camp fire is an omni light that
+  brightens and flickers in the dark. The time panel shows a moon on clear nights.
+- GPU captures drove the tuning: twilight first rendered darker than midnight
+  (ambient now holds through civil twilight), sunset light was too red and the
+  golden-hour sky a dull beige (warmer gold), unshaded night rain glowed
+  (particles now dim in the dark and flash with lightning), and a stormy night
+  was almost black (higher ambient floor).
+- `test_menu.gd` checks the equinox and solstice sun, noon and midnight light
+  direction, energy, sky and fire, and the panel's moon. All nine suites pass
+  with exit 0.
+- `tests/capture_weather.gd` now captures dawn, sunrise, noon, sunset, twilight,
+  blue hour, night, the camp fire at night and night rain, storm and snow, plus
+  the 1000×700 window; all were inspected.
+
+Not checked: lunar phases (the moon is always full), stars, glow or bloom, and
+frame rate on slower GPUs (the light is updated every frame).
+
 ## Camp sleep — 25 October 2026
 
 - Camp now offers Sleep beside Eat, with mouse, arrows and focused Enter

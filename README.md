@@ -11,6 +11,12 @@ Each day rolls seeded weather (Clear, Cloudy, Rain, Storm, Snow) and a temperatu
 tuned to modern Moldovan (Chișinău) climate normals, with multi-day warm, cold,
 wet and dry spells. Rain and snow fall as particles, storms flash lightning, and
 fog, sky, sunlight, wet ground and lying snow blend in as the weather turns.
+The sun follows its path at Chișinău's latitude: spring and autumn begin at the
+equinoxes, with sunrise at 06:00, and days last 15.7 hours at midsummer and 8.3
+at midwinter, so shadows lengthen and swing through the day. Dawn and dusk tint
+the sky gold and violet, a full moon opposite the sun lights the night, the camp
+fire glows and flickers in the dark, and the time panel shows the moon on clear
+nights.
 
 Farming is the first gameplay loop. Click a plot or drag over a rectangle of
 plots; hold **Shift** to add to the selection. Without a mouse, move the view
@@ -232,6 +238,7 @@ To capture actual GPU-rendered screens:
 ./godot/run.sh --script tests/capture_menu.gd -- /tmp/stefan-menu
 ./godot/run.sh --script tests/capture_wheel.gd -- /tmp/stefan-wheel
 ./godot/run.sh --script tests/capture_human.gd -- /tmp/stefan-human
+./godot/run.sh --script tests/capture_weather.gd -- /tmp/stefan-weather
 ```
 
 The default window is 1280×800; the minimum is 1000×700. The title uses bundled

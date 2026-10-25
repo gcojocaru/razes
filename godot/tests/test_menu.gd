@@ -144,9 +144,29 @@ func run() -> void:
 			effects.show_weather("Storm")
 			first_flash = minf(first_flash, effects._next_flash)
 		check(first_flash > effects.BLEND_SECONDS * 2, "The first lightning waits until the ground has turned wet")
+		var noon := Calendar.sun(0, 12.0)
+		check(is_zero_approx(Calendar.sun(0, 6.0).y) and absf(rad_to_deg(asin(noon.y)) - 43.0) < 0.01 and noon.z > 0.7 and Calendar.sun(0, 7.0).x > 0.9, "The equinox sun rises at 06:00 in the east and stands 43° up in the south at noon")
+		var daylight := func(on: int) -> float:
+			var hours := 0.0
+			for minute in 24 * 60:
+				hours += float(Calendar.sun(on, minute / 60.0).y > 0.0) / 60.0
+			return hours
+		check(absf(daylight.call(Calendar.DAYS_PER_SEASON) - 15.7) < 0.1 and absf(daylight.call(Calendar.DAYS_PER_SEASON * 3) - 8.3) < 0.1, "Days last 15.7 hours at midsummer and 8.3 at midwinter, as at Chișinău")
+		effects.show_weather("Clear", true)
+		await process_frame
+		effects.show_time(0, 12.0)
+		var lit: Array = [effects._sun.light_energy, effects._environment.background_color.v, effects._fire.light_energy]
+		check(effects._sun.basis.z.is_equal_approx(noon), "At noon the light comes from the sun")
+		effects.show_time(0, 0.0)
+		check(effects._sun.basis.z.is_equal_approx(-Calendar.sun(0, 0.0)) and effects._sun.light_energy < lit[0] * 0.5 and effects._environment.background_color.v < lit[1] * 0.3 and effects._fire.light_energy > lit[2] * 3.0, "At midnight a dimmer moon opposite the sun lights the field, the sky darkens and the camp fire brightens")
+		var hud = current_scene._time_hud
+		hud.show_time(0, 0, {"temperature": 10, "condition": "Clear"}, 0.0)
+		var night: bool = hud._night
+		hud.show_time(0, 0, {"temperature": 10, "condition": "Clear"}, 12.0)
+		check(night and not hud._night, "The time panel shows a moon at night and the sun by day")
 		check(current_scene._focus().is_equal_approx(looked_at), "Rotating orbits the field without moving the view centre")
 	if failures.is_empty():
-		print("PASS: title, Romanian glyph, version, focus, three layouts, Enter, Space and mouse Play, looping menu music stops on start, grid field with cell picking, calendar with pause, speeds, debug day length, seasonal weather with particles")
+		print("PASS: title, Romanian glyph, version, focus, three layouts, Enter, Space and mouse Play, looping menu music stops on start, grid field with cell picking, calendar with pause, speeds, debug day length, seasonal weather with particles, sun path, day and night lighting")
 	current_scene.free()
 	# Let the audio server release stopped playback before the test process exits.
 	await create_timer(0.2).timeout
