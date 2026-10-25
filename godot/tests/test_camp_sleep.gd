@@ -28,7 +28,11 @@ func click(at: Vector2) -> void:
 		await process_frame
 
 func run() -> void:
-	change_scene_to_file("res://game.tscn")
+	var field_scene = load("res://game.tscn").instantiate()
+	field_scene.terrain_seed = 40
+	root.add_child(field_scene)
+	field_scene.set_speed(0)
+	current_scene = field_scene
 	await process_frame
 	await process_frame
 	var game = current_scene
@@ -39,7 +43,7 @@ func run() -> void:
 	game._show_person()
 	var cell := Vector2i(8, 8)
 	game._start_selection(cell, false)
-	var camp: Vector3 = Vector3(person.home.x, 0, person.home.y) * game.METRES_TO_UNITS
+	var camp: Vector3 = game._surface_point(person.home * game.METRES_TO_UNITS)
 	await click(game._camera.unproject_position(camp))
 	check(game._camp_menu.has_method("wheel_rect"), "Camp offers Sleep in the shared action wheel")
 	if not game._camp_menu.has_method("wheel_rect"):

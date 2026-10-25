@@ -152,6 +152,8 @@ func show_farm(farm: Farm, cells: Array, day: int, seed_crop: String, queued: Ar
 				_plot_label.text = "Ripe " + farm.crop(cell).to_lower()
 			_:
 				_plot_label.text = stage
+		if farm.terrain != null and farm.terrain.cell_reason(cell) != "":
+			_plot_label.text = farm.terrain.cell_reason(cell)
 		notes.append(reasons.keys()[0] if reasons else NOTES[stage])
 		if stage in ["Sown", "Ripe"]:
 			_detail_label.tooltip_text = ("Expected harvest: about %s kg" if stage == "Sown" else "Harvest: %s kg") % Farm.kg(farm.harvest_yield(cell))

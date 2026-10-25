@@ -1,7 +1,7 @@
 # Ștefan
 
 A fresh Godot desktop game, starting with a medieval Moldavian inspired main menu.
-Select **Play** or press **Enter/Space** to create your peasant, then **Begin**
+Select **Play** or press **Enter/Space** to create your peasant and choose the land, then **Begin**
 (or **Enter** in the name field) to open the strategy field: a 16×16 grid
 of 10×10 m plots (100 m² each, 2.56 hectares in total).
 Hover or click a square to highlight or select it. Move with WASD/arrows, rotate
@@ -18,6 +18,18 @@ at midwinter, so shadows lengthen and swing through the day. Dawn and dusk tint
 the sky gold and violet, a full moon opposite the sun lights the night, the camp
 fire glows and flickers in the dark, and the time panel shows the moon on clear
 nights.
+
+Each new game generates playable hills and ponds inside the field from the land
+chosen before it starts: **Steppe** (hills up to 7 m, one pond: the most
+farmland), **Hills** (18 m, two ponds; the default), **Lakeland** (11 m, four
+ponds: the least farmland) or **Custom** (0–24 m and 0–4 ponds). Farm dry,
+gentle slopes as usual; water, wet banks and steep plots show why they cannot
+be worked. The farmer follows dry routes around ponds for jobs, hauling, meals
+and sleep. The camp keeps a small clearing, level at its own ground height,
+while people, crops, picking and the camera follow the terrain. The ledger lists
+usable plots and water; the field covers 2.56 hectares, with its farmable area
+varying by land and seed. Each start uses a fresh seed, with repeatable terrain
+for a given seed and land; **Restart** keeps the land on a fresh seed.
 
 Farming is the first gameplay loop. Click a plot or drag over a rectangle of
 plots; hold **Shift** to add to the selection. Without a mouse, move the view
@@ -95,7 +107,8 @@ lean and fat mass, basal metabolism, ready energy and an hour of hoeing: lean
 mass raises the metabolism and holds more ready energy, fat lasts longer without
 food, and every kilogram makes walking and work dearer. Looks are skin, hair,
 beard (none, moustache or full) and clothes, beside a turning preview at the
-chosen height and build. **Escape** or × returns to the title. The name heads
+chosen height and build. Under **Land**, a preset shows its hills and ponds on
+locked sliders; **Custom** unlocks them. **Escape** or × returns to the title. The name heads
 the Farmer panel and floats above the farmer, who widens or thins as their
 weight changes; the Body window measures change from the chosen start, and
 **Restart** keeps the same peasant. Choices are not saved between launches.
@@ -188,7 +201,7 @@ to those tags. It is not a Godot resource, so an export preset must include
 The field uses CC0 grass and ploughed-soil textures (see their
 [sources](godot/assets/textures/SOURCE.md)); crops are instanced stalks sized
 and coloured on the GPU from a per-plot data texture.
-Current version: **0.1.1**. No saves yet.
+Current version: **0.1.2**. No saves yet.
 
 The menu loops **Drumul Dracului – (Moldavian Medieval Song)** from the
 [user-selected recording](https://www.youtube.com/watch?v=HdnlsAkVnmk), at -14 dB.
@@ -235,13 +248,17 @@ script), then run the tests:
 ./godot/run.sh --headless --script tests/test_person_scene.gd
 ./godot/run.sh --headless --script tests/test_camp_food.gd
 ./godot/run.sh --headless --script tests/test_camp_sleep.gd
+./godot/run.sh --headless --script tests/test_terrain.gd
+./godot/run.sh --headless --script tests/test_terrain_scene.gd
+./godot/run.sh --headless --script tests/test_terrain_human.gd
 ```
 
 The menu test checks title spelling/font coverage, version, initial keyboard focus,
 visible focus styling, layouts at three sizes, real keyboard/mouse activation
 of Play and peasant creation (its fit at three sizes, typed and blank names,
-weight limits per height, the body summary, swatch clicks and Escape), Begin into
-the grid field as the chosen peasant and Restart keeping them, cell picking, camera rotation and pinch zoom, automatic menu music, loop wraparound and stopping
+weight limits per height, the body summary, swatch clicks, land presets, Custom
+hills and ponds and their limit, and Escape), Begin into the grid field as the
+chosen peasant on the chosen land and Restart keeping both, cell picking, camera rotation and pinch zoom, automatic menu music, loop wraparound and stopping
 playback when the game starts. The crop test checks each crop's sowing months,
 warmth, rain, frost and winter needs, the plow/sow/harvest rules, stubble, plowed
 land staying plowed, returning grass, soil wear and rest, yearly records, that
@@ -272,6 +289,14 @@ The sleep test follows camp and keyboard choices, typed duration, live recovery
 and starvation predictions, pause, early waking, preserved work, meal conflicts
 and Game Over/Restart. Model checks compare predictions with real travel and
 sleep, including death and non-frame-aligned waking across midnight.
+Terrain tests cover 30 seeded fields, farmable hills, ponds, connected dry routes,
+each preset and the flat and highest Custom lands (pond counts, reachable
+farmland, Steppe > Hills > Lakeland in farmable plots), a camp on high ground,
+mesh/sampler agreement, edge/vertex picking, blocked plot previews, reservations,
+route cancellation and sleep forecasts while already returning home. The scene
+test checks hill/water picking, grounded people and camera clearance; run it
+without `--headless` to also inspect actual crop instance transforms, which the
+dummy renderer discards.
 To capture actual GPU-rendered screens:
 
 ```sh
@@ -279,6 +304,7 @@ To capture actual GPU-rendered screens:
 ./godot/run.sh --script tests/capture_wheel.gd -- /tmp/stefan-wheel
 ./godot/run.sh --script tests/capture_human.gd -- /tmp/stefan-human
 ./godot/run.sh --script tests/capture_weather.gd -- /tmp/stefan-weather
+./godot/run.sh --script tests/capture_terrain.gd -- /tmp/stefan-terrain
 ```
 
 The default window is 1280×800; the minimum is 1000×700. The title uses bundled

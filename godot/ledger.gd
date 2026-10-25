@@ -76,6 +76,15 @@ func _show_fields(farm: Farm) -> void:
 		if land.has(stage):
 			summary.append("%s %d" % ["Dead" if stage == "Withered" else stage, land[stage]])
 	_row(["", "Land", "  ·  ".join(summary) if summary else "No idle fields", "", "%d%%" % roundi(soil / worked * 100) if worked else "", ""], widths, false, MUTED)
+	if farm.terrain != null:
+		var usable := 0
+		var water := 0
+		for x in 16:
+			for z in 16:
+				var reason: String = farm.terrain.cell_reason(Vector2i(x, z))
+				usable += int(reason == "")
+				water += int(reason == "Water")
+		_row(["", "Terrain", "%d usable · %d water" % [usable, water], "", "", ""], widths, false, MUTED, "%d m² can be farmed; water and unusable banks are excluded" % (usable * Farm.PLOT_AREA_M2))
 
 func _show_years(farm: Farm, day: int) -> void:
 	var current: int = Calendar.date(day).year

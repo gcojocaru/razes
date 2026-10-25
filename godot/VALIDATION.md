@@ -2,6 +2,38 @@
 
 Godot 4.7.2.stable.official.ed1daf0bf, macOS, Apple M4, Compatibility renderer.
 
+## Land presets — 25 October 2026
+
+- The creation screen's **Land** section offers Steppe (hills up to 7 m, one
+  pond), Hills (18 m, two ponds; the default), Lakeland (11 m, four ponds) and
+  Custom (0–24 m, 0–4 ponds). Presets show their values on dimmed, locked
+  sliders; Custom unlocks them. Begin stores the land in `Terrain.land`, the
+  game builds its terrain from it, and Restart keeps it on a fresh seed. The pond
+  count now comes from the land instead of a random two or three, so a given
+  seed makes a different field than before.
+- Found while probing 200 seeds of the existing generator: at 18 m, 8 seeds had
+  unreachable plots and seed 48's camp was cut off from all 256. The clearing
+  was dug down to height 0, so a camp on high ground sat in a bank too steep to
+  walk out of. The clearing is now level at the camp's own ground height. Since
+  then, 200 seeds at 18 m and at 24 m, each with no ponds and with four, left
+  every dry plot reachable. The worst case (24 m, four ponds) kept 78 farmable
+  plots; this sets the Custom maximum.
+- Farmable plots over seeds 0–29: Steppe 231–242, Hills 183–201, Lakeland
+  141–167, highest Custom with four ponds 82–121. The terrain test checks each preset and the flat and highest Custom
+  lands over 10 seeds (pond count, no unreachable plots, a route from camp to
+  every usable plot, Steppe > Hills > Lakeland per seed), plus seed 48's camp.
+  The menu test covers the default, a preset click, Custom sliders and their
+  limit, Escape keeping the land, Begin and Restart. Fixtures that clicked the
+  camp at height 0 now click its surface; the crop test's fixture moved from
+  seed 40 to seed 67, whose test plots are all dry.
+- All 12 suites exit 0; the terrain scene suite also passes on the native
+  Compatibility renderer. Inspected GPU captures: creation at 1000×700 and
+  1280×800 with a Custom land, the game on that land, each preset at seed 42,
+  the highest Custom land, farming, camp, snow and the minimum window.
+
+Not checked: whether the presets play better or worse over a full year, or
+lands above 24 m. Ponds keep their oval shape and quadrant placement.
+
 ## Peasant creation — 25 October 2026
 
 - **Play** now opens peasant creation over the menu, whose music continues: a
@@ -36,6 +68,74 @@ Godot 4.7.2.stable.official.ed1daf0bf, macOS, Apple M4, Compatibility renderer.
 Not checked: screen readers, gamepads, names in non-Latin scripts, or whether
 any body is better or worse to play in practice. Choices are not saved between
 launches.
+
+## Playable hills and field ponds — 25 October 2026
+
+- The playing field now contains seeded hills and 2–3 separate ponds. Dry,
+  gentle hillside plots accept normal farm work; wet, steep and inaccessible
+  plots give a reason in the panel and wheel and cannot spend seed or accept
+  debug crops. The ledger reports usable land and water. Only the camp has a
+  compact level clearing. Gameplay saves remain absent.
+- A single one-unit height lattice drives the 66,049-vertex mesh, triangle
+  interpolation, crop roots, person placement and hill/water picking. Water
+  supports the same hover and selected-cell feedback. Camera focus follows
+  the surface and backs away when close zoom would enter a hillside.
+- Farmer travel uses cached dry-land paths for jobs, hauling, meals, sleep and
+  cancellation. Work and travel retain their previous timing rules. Preview
+  farms share terrain restrictions, and sleep forecasts retain any return
+  route already being followed.
+- Independent review found three issues, each reproduced before fixing:
+  forecasts recomputed a shorter return path; endpoint-only navigation could
+  cross an unusable slope; close camera zoom could enter the camp-clearing
+  bank. Forecasts now copy retained routes; AStar2D edges and direct shortcuts
+  validate all heightfield triangle crossings for body clearance and slopes;
+  camera clearance is checked before placement. Picking regressions also cover
+  exact lattice edges and vertices, where the engine's triangle query missed.
+- Terrain checks exercise 30 seeds, farmable hills and multiple ponds, connected
+  camp routes, dry/slope-safe route interiors and requests to return home from
+  route midpoints. Movement checks cover pond detours, seed refunds, stale jobs,
+  route-based sleep forecasts, frame subdivision and unreachable requests.
+  Scene checks cover hill/water picking after rotation, person grounding,
+  water refusal, hill orders, camp access and close camera clearance. A native
+  renderer run additionally passed the actual crop instance grounding checks;
+  the headless dummy renderer does not retain those transforms.
+- Final run: all 12 suites exited 0 (menu, crops, audio, wheel, human,
+  human_actor, person_scene, camp_food, camp_sleep, terrain_human,
+  terrain_scene and terrain). Inspected fresh GPU captures in
+  `/tmp/stefan-playable-terrain/`: three seeds, farmed hills, water selection,
+  close crops, a walking farmer beside a pond, rotation, camp, snow and
+  1000×700. `git diff --check` passed; no script or shader compilation errors.
+
+Not checked: other platforms, exports, slower GPU performance or long-term
+survival balance. Uphill speed/energy penalties and frozen water are not modeled.
+Existing sandbox certificate/settings and engine shutdown shader warnings remain.
+
+## Procedural landscape — 25 October 2026
+
+- A fresh seed generates rolling hills and an irregular lake on each start.
+  The continuous 256-unit terrain has 16,641 vertices with slope normals and
+  tangents. The central ±18-unit clearing stays at zero, covering the 16×16
+  farm, camp and all direct walking routes. Water sits at -0.3 and appears in
+  the lake basin. Terrain and crops retain the same plot coordinates.
+- GPU captures first showed steep crater banks, broad grey rock patches and
+  excessive water glints. Lower-frequency hills, a smooth basin join, subdued
+  rock and calm water corrected these. Lake placement is constrained to the
+  two sides beyond the opening view, retaining the established camera heading.
+  The wider opening zoom shows the lake; pan limits stay on the flat clearing.
+- All 11 suites passed with exit 0: menu, crops, audio, wheel, human,
+  human_actor, person_scene, camp_food, camp_sleep, terrain and terrain_scene.
+  New checks cover repeatable/different seeds, 30-seed dry clearing/routes,
+  guaranteed hills and lake, gentle banks, mesh height/normals, 30 opening
+  lake projections, picking, farming orders and 96 camera limit combinations.
+- Inspected actual renderer captures in `/tmp/stefan-terrain/`: three seeds,
+  rotation, close camp, field selection/soil/crops, close farming, snow, and
+  1000×700. Independent scoped code review found no actionable issues.
+  Existing sandbox certificate/settings warnings and engine shader-release
+  warnings remain; no failed assertions or script/shader compilation errors.
+
+Not checked: other platforms, exports or performance on slower GPUs. Hills and
+water are scenery; navigation, farming on slopes, fishing and frozen lakes are
+outside this version. No saves or migration code were added.
 
 ## Simulated body — 25 October 2026
 

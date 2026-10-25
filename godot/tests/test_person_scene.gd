@@ -26,7 +26,11 @@ func until(game, condition: Callable, hours := 48.0, step := 0.05) -> bool:
 	return condition.call()
 
 func run() -> void:
-	change_scene_to_file("res://game.tscn")
+	var field_scene = load("res://game.tscn").instantiate()
+	field_scene.terrain_seed = 40
+	root.add_child(field_scene)
+	field_scene.set_speed(0)
+	current_scene = field_scene
 	await process_frame
 	await process_frame
 	var game = current_scene
@@ -77,7 +81,7 @@ func run() -> void:
 	check(game.farm.stock.Oats == 6400, "Grain in the person's bag is not simultaneously in the store")
 	check(until(game, func(): return person.carried == 0 and game.farm.stock.Oats == 12000, 1.0), "The grain enters the store on arrival at camp")
 	key(KEY_H)
-	check(game._focus().is_equal_approx(Vector3(person.position.x, 0, person.position.y) * game.METRES_TO_UNITS), "H centres the camera on the person")
+	check(game._focus().is_equal_approx(game._surface_point(person.position * game.METRES_TO_UNITS)), "H centres the camera on the person")
 	var camp_focus: Vector3 = game._focus()
 	Input.action_press("ui_left")
 	game._process(0.01)

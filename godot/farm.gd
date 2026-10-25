@@ -60,6 +60,8 @@ var stock: Dictionary = STARTING_STOCK.duplicate()
 var plots := {}
 ## Year number -> crop name -> {"sown", "frost", "harvested": plots, "seed", "gathered": grams}.
 var years := {}
+## Optional shared playable terrain; standalone crop simulations stay flat.
+var terrain: RefCounted
 
 ## Display kilograms without losing gram precision or adding trailing zeroes.
 static func kg(grams: int) -> String:
@@ -124,6 +126,10 @@ static func next_sowing(day: int) -> String:
 ## reason says why it cannot be done now. Sowing uses `seed_crop`. `act` uses the
 ## same check.
 func action(cell: Vector2i, day: int, seed_crop := "") -> Dictionary:
+	if terrain != null:
+		var reason: String = terrain.cell_reason(cell)
+		if reason != "":
+			return {"name": "Plow", "reason": reason}
 	var season: int = Calendar.date(day).season
 	match stage(cell):
 		"Plowed":
@@ -182,6 +188,7 @@ func work(cells: Array, day: int, name := "", seed_crop := "") -> int:
 ## What `work` would do, without doing it: {"plots": worked, "grain": change in grams stored}.
 func preview(cells: Array, day: int, name := "", seed_crop := "") -> Dictionary:
 	var trial := Farm.new()
+	trial.terrain = terrain
 	trial.stock = stock.duplicate()
 	trial.plots = plots.duplicate(true)
 	var done := trial.work(cells, day, name, seed_crop)
