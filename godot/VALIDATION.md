@@ -5,6 +5,29 @@ Godot 4.7.2.stable.official.ed1daf0bf, macOS, Apple M4, Compatibility renderer.
 Run every suite with `./run_tests.sh` (set `GODOT_BIN` if `godot` is not on the path).
 The per-feature notes below record suite counts at their time.
 
+## Rigged peasant model — 25 October 2026
+
+- The block farmer is replaced by `assets/peasant/peasant.glb`, built by
+  `assets/peasant/build_peasant.py` from four CC0 Quaternius packs (see its
+  `SOURCE.md`): the Male Peasant outfit, the base character's head, hair and
+  beard (split into a moustache), and eight clips. Walking, hoeing (a chopping
+  clip with the hoe), sowing, reaping, cooking (kneeling), resting (sitting on
+  the ground), sleeping (lying on the bedroll) and dying play from the clips;
+  paused redraws hold still. Skin, hair, beard and clothes tint the textures.
+- Found while testing: the GLB's armature scale was baked into the skinned
+  vertices and applied again on the node, so the farmer rendered at 1.60 m. The
+  model now imports at its own 1.85 m and the actor shrinks it to the peasant's
+  height. A pose change also threw away that frame's time, so the death fall
+  never started. The menu test hung, not failed, on a script error reading the
+  old single materials.
+- All 12 suites exit 0. The actor test now measures skeleton joints for poses,
+  since skinned meshes keep their rest bounds; standing height still uses the
+  mesh. GPU captures of creation (default and customised) and every farm pose
+  were inspected.
+
+Not checked: two-handed hoeing (the clip swings one-handed), hair and face
+normal maps (missing from the download), or a female body.
+
 ## Land presets — 25 October 2026
 
 - The creation screen's **Land** section offers Steppe (hills up to 7 m, one

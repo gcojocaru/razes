@@ -1,5 +1,6 @@
 extends Node3D
-## Original low-poly clothing and camp, interpreted rather than reconstructed.
+## The farmer is a CC0 Quaternius model (assets/peasant/SOURCE.md); the tools,
+## sack and camp are original low-poly meshes, interpreted rather than reconstructed.
 ## Geometry is in metres; only this root and the separate camp convert units.
 
 ## Looks the creation screen offers; the farmer starts with the first of each.
@@ -8,79 +9,82 @@ const HAIRS := {"Dark brown": Color("382a23"), "Black": Color("1c1917"), "Chestn
 const BEARDS := ["None", "Moustache", "Beard"]
 const CLOTHES := {"Undyed linen": Color("c4b393"), "Bleached linen": Color("e4ddc9"), "Grey wool": Color("8b877b"), "Brown wool": Color("6d5844"), "Madder red": Color("8f3d2f"), "Woad blue": Color("4d6275")}
 
+## Which clip, and which seconds of it, each pose plays: loops repeat the span,
+## holds sway through it and back every four seconds, and once plays and stays.
+const POSES := {
+	"Idle": ["Idle", 0.0, 2.5, "loop"],
+	"Walking": ["Walk", 0.0, 1.333, "loop"],
+	"Plow": ["TreeChopping", 0.0, 0.958, "loop"],
+	"Sow": ["Farm_PlantSeed", 0.0, 2.75, "loop"],
+	"Harvest": ["Farm_Harvest", 0.0, 2.5, "loop"],
+	"Cooking": ["Fixing_Kneeling", 0.8, 4.0, "hold"],
+	"Resting": ["LayToIdle", 0.42, 0.48, "hold"],
+	"Sleeping": ["LayToIdle", 0.0, 0.05, "hold"],
+	"Dead": ["Death01", 0.0, 2.375, "once"],
+}
+const MODEL := preload("res://assets/peasant/peasant.glb")
+## Soles to hair, the imported model stands this tall; it is shrunk to the default peasant.
+const MODEL_HEIGHT := 1.8477
+
 var _metres_to_units: float
 var _time := 0.0
+var _pose := ""
 var _body: Node3D
-var _tunic: MeshInstance3D
-var _head: Node3D
+var _model: Node3D
+var _skeleton: Skeleton3D
+var _player: AnimationPlayer
+## Turns and shifts the lying clip onto the bedroll's length, along +z from the feet.
+var _lying: Transform3D
 var _moustache: MeshInstance3D
 var _beard: MeshInstance3D
-var _left_arm: Node3D
-var _right_arm: Node3D
-var _left_forearm: Node3D
-var _right_forearm: Node3D
-var _left_leg: Node3D
-var _right_leg: Node3D
 var _sack: Node3D
 var _hoe: Node3D
 var _sickle: Node3D
 var _label: Label3D
 
 var _linen := _material(Color("c4b393"))
-var _clothes := _material(CLOTHES.values()[0])
-var _trousers := _material(Color("484b40"))
 var _leather := _material(Color("493427"))
-var _skin := _material(SKINS.values()[0])
-var _hair := _material(HAIRS.values()[0])
 var _wood := _material(Color("775336"))
 var _iron := _material(Color("606665"))
 var _burlap := _material(Color("a78c60"))
+var _skin: StandardMaterial3D
+var _hands: StandardMaterial3D
+var _hair: Array[StandardMaterial3D] = []
+var _clothes: Array[StandardMaterial3D] = []
 
 func _init(metres_to_units: float) -> void:
 	_metres_to_units = metres_to_units
 	name = "Farmer"
 	scale = Vector3.ONE * metres_to_units
 	_body = _pivot(self, "Body", Vector3.ZERO)
-	_tunic = _part(_body, _cylinder(0.23, 0.28, 0.64), _clothes, Vector3(0, 1.08, 0))
-	_tunic.scale.z = 0.65
-	var belt := _part(_body, _cylinder(0.266, 0.266, 0.06), _leather, Vector3(0, 0.95, 0))
-	belt.scale.z = 0.66
-	_part(_body, _box(Vector3(0.07, 0.055, 0.025)), _iron, Vector3(0, 0.95, -0.182))
-	_part(_body, _cylinder(0.065, 0.07, 0.12), _skin, Vector3(0, 1.41, 0))
-	_head = _pivot(_body, "Head", Vector3(0, 1.56, 0))
-	_part(_head, _sphere(0.125, 0.27), _skin, Vector3.ZERO)
-	var hair := _part(_head, _sphere(0.132, 0.18), _hair, Vector3(0, 0.068, 0.014))
-	hair.scale.z = 0.94
-	_part(_head, _box(Vector3(0.07, 0.075, 0.06)), _skin, Vector3(0, -0.005, -0.12))
-	_moustache = _part(_head, _box(Vector3(0.1, 0.022, 0.03)), _hair, Vector3(0, -0.045, -0.118))
-	_beard = _part(_head, _sphere(0.1, 0.16), _hair, Vector3(0, -0.09, -0.055))
+	_model = MODEL.instantiate()
+	_body.add_child(_model)
+	_skeleton = _model.find_children("*", "Skeleton3D")[0]
+	_player = _model.find_children("*", "AnimationPlayer")[0]
+	# Posed only by show_person, so a paused game holds still.
+	_player.callback_mode_process = AnimationMixer.ANIMATION_CALLBACK_MODE_PROCESS_MANUAL
+	_skin = _recolour("Skin", 0)
+	_hands = _recolour("Male_Peasant_Arms", 1)
+	_hands.albedo_texture = null
+	for part in ["Hair", "Eyebrows", "Beard", "Moustache"]:
+		_hair.append(_recolour(part, 0))
+	_clothes = [_recolour("Male_Peasant_Body", 0), _recolour("Male_Peasant_Arms", 0)]
+	_moustache = _skeleton.get_node("Moustache")
+	_beard = _skeleton.get_node("Beard")
 	_moustache.visible = false
 	_beard.visible = false
-	for side in [-1, 1]:
-		var arm := _pivot(_body, "LeftArm" if side < 0 else "RightArm", Vector3(side * 0.265, 1.34, 0))
-		_part(arm, _cylinder(0.095, 0.078, 0.25), _clothes, Vector3(0, -0.12, 0))
-		var forearm := _pivot(arm, "Forearm", Vector3(0, -0.24, 0))
-		_part(forearm, _cylinder(0.058, 0.042, 0.22), _skin, Vector3(0, -0.11, 0))
-		_part(forearm, _box(Vector3(0.085, 0.105, 0.07)), _skin, Vector3(0, -0.255, 0))
-		var leg := _pivot(_body, "LeftLeg" if side < 0 else "RightLeg", Vector3(side * 0.105, 0.82, 0))
-		_part(leg, _cylinder(0.095, 0.065, 0.65), _trousers, Vector3(0, -0.325, 0))
-		_part(leg, _cylinder(0.072, 0.072, 0.22), _leather, Vector3(0, -0.64, 0))
-		_part(leg, _box(Vector3(0.16, 0.16, 0.29)), _leather, Vector3(0, -0.74, -0.04))
-		if side < 0:
-			_left_arm = arm
-			_left_forearm = forearm
-			_left_leg = leg
-		else:
-			_right_arm = arm
-			_right_forearm = forearm
-			_right_leg = leg
-	_sack = _pivot(_body, "CarriedSack", Vector3(0, 1.02, 0.25))
+	_player.play("LayToIdle")
+	_player.seek(0.0, true)
+	var feet := (_bone("foot_l") + _bone("foot_r")) / 2
+	var along := _bone("Head") - feet
+	_lying = Transform3D(Basis(Vector3.UP, -atan2(along.x, along.z)).scaled(Vector3.ONE * Human.HEIGHT / MODEL_HEIGHT), Vector3.ZERO)
+	# The toes reach about 0.17 m past the ankles; the bedroll's top is 0.1 m up.
+	_lying.origin = Vector3(0, 0.12, 0.2) - _lying * Vector3(feet.x, 0, feet.z)
+	# On the back, which faces the model's -z.
+	_sack = _attach("spine_03", "CarriedSack", Transform3D(Basis(), Vector3(0, 1.05, -0.24)))
 	var sack := _part(_sack, _sphere(0.17, 0.45), _burlap, Vector3.ZERO)
 	sack.scale.z = 0.7
 	_part(_sack, _cylinder(0.055, 0.075, 0.08), _leather, Vector3(0, 0.22, 0))
-	for side in [-1, 1]:
-		var strap := _part(_sack, _box(Vector3(0.035, 0.39, 0.025)), _leather, Vector3(side * 0.13, 0.12, -0.12))
-		strap.rotation.x = -0.4
 	_sack.visible = false
 	_make_tools()
 	var marker := _material(Color("e4cb7c"))
@@ -104,95 +108,54 @@ func _init(metres_to_units: float) -> void:
 	_label.modulate = Color("f3e4bc")
 	_label.outline_modulate = Color("2c281f")
 	add_child(_label)
+	dress({"skin": SKINS.keys()[0], "hair": HAIRS.keys()[0], "beard": BEARDS[0], "clothes": CLOTHES.keys()[0]})
 
 ## Colours the farmer and grows the beard chosen on the creation screen.
 func dress(peasant: Dictionary) -> void:
-	_skin.albedo_color = SKINS[peasant.skin]
-	_hair.albedo_color = HAIRS[peasant.hair]
-	_clothes.albedo_color = CLOTHES[peasant.clothes]
+	# The textures are fair skin, grey hair and undyed linen; the choice tints them.
+	_skin.albedo_color = _ratio(SKINS[peasant.skin], SKINS.Fair)
+	_hands.albedo_color = SKINS[peasant.skin]
+	for material in _hair:
+		material.albedo_color = HAIRS[peasant.hair] * 1.6
+	for material in _clothes:
+		material.albedo_color = _ratio(CLOTHES[peasant.clothes], CLOTHES["Undyed linen"])
 	_moustache.visible = peasant.beard != "None"
 	_beard.visible = peasant.beard == "Beard"
 
 func show_person(person, seconds: float) -> void:
-	_time += maxf(seconds, 0.0)
+	seconds = maxf(seconds, 0.0)
 	position = Vector3(person.position.x, 0, person.position.y) * _metres_to_units
 	if person.facing.length_squared() > 0.0001:
 		rotation.y = atan2(-person.facing.x, -person.facing.y)
-	var swing := sin(_time * 7.5)
 	# The mesh is the default body; mass grows with height and the square of width.
 	var tall: float = person.height / Human.HEIGHT
 	var wide := sqrt(person.mass() / (Human.START_FAT + Human.START_LEAN) / tall)
-	_body.scale = Vector3(wide, tall, wide)
 	_label.text = person.name
 	_label.position.y = person.height + 0.43
-	_body.position = Vector3.ZERO
-	_body.rotation = Vector3.ZERO
-	_tunic.scale.z = 0.65
-	_head.rotation = Vector3.ZERO
-	_left_leg.rotation = Vector3.ZERO
-	_right_leg.rotation = Vector3.ZERO
-	_left_arm.rotation = Vector3(0, 0, 0.06)
-	_right_arm.rotation = Vector3(0, 0, -0.06)
-	_left_forearm.rotation = Vector3.ZERO
-	_right_forearm.rotation = Vector3.ZERO
-	_sack.visible = person.carried > 0 and person.activity not in ["Sleeping", "Dead"]
-	_hoe.visible = false
-	_sickle.visible = false
 	_label.modulate = Color("bc8c81") if person.activity == "Dead" else Color("f3e4bc")
-	match person.activity:
-		"Walking":
-			_body.position.y = 0.012 * absf(swing)
-			_left_leg.rotation.x = swing * 0.34
-			_right_leg.rotation.x = -swing * 0.34
-			_left_arm.rotation.x = -swing * 0.3
-			_right_arm.rotation.x = swing * 0.3
-			_left_forearm.rotation.x = 0.12
-			_right_forearm.rotation.x = 0.12
-		"Working":
-			_head.rotation.x = -0.12
-			match person.job.get("action", ""):
-				"Plow":
-					_hoe.visible = true
-					_right_arm.rotation.x = 0.5 + swing * 0.2
-					_left_arm.rotation.x = 0.6 + swing * 0.18
-					_left_arm.rotation.z = -0.35
-					_right_forearm.rotation.x = 0.35
-					_left_forearm.rotation.x = 0.7
-				"Sow":
-					_right_arm.rotation = Vector3(0.65 + swing * 0.35, 0, 0.2 + cos(_time * 7.5) * 0.35)
-					_right_forearm.rotation.x = 0.25
-					_left_arm.rotation.x = 0.45
-					_left_forearm.rotation.x = 0.9
-				"Harvest":
-					_sickle.visible = true
-					_right_arm.rotation = Vector3(0.9, 0, swing * 0.5)
-					_right_forearm.rotation.x = 0.65
-					_left_arm.rotation.x = 1.0 + swing * 0.15
-					_left_forearm.rotation.x = 0.25
-		"Resting", "Cooking":
-			_body.position.y = -0.68 * tall
-			_tunic.scale.z += sin(_time * 2.0) * 0.009
-			_left_leg.rotation.x = PI / 2
-			_right_leg.rotation.x = PI / 2
-			_left_forearm.rotation.x = 0.5
-			_right_forearm.rotation.x = 0.5
-			if person.activity == "Cooking":
-				_right_arm.rotation.x = 0.65 + swing * 0.15
-				_left_arm.rotation.x = 0.5
-		"Sleeping", "Dead":
-			_body.position.y = 0.25
-			_body.rotation.x = PI / 2
-			_left_forearm.rotation.x = 0.18
-			_right_forearm.rotation.x = 0.18
-			if person.activity == "Dead":
-				_body.rotation.z = 0.2
-				_head.rotation.z = 0.25
-				_left_arm.rotation.z = 0.16
-			else:
-				_body.position.y = 0.3
-				# The fixed bedroll has one direction, whatever the walk home faced.
-				_body.rotation.y = -rotation.y
-				_tunic.scale.z += sin(_time * 2.0) * 0.009
+	_sack.visible = person.carried > 0 and person.activity not in ["Sleeping", "Dead"]
+	var action: String = person.job.get("action", "") if person.activity == "Working" else ""
+	_hoe.visible = action == "Plow"
+	_sickle.visible = action == "Harvest"
+	var pose: String = action if POSES.has(action) else person.activity if POSES.has(person.activity) else "Idle"
+	if pose != _pose:
+		_pose = pose
+		_time = 0.0
+	_time += seconds
+	var clip: Array = POSES[pose]
+	var span: float = clip[2] - clip[1]
+	var at: float = clip[1] + (fposmod(_time, span) if clip[3] == "loop" else span * (0.5 - 0.5 * cos(_time * TAU / 4.0)) if clip[3] == "hold" else minf(_time, span))
+	_player.play(clip[0])
+	_player.seek(at, true)
+	_body.rotation = Vector3.ZERO
+	_body.scale = Vector3(wide, tall, wide)
+	# The model faces +z; the farmer faces -z.
+	_model.transform = Transform3D(Basis(Vector3.UP, PI).scaled(Vector3.ONE * Human.HEIGHT / MODEL_HEIGHT), Vector3.ZERO)
+	if pose == "Sleeping":
+		# The fixed bedroll has one direction, whatever the walk home faced.
+		_body.rotation.y = -rotation.y
+		_body.scale = Vector3(wide, wide, tall)
+		_model.transform = _lying
 
 func create_camp() -> Node3D:
 	var camp := Node3D.new()
@@ -245,11 +208,12 @@ func create_camp() -> Node3D:
 	return camp
 
 func _make_tools() -> void:
-	_hoe = _pivot(_right_forearm, "Hoe", Vector3(0, -0.23, 0))
-	_hoe.rotation.x = -0.85
+	# Gripped like an axe: in the model's rest pose the hand points sideways, thumb forward.
+	var grip := Transform3D(Basis(Vector3.RIGHT, -PI / 2), _bone_rest("hand_r"))
+	_hoe = _attach("hand_r", "Hoe", grip)
 	_part(_hoe, _cylinder(0.017, 0.017, 1.0), _wood, Vector3(0, -0.4, 0))
 	_part(_hoe, _box(Vector3(0.24, 0.035, 0.17)), _iron, Vector3(0, -0.89, -0.06))
-	_sickle = _pivot(_right_forearm, "Sickle", Vector3(0, -0.25, 0))
+	_sickle = _attach("hand_r", "Sickle", grip)
 	_part(_sickle, _cylinder(0.023, 0.023, 0.22), _wood, Vector3(0, -0.1, 0))
 	for index in 4:
 		var angle := -0.9 + index * 0.55
@@ -257,6 +221,39 @@ func _make_tools() -> void:
 		blade.rotation.z = angle
 	_hoe.visible = false
 	_sickle.visible = false
+
+## A node that follows `bone`, placed at `rest` in the model's own space while
+## the model stands in its rest pose.
+func _attach(bone: String, title: String, rest: Transform3D) -> Node3D:
+	var attachment := BoneAttachment3D.new()
+	attachment.bone_name = bone
+	_skeleton.add_child(attachment)
+	var node := Node3D.new()
+	node.name = title
+	node.transform = (_to_model() * _skeleton.get_bone_global_rest(_skeleton.find_bone(bone))).affine_inverse() * rest
+	attachment.add_child(node)
+	return node
+
+## The model-space position of `bone` in the current pose.
+func _bone(bone: String) -> Vector3:
+	return _to_model() * _skeleton.get_bone_global_pose(_skeleton.find_bone(bone)).origin
+
+func _bone_rest(bone: String) -> Vector3:
+	return _to_model() * _skeleton.get_bone_global_rest(_skeleton.find_bone(bone)).origin
+
+## From skeleton space to the model's own, unshrunk space.
+func _to_model() -> Transform3D:
+	return _skeleton.get_parent().transform * _skeleton.transform
+
+## A copy of surface `surface` of mesh `part`'s material, to tint for this farmer alone.
+func _recolour(part: String, surface: int) -> StandardMaterial3D:
+	var mesh: MeshInstance3D = _skeleton.get_node(part)
+	var material: StandardMaterial3D = mesh.mesh.surface_get_material(surface).duplicate()
+	mesh.set_surface_override_material(surface, material)
+	return material
+
+static func _ratio(colour: Color, base: Color) -> Color:
+	return Color(colour.r / base.r, colour.g / base.g, colour.b / base.b)
 
 static func _material(color: Color) -> StandardMaterial3D:
 	var material := StandardMaterial3D.new()

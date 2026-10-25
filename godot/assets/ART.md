@@ -34,13 +34,14 @@ a crescent moon. Both retain the 64×64 view box and gold gradient.
 
 ## Farmer and camp
 
-`human_actor.gd` builds original low-poly meshes in metres: a roughly 1.7 m
-adult with a linen-coloured tunic, belt, trousers, boots, head, hair and hands;
-a carried sack, hoe and sickle; and a separate small camp with a bedroll,
-cooking pot, fire and grain sacks. No external model, texture or animation
-dependency was added. Walking, work, cooking, rest and sleeping use joint
-poses; the name label and ground ring help locate the realistically scaled
-person. The actor and cereal heights convert metres into the field's scene
+The farmer is `peasant/peasant.glb`, a rigged CC0 Quaternius model with its
+animation clips; `peasant/SOURCE.md` lists the packs and how it is built.
+`human_actor.gd` shrinks it to the peasant's height, tints its skin, hair and
+tunic from the creation screen, and plays walking, hoeing, sowing, reaping,
+cooking, resting, sleeping and dying clips. It still builds original low-poly
+meshes in metres for the carried sack, hoe and sickle, and for a separate
+small camp with a bedroll, cooking pot, fire and grain sacks. The name label
+and ground ring help locate the realistically scaled person. The actor and cereal heights convert metres into the field's scene
 scale together. These clothes and tools are interpretations, not verified
 fifteenth-century Moldavian reconstructions.
 
