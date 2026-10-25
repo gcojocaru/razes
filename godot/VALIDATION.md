@@ -2,6 +2,41 @@
 
 Godot 4.7.2.stable.official.ed1daf0bf, macOS, Apple M4, Compatibility renderer.
 
+## Peasant creation — 25 October 2026
+
+- **Play** now opens peasant creation over the menu, whose music continues: a
+  name (up to 24 characters; blank names cannot begin), height 1.55–1.85 m,
+  whole-kilogram weight from BMI 18.5 to 30 at that height, 8–30% body fat, and
+  looks: skin, hair, beard (none, moustache or full) and clothes. The summary
+  comes from the real `Human` model (BMI, lean and fat, basal metabolism, ready
+  energy, an hour of hoeing) and a SubViewport turns the actual farmer mesh.
+  **Begin** stores the peasant in `Human.peasant`; the game applies it with
+  `Human.create()` and `dress()`, so Restart keeps them. Escape or × returns.
+- `Human` carries a name, height and starting fat and lean; BMI, the starvation
+  reserve, sleep forecasts and the Body window use them. The mesh scales to the
+  height and widens or thins with current mass, under its name label. A new
+  check found a 1.85 m sleeper overhanging the 1.9 m bedroll; it is now
+  0.9 × 2.0 m, which also fits a 102 kg build.
+- Found while testing: LineEdit reports `text_changed` a frame late, so a name
+  typed and submitted in one frame reached Begin stale; Begin now re-reads the
+  controls, and the menu test types and submits in one frame (it fails without
+  the re-read). After Enter on a blank name LineEdit stopped editing, so the next
+  Enter only resumed editing; the field now keeps editing after a refused Begin.
+- All nine earlier suites pass with exit 0. New checks cover the creation flow
+  by Enter, Space and mouse, its fit at three window sizes, typing over the
+  suggested name, weight limits per height, the summary, swatch clicks, Escape,
+  blank names, the game's farmer, panel, label and Body window, Restart; created
+  bodies starving at BMI 12.5 for their own height when the sleep forecast says;
+  and mesh height, width, looks and bedroll fit.
+- GPU captures (`tests/capture_menu.gd`) at 1280×800 and 1000×700 were
+  inspected: default and customised creation (1.85 m, 90 kg, red beard, woad
+  blue) and that peasant in the field. The preview's earth first read as sand
+  and was darkened.
+
+Not checked: screen readers, gamepads, names in non-Latin scripts, or whether
+any body is better or worse to play in practice. Choices are not saved between
+launches.
+
 ## Simulated body — 25 October 2026
 
 - Needs now derive from a body (1.718 m, 65 kg, 15% fat): Katch–McArdle basal

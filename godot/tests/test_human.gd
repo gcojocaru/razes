@@ -32,7 +32,7 @@ func starving(person, kcal: float) -> void:
 	person.fat = 2.0
 	# Forbes' rule at 2 kg of fat: the kcal each kilogram of body mass still holds.
 	var per_kg: float = (Human.FAT_KCAL + Human.LEAN_KCAL * Human.FORBES / 2.0) / (1.0 + Human.FORBES / 2.0)
-	person.lean = Human.DEATH_BMI * Human.HEIGHT * Human.HEIGHT - 2.0 + kcal / per_kg
+	person.lean = Human.DEATH_BMI * person.height * person.height - 2.0 + kcal / per_kg
 
 func run() -> void:
 	if not ResourceLoader.exists("res://human.gd"):
@@ -49,6 +49,7 @@ func run() -> void:
 		quit(1)
 		return
 	test_body()
+	test_created_body()
 	test_starvation()
 	test_tired_pace()
 	test_orders_and_work()
@@ -70,7 +71,7 @@ func run() -> void:
 	test_subdivision()
 	test_meal_subdivision()
 	if failures.is_empty():
-		print("PASS: body-derived metabolism, digestion, fat and lean stores, starvation and tired pace; human walking and timed jobs; seed and selected-meal reservations; proportional porridge; invalid meal requests; cancellation and death; hauling; timed sleep and forecasts; deterministic subdivision")
+		print("PASS: body-derived metabolism, created bodies, digestion, fat and lean stores, starvation and tired pace; human walking and timed jobs; seed and selected-meal reservations; proportional porridge; invalid meal requests; cancellation and death; hauling; timed sleep and forecasts; deterministic subdivision")
 	quit(0 if failures.is_empty() else 1)
 
 func test_body() -> void:
@@ -113,6 +114,18 @@ func test_body() -> void:
 		glutton.advance(farm, DAY, minute / 60.0, 1.0 / 60.0)
 	var gained: float = glutton.mass() - 65.0
 	check(gained > 0.1 and gained < 0.2, "Eating at every chance for a resting day adds under 0.2 kg: the gut caps what overeating can store")
+
+func test_created_body() -> void:
+	var person = Model.new()
+	person.create({"name": "Toader", "height": 1.85, "weight": 72.0, "body_fat": 0.25})
+	check(person.name == "Toader" and is_equal_approx(person.mass(), 72.0) and is_equal_approx(person.fat, 18.0) and is_equal_approx(person.start_lean, 54.0) and is_equal_approx(person.glycogen, 54.0 * Human.GLYCOGEN_PER_LEAN) and absf(person.bmi() - 21.04) < 0.01, "A created peasant starts with the chosen name and body, full glycogen and a BMI from their own height")
+	check(is_equal_approx(person.basal() * 24.0, 370.0 + 21.6 * 54.0), "Their lean mass sets their basal metabolism")
+	person.fatigue = 80
+	starving(person, 30.0)
+	var preview: Dictionary = person.sleep_prediction(8)
+	person.sleep(8)
+	person.advance(Farm.new(), DAY, 22, 8)
+	check(person.activity == "Dead" and is_equal_approx(person.bmi(), Human.DEATH_BMI) and person.mass() > 42.0 and is_equal_approx(person.advanced_hours, preview.hours), "A taller body starves at a BMI of 12.5 for its own height, when its sleep forecast says")
 
 func test_starvation() -> void:
 	var person = Model.new()

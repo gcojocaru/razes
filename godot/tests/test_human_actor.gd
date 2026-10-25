@@ -2,12 +2,17 @@ extends SceneTree
 ## Geometry and animation contracts, using presentation input without simulation.
 
 class Person extends RefCounted:
+	var name := "Ion"
+	var height := 1.718
+	var weight := 65.0
 	var position := Vector2.ZERO
 	var facing := Vector2(0, -1)
 	var home := Vector2.ZERO
 	var activity := "Idle"
 	var job := {}
 	var carried := 0
+	func mass() -> float:
+		return weight
 
 var failures: Array[String] = []
 
@@ -98,6 +103,23 @@ func run() -> void:
 	actor.show_person(person, 0.0)
 	check(pose(body) != empty, "Grain in transit shows a carried sack")
 	person.carried = 0
+	person.height = 1.85
+	actor.show_person(person, 0.0)
+	var tall := mesh_bounds(body)
+	check(absf(tall.size.y - 1.85) < 0.005 and absf(tall.position.y) < 0.02 and actor.get_node("Name").position.y > 1.85, "A taller peasant stands at their own height, boots on the ground, under their name")
+	person.height = 1.718
+	person.weight = 88.0
+	actor.show_person(person, 0.0)
+	check(mesh_bounds(body).size.x > standing.size.x * 1.1 and is_equal_approx(mesh_bounds(body).size.y, standing.size.y), "A heavier body is wider, not taller")
+	person.weight = 65.0
+	actor.dress({"skin": "Olive", "hair": "Red", "beard": "Beard", "clothes": "Madder red"})
+	person.name = "Toader"
+	actor.show_person(person, 0.0)
+	var bearded := mesh_bounds(body)
+	check(actor._skin.albedo_color == actor.SKINS.Olive and actor._hair.albedo_color == actor.HAIRS.Red and actor._clothes.albedo_color == actor.CLOTHES["Madder red"] and actor._beard.visible and actor._moustache.visible and actor.get_node("Name").text == "Toader", "Dressing colours skin, hair and clothes, grows the beard, and the label names the peasant")
+	check(bearded.size.y <= standing.size.y + 0.001 and bearded.size.z <= standing.size.z + 0.001, "The beard stays within the figure's height and depth")
+	actor.dress({"skin": "Tanned", "hair": "Dark brown", "beard": "Moustache", "clothes": "Undyed linen"})
+	check(actor._moustache.visible and not actor._beard.visible, "A moustache alone shows no beard")
 	for activity in ["Sleeping", "Resting", "Dead"]:
 		person.activity = activity
 		actor.show_person(person, 0.0)
@@ -133,15 +155,18 @@ func run() -> void:
 	check(bedroll != null, "The farmer's camp has a bedroll")
 	if bedroll != null:
 		var bedding: AABB = bedroll.global_transform * bedroll.get_aabb()
-		for facing in [Vector2.UP, Vector2.RIGHT, Vector2.DOWN, Vector2.LEFT]:
-			person.facing = facing
-			small.show_person(person, 0.0)
-			var sleeper := mesh_bounds(small.get_node("Body"))
-			check(Rect2(bedding.position.x, bedding.position.z, bedding.size.x, bedding.size.z).encloses(Rect2(sleeper.position.x, sleeper.position.z, sleeper.size.x, sleeper.size.z)), "The farmer sleeping at home lies on the bedroll regardless of approach direction")
+		for build in [[1.55, 65.0], [1.718, 65.0], [1.85, 65.0], [1.85, 102.0]]:
+			person.height = build[0]
+			person.weight = build[1]
+			for facing in [Vector2.UP, Vector2.RIGHT, Vector2.DOWN, Vector2.LEFT]:
+				person.facing = facing
+				small.show_person(person, 0.0)
+				var sleeper := mesh_bounds(small.get_node("Body"))
+				check(Rect2(bedding.position.x, bedding.position.z, bedding.size.x, bedding.size.z).encloses(Rect2(sleeper.position.x, sleeper.position.z, sleeper.size.x, sleeper.size.z)), "A %.2f m, %d kg farmer sleeping at home lies on the bedroll regardless of approach direction" % build)
 	camp.free()
 	small.free()
 	actor.free()
 	if failures.is_empty():
-		print("PASS: 1.7 m farmer bounds, one-fifth scale, grounding, direction, walking/work/cooking/rest/death poses, pause, carried sack and separate camp")
+		print("PASS: 1.7 m farmer bounds, height, build and looks from the peasant, one-fifth scale, grounding, direction, walking/work/cooking/rest/death poses, pause, carried sack and separate camp")
 		print("Standing bounds in metres: ", standing, "; scaled size: ", scaled.size, "; camp size: ", camp_bounds.size)
 	quit(0 if failures.is_empty() else 1)

@@ -26,7 +26,6 @@ func _init() -> void:
 	column.custom_minimum_size.x = 250
 	column.add_theme_constant_override("separation", 6)
 	add_child(column)
-	title.text = "Farmer"
 	title.add_theme_font_override("font", preload("res://assets/fonts/CormorantUnicase-Bold.ttf"))
 	title.add_theme_font_size_override("font_size", 24)
 	title.add_theme_color_override("font_color", TimeHud.GOLD)
@@ -57,6 +56,7 @@ func _button(text: String, tooltip: String) -> Button:
 
 func show_person(person) -> void:
 	var waiting: int = person.queue.size() + int(not person.job.is_empty())
+	title.text = person.name
 	_activity.text = person.activity
 	if person.eating_requested:
 		_activity.text += " · %s porridge (%s kg)" % [person.meal_crop, Farm.kg(person.meal_grams)]

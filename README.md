@@ -1,7 +1,8 @@
 # Ștefan
 
 A fresh Godot desktop game, starting with a medieval Moldavian inspired main menu.
-Select **Play** or press **Enter/Space** to open the strategy field: a 16×16 grid
+Select **Play** or press **Enter/Space** to create your peasant, then **Begin**
+(or **Enter** in the name field) to open the strategy field: a 16×16 grid
 of 10×10 m plots (100 m² each, 2.56 hectares in total).
 Hover or click a square to highlight or select it. Move with WASD/arrows, rotate
 with Q/E or right-drag, zoom with the mouse wheel or trackpad pinch/scroll. Time runs at one day every
@@ -86,7 +87,20 @@ including during daytime. Work resumes when that time ends; **Wake up** or
 **R** ends sleep early. Opening or closing the window starts nothing. Finish a
 pending meal before sleeping, and wake before preparing another meal.
 
-Needs follow from a simulated body: 1.72 m and 65 kg with 15% body fat (BMI 22).
+Peasant creation opens over the menu, its music still playing. Name your peasant
+(up to 24 characters; a blank name cannot begin) and choose the body the needs
+below run on: height 1.55–1.85 m, weight in whole kilograms from a BMI of 18.5
+(full health) to 30 at that height, and 8–30% body fat. A summary shows BMI,
+lean and fat mass, basal metabolism, ready energy and an hour of hoeing: lean
+mass raises the metabolism and holds more ready energy, fat lasts longer without
+food, and every kilogram makes walking and work dearer. Looks are skin, hair,
+beard (none, moustache or full) and clothes, beside a turning preview at the
+chosen height and build. **Escape** or × returns to the title. The name heads
+the Farmer panel and floats above the farmer, who widens or thins as their
+weight changes; the Body window measures change from the chosen start, and
+**Restart** keeps the same peasant. Choices are not saved between launches.
+
+Needs follow from a simulated body, by default 1.72 m and 65 kg with 15% body fat (BMI 22).
 Lean mass sets basal metabolism (Katch–McArdle, 1,563 kcal a day) and each
 activity burns a multiple of it (FAO physical activity ratios): sleep 1.0, idle
 1.4, cooking 2.1, walking 3.2, sowing and harvesting 4.1, hoeing 5.0. Moving
@@ -112,8 +126,9 @@ figures are game tuning. See the
 [body sources](docs/historical-research.md#body-and-needs-model--25-october-2026).
 
 The person and cereal heights share the plot's metre scale; **H** zooms in to
-make the farmer easy to see. The camp and clothing are original low-poly art,
-not a verified reconstruction. The grass outside the grid grounds the camp
+make the farmer easy to see. The camp, clothing and the creation screen's skin,
+hair and cloth colours (such as madder red and woad blue) are original low-poly
+art, not a verified reconstruction. The grass outside the grid grounds the camp
 and cannot be farmed.
 
 | Crop | Sown | Grows above | Needs | Dies at | Seed → harvest a plot | Bag |
@@ -224,7 +239,9 @@ script), then run the tests:
 
 The menu test checks title spelling/font coverage, version, initial keyboard focus,
 visible focus styling, layouts at three sizes, real keyboard/mouse activation
-the grid field, cell picking, camera rotation and pinch zoom, automatic menu music, loop wraparound and stopping
+of Play and peasant creation (its fit at three sizes, typed and blank names,
+weight limits per height, the body summary, swatch clicks and Escape), Begin into
+the grid field as the chosen peasant and Restart keeping them, cell picking, camera rotation and pinch zoom, automatic menu music, loop wraparound and stopping
 playback when the game starts. The crop test checks each crop's sowing months,
 warmth, rain, frost and winter needs, the plow/sow/harvest rules, stubble, plowed
 land staying plowed, returning grass, soil wear and rest, yearly records, that
@@ -241,8 +258,9 @@ The human tests cover the body's metabolism, load, digestion and its daily
 limit, fat and lean gain and loss, two-month starvation, refeeding, tired pace
 and the live Body window, exact reservations and
 refunds, timed work, walking, hauling, stale orders, timed sleep and meals,
-death at the limit of survival, subdivision of time, physical mesh scale and
-poses, and actual scene input, pause, focus, cancellation and debug skips.
+death at the limit of survival, created bodies (their BMI, metabolism, death and
+sleep forecasts at their own height), subdivision of time, physical mesh scale,
+height, build, looks, bedroll fit and poses, and actual scene input, pause, focus, cancellation and debug skips.
 The camp food test follows real camp clicks, menu and bag selection, typed
 portions and their live previews, stomach room, exact grain reservation,
 proportional cooking, digestion,

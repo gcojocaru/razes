@@ -119,6 +119,9 @@ func _ready() -> void:
 	add_child(_crop_stalks())
 	_human_actor = preload("res://human_actor.gd").new(METRES_TO_UNITS)
 	_human_actor.name = "HumanActor"
+	if not Human.peasant.is_empty():
+		human.create(Human.peasant)
+		_human_actor.dress(Human.peasant)
 	add_child(_human_actor)
 	var camp: Node3D = _human_actor.create_camp()
 	camp.position = Vector3(human.home.x, 0, human.home.y) * METRES_TO_UNITS

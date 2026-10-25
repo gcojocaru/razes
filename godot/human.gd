@@ -13,7 +13,8 @@ const MEAL_HOURS := 0.5
 const MAX_SLEEP_HOURS := 24.0
 const EPSILON := 0.00000001
 
-## A lean adult, 1.718 m like the 3D farmer, of 65 kg with 15% body fat (BMI 22).
+## The default peasant: a lean adult, 1.718 m like the 3D farmer's mesh, of 65 kg with
+## 15% body fat (BMI 22). The creation screen can choose another body; see create().
 const HEIGHT := 1.718
 const START_FAT := 9.75
 const START_LEAN := 55.25
@@ -47,6 +48,15 @@ const AWAKE_TIRING := 70.0 / 16.0
 const EFFORT_TIRING := 30.0 / (9.0 * 3.6)
 const TIRED_PACE := {70.0: 0.8, 90.0: 0.6}
 
+## The peasant made on the creation screen, if any. Each new game's farmer is made
+## from them, so Restart keeps them.
+static var peasant := {}
+
+var name := "Ion"
+var height := HEIGHT
+## Fat and lean mass at the start, for the Body window's change since then.
+var start_fat := START_FAT
+var start_lean := START_LEAN
 var home := Vector2(-85, 0)
 var position := home
 var facing := Vector2.DOWN
@@ -78,6 +88,17 @@ var _carrying_seed := false
 var _returning_home := false
 var _cooking_remaining := 0.0
 var _farm_changed := false
+
+## Gives the farmer the creation screen's name and a body of `chosen.weight` kg, a
+## `chosen.body_fat` share of it fat, with full glycogen.
+func create(chosen: Dictionary) -> void:
+	name = chosen.name
+	height = chosen.height
+	start_fat = chosen.weight * chosen.body_fat
+	start_lean = chosen.weight - start_fat
+	fat = start_fat
+	lean = start_lean
+	glycogen = lean * GLYCOGEN_PER_LEAN
 
 func order(farm: Farm, cells: Array, day: int, action := "", crop := "") -> int:
 	if activity == "Dead" or (action != "" and action not in Farm.ACTIONS):
@@ -112,7 +133,7 @@ func mass() -> float:
 	return fat + lean
 
 func bmi() -> float:
-	return mass() / (HEIGHT * HEIGHT)
+	return mass() / (height * height)
 
 ## Basal metabolic rate in kcal an hour, from lean mass (Katch–McArdle).
 func basal() -> float:
@@ -178,7 +199,7 @@ func wake_up() -> void:
 
 func sleep_prediction(hours: Variant) -> Dictionary:
 	var forecast := Human.new()
-	for property in ["position", "home", "carried", "carried_crop", "fat", "lean", "glycogen", "stomach", "stomach_kcal", "fatigue"]:
+	for property in ["position", "home", "carried", "carried_crop", "height", "fat", "lean", "glycogen", "stomach", "stomach_kcal", "fatigue"]:
 		forecast.set(property, get(property))
 	if not forecast.sleep(hours):
 		return {}
@@ -352,7 +373,7 @@ func _store(kcal: float) -> void:
 ## kcal of tissue the body can still lose before starving to death, at today's fat.
 func _reserve() -> float:
 	var lean_per_fat := FORBES / maxf(fat, 0.001)
-	return maxf(0.0, mass() - DEATH_BMI * HEIGHT * HEIGHT) / (1.0 + lean_per_fat) * (FAT_KCAL + LEAN_KCAL * lean_per_fat)
+	return maxf(0.0, mass() - DEATH_BMI * height * height) / (1.0 + lean_per_fat) * (FAT_KCAL + LEAN_KCAL * lean_per_fat)
 
 func _finish_job(farm: Farm, day: int) -> void:
 	# Temporarily restore held seed so Farm validates and consumes the same reserved grams.

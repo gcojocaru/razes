@@ -115,7 +115,7 @@ func run() -> void:
 	var stored: int = game.farm.stored()
 	game.skip_days(1)
 	check(game.day == old_day + 1 and game.farm.stored() == stored, "Debug day skips never automatically eat the player's grain")
-	check(person.health > 0 and "Farmer" in game._human_hud.title.text, "The farmer survives the test day after an explicitly requested meal")
+	check(person.health > 0 and game._human_hud.title.text == person.name, "The farmer survives the test day after an explicitly requested meal")
 	var stale := Vector2i(9, 8)
 	game._day_time = game.seconds_per_day / 3.0
 	person.wake_up()

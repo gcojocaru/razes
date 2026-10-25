@@ -106,6 +106,7 @@ The farmer's needs follow from a simulated body in `godot/human.gd`:
 | Quantity | Value | Source or reason |
 | --- | --- | --- |
 | Body | 1.718 m, 65 kg, 15% fat, BMI 22 | Game choice: a lean working adult, as tall as the 3D farmer |
+| Created bodies | 1.55–1.85 m, whole kilograms from BMI 18.5 to 30, 8–30% fat | Game choice for the creation screen: full health at the start (WHO's 18.5) up to obese, and a fat share from lean to heavy. Not checked against Moldavian skeletal or written records |
 | Basal metabolism | 370 + 21.6 × lean kg kcal a day (1,563 at the start) | Katch–McArdle equation: needs no age or sex, and falls as starvation consumes lean mass |
 | Activity cost (× basal) | sleep 1.0, idle 1.4, cooking 2.1, walking 3.2, sowing and harvesting 4.1 | [FAO/WHO/UNU 2004, *Human energy requirements*, Table 5.1](https://www.fao.org/4/y5686e/y5686e07.htm): idle uses light leisure, sowing and harvesting non-mechanized agricultural work |
 | Hoeing (Plow) | 5.0 × basal | About 5 METs for moderate hoeing and digging in the [Compendium of Physical Activities](https://pacompendium.com/occupation/) |
@@ -127,6 +128,10 @@ hours and eight hours' sleep burns about 4,250 kcal, 2.7 times basal: above the
 3,900 kcal a day, so even eating at every chance the farmer loses weight until
 lighter days balance it. A resting farmer fed at every chance for a day gains
 about 0.15 kg, two thirds of it fat.
+
+The creation screen's skin, hair and cloth colours (undyed and bleached linen,
+grey and brown wool, madder red, woad blue) are invented palettes, not evidence
+of fifteenth-century peasant dress or dyes.
 
 Not modelled: water, hulls (about a quarter of oat weight) and milling losses,
 threshing and dehulling labour, fitness and strength, sex and age, circadian

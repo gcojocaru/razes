@@ -34,10 +34,10 @@ func _init() -> void:
 
 ## Shows `person`'s body now.
 func show_body(person: Human) -> void:
-	_show("Height", "%.2f m" % Human.HEIGHT)
-	_show("Weight", "%.1f kg" % person.mass(), "%+.2f kg since start" % (person.mass() - Human.START_FAT - Human.START_LEAN))
-	_show("Body fat", "%.1f kg · %d%%" % [person.fat, roundi(person.fat / person.mass() * 100.0)], "%+.2f kg" % (person.fat - Human.START_FAT))
-	_show("Lean mass", "%.1f kg" % person.lean, "%+.2f kg" % (person.lean - Human.START_LEAN))
+	_show("Height", "%.2f m" % person.height)
+	_show("Weight", "%.1f kg" % person.mass(), "%+.2f kg since start" % (person.mass() - person.start_fat - person.start_lean))
+	_show("Body fat", "%.1f kg · %d%%" % [person.fat, roundi(person.fat / person.mass() * 100.0)], "%+.2f kg" % (person.fat - person.start_fat))
+	_show("Lean mass", "%.1f kg" % person.lean, "%+.2f kg" % (person.lean - person.start_lean))
 	_show("BMI", "%.1f" % person.bmi(), "healthy from 18.5")
 	_show("Health", "%d%%" % roundi(person.health), person.health / 100.0)
 	_show("Basal", "%d kcal a day" % roundi(person.basal() * 24.0))
