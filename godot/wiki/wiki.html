@@ -22,7 +22,7 @@
 </head>
 <body>
 <h1>Ștefan wiki</h1>
-<p>Ștefan is a farming and strategy game set on a 16 by 16 field of plots. These pages explain the seasons, the weather and how to grow grain. Open them in the game with <kbd>F1</kbd> or the Wiki button.</p>
+<p>Ștefan is a farming and strategy game set on a 16 by 16 field of plots. Each plot is 10 by 10 metres (100 m²); the whole field covers 2.56 hectares. These pages explain the seasons, the weather and how to grow grain. Open them in the game with <kbd>F1</kbd> or the Wiki button.</p>
 
 <h2>Controls</h2>
 <table>
@@ -33,23 +33,47 @@
 <tr><td><kbd>Space</kbd>, <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd></td><td>Pause, or run time at 1×, 2× or 4×</td></tr>
 <tr><td>Click or drag</td><td>Select plots; hold <kbd>Shift</kbd> to add to the selection</td></tr>
 <tr><td><kbd>Enter</kbd></td><td>Select the plot at the centre of the view; <kbd>Shift</kbd>+<kbd>Enter</kbd> adds it</td></tr>
-<tr><td><kbd>F</kbd></td><td>Do every ready action on the selected plots</td></tr>
+<tr><td><kbd>F</kbd></td><td>Queue every ready action on the selected plots</td></tr>
 <tr><td><kbd>C</kbd>, Actions or right-click a plot</td><td>Open the contextual action wheel</td></tr>
+<tr><td><kbd>H</kbd></td><td>Focus the farmer</td></tr>
+<tr><td><kbd>G</kbd></td><td>Focus camp and open its menu</td></tr>
+<tr><td><kbd>R</kbd></td><td>Configure Sleep, or wake up early</td></tr>
+<tr><td><kbd>Backspace</kbd></td><td>Clear jobs and return carried grain</td></tr>
 <tr><td><kbd>L</kbd>, <kbd>I</kbd>, <kbd>F1</kbd></td><td>Ledger, inventory and this wiki</td></tr>
 </table>
 
 <h2>The year</h2>
-<p>A year has four seasons of three months. Each month has four weeks of seven days, so a year is 336 days. The game starts on the first day of spring. At normal speed a day lasts two seconds.</p>
+<p>A year has four seasons of three months. Each month has four weeks of seven days, so a year is 336 days. The game starts at 06:00 on the first day of spring. At normal speed a day lasts ten real minutes. The top panel shows the hour. Space pauses the calendar and the farmer together; 1, 2 and 3 select normal, double and quadruple speed. F3 changes the day length in debug builds.</p>
 <p>Every day has its own weather: clear, cloudy, rain, storm or snow. Temperatures follow the modern climate of Chișinău, from about −1.5°C in midwinter to 22.5°C in midsummer, with warm, cold, wet and dry spells that last several days. Snow only falls at 1°C or colder.</p>
 
 <h2>Working the land</h2>
 <ul>
 <li><b>Plow</b> grass, stubble or dead crops to make a field. The ground is frozen in winter.</li>
-<li><b>Sow</b> a plowed field with a crop during that crop's sowing months. Sowing uses the crop's own grain from the inventory as seed.</li>
-<li><b>Harvest</b> a ripe crop. Its grain goes to the inventory and the field is left as stubble, which must be plowed again before sowing.</li>
+<li><b>Sow</b> a plowed field with a crop during that crop's sowing months. Sowing reserves the crop's own grain from the inventory as seed.</li>
+<li><b>Harvest</b> a ripe crop. Its grain goes into the farmer's bag, then to the inventory when carried home. The field is left as stubble, which must be plowed again before sowing.</li>
 </ul>
-<p>Right-click land to open its action wheel: Plow for grass, stubble or dead crops; a separate icon for each available crop on plowed land; Harvest for ripe crops. Only actions possible now appear, with plot counts and seed costs or harvest yields in kilograms. A growing crop or unavailable work shows its reason in the centre. Right-clicking a selected plot keeps the group, so mixed land offers actions for each eligible part. Click a segment, or use arrows/Tab and Enter. Escape or an outside click closes the wheel. Choosing a crop sows it and remembers it for Sow and F. Time keeps running and the wheel refreshes as days change.</p>
+<p>Right-click land to open its action wheel: Plow for grass, stubble or dead crops; a separate icon for each available crop on plowed land; Harvest for ripe crops. Only actions possible now appear, with plot counts and seed costs or harvest yields in kilograms. A growing crop or unavailable work shows its reason in the centre. Right-clicking a selected plot keeps the group, so mixed land offers actions for each eligible part. Click a segment, or use arrows/Tab and Enter to queue the work. Escape or an outside click closes the wheel. Choosing a crop queues sowing and remembers it for Sow and F. Time keeps running and the wheel refreshes as days change.</p>
 <p>The farm panel shows illustrated icons for each action the selected plots allow. Hover an icon for its name, plot count and kilograms of grain it costs or brings. The wheel icon opens Actions; the closed ledger, grain sack and open book open Ledger, Inventory and Wiki. Grain totals are in Inventory. Plowed land stays plowed. Stubble and dead crops left alone turn back to grass after about 40 warm days; cold days count less and winter days not at all.</p>
+
+<h2>The farmer</h2>
+<p>One person carries out the farm orders. The Farmer panel shows their activity, work left, queued plots, food energy, fatigue, health and carried grain. Press <kbd>H</kbd> or Focus to find them, <kbd>G</kbd> to focus camp and open its menu, <kbd>R</kbd> to configure Sleep or wake early, and <kbd>Backspace</kbd> or Clear jobs to cancel. Sleep preserves unfinished work; cancellation returns unused seed and carried grain. Ordering the same plot again cannot duplicate its job.</p>
+<p>A farm action takes time: three game hours to plow 100 m² by hand, half an hour to sow it and two hours to harvest it. Sowing reserves seed immediately, so meals and other orders cannot spend it again. The farmer collects the seed at camp, walks to the plot and finishes the work before the crop changes. Harvested grain travels in a sack before entering the inventory. Work is checked again on completion: a changed plot, closed sowing season or frost-killed crop can make an old order unusable.</p>
+<p>Eating and resting are manual. Hunger, exhaustion and night do not interrupt work automatically. Click the camp to open its <b>action wheel</b>, using the same rings and controls as the field wheel, then choose <b>Eat</b> to open <b>Prepare food</b>, a window with the inventory's grain bags. Select a grain and enter a quantity in whole grams; the porridge preview shows calories and preparation time. <b>Prepare &amp; Eat Porridge</b> reserves exactly that amount of the selected grain, then the farmer returns to camp to cook and eat it. Energy is added when cooking finishes. A 300 g portion takes half an hour; time scales with quantity, and calories depend on the grain. The preview and bag tooltips show calories per 100 g of dry edible grain. Only unreserved grain is available, and a pending meal cannot be ordered twice. Opening or closing spends nothing; <kbd>Escape</kbd> closes the menu or window. There is no initial flour supply.</p>
+<p>The camp wheel offers Eat and Sleep. Use arrows or <kbd>Tab</kbd> and <kbd>Enter</kbd>; Eat is focused first. <kbd>Escape</kbd> or a click on the hub or outside dismisses it without changing field selection.</p>
+<table>
+<tr><th>Dry edible grain</th><th>kcal per 100 g</th><th>kcal in 300 g porridge</th></tr>
+<tr><td>Barley</td><td>354</td><td>1,062</td></tr>
+<tr><td>Oats</td><td>389</td><td>1,167</td></tr>
+<tr><td>Millet</td><td>378</td><td>1,134</td></tr>
+<tr><td>Wheat</td><td>327</td><td>981</td></tr>
+<tr><td>Rye</td><td>338</td><td>1,014</td></tr>
+</table>
+<p>Energy densities use USDA SR28 modern reference grains, with hard red winter wheat as the wheat proxy. These are edible dry-grain amounts, not wet porridge weights or husks; dehulling and milling losses remain abstracted. Added water contributes no energy. Meal energy keeps fractional calories internally.</p>
+<p>Click camp and choose <b>Sleep</b> to choose how many hours to sleep, up to 24 with quarter-hour controls. The live preview shows <b>restedness</b> (100 minus fatigue), food energy, health and elapsed time including the walk home. Sleep recovers 20 fatigue points per hour and uses 60 kcal per hour: food calories come from eating. The preview includes travel costs and stops at death if you cannot survive the chosen duration.</p>
+<p>Confirm <b>Sleep</b> to return to camp and sleep for the chosen hours, during daytime or night. The timer starts on arrival. Full recovery does not shorten it; unfinished farm work resumes when the time ends. <b>Wake up</b> in the Farmer panel or <kbd>R</kbd> ends sleep early. Opening or closing the window starts nothing; <kbd>Escape</kbd> closes it. Finish a pending meal before sleeping, and wake before preparing food. Inventory shows available grain and the Farmer panel shows reserved and carried seed. Porridge is the only recipe so far, prepared and eaten as one command.</p>
+<p>Living and work consume energy, which can fall below zero. Once energy is depleted, health diminishes. At zero health the game ends: a centred <b>Game Over</b> message appears, the calendar and farming stop, and time controls and debug skips cannot resume play. Restart or <kbd>Enter</kbd> begins a fresh farm. Meals add energy; rest recovers fatigue.</p>
+<p>The person is about 1.7 metres tall and the crop heights use the same scale as the 10-metre plots. Grass outside the field supports the camp and is not selectable farmland. The camp and clothes are original artistic interpretations.</p>
+<p><i>This is the first human simulation. Work rates and food energy are initial game tuning. Cooking water, fuel, milling losses, diet quality and weather exposure are abstracted. There is one person, no village growth, no vegetables and no saved gameplay progress yet. Debug time skips advance the person as well as the crops.</i></p>
 
 <h2>How crops grow</h2>
 <p>A crop grows each day the temperature is above its base, fastest at its best temperature. Rain helps and sunny days dry it out: oats gain the most from rain, and millet barely minds a dry spell. A crop dies on any day at or below its frost limit, whether it is still growing or already ripe, so harvest before the frost. Wheat and rye are winter crops: sown in autumn, they grow a little, wait out the winter and ripen the next summer.</p>
@@ -57,16 +81,16 @@
 <h2>Crops</h2>
 <table>
 <tr><th>Crop</th><th>Sown</th><th>Grows above</th><th>Ripens after</th><th>Dies at</th><th>Seed → harvest a plot</th><th>A bag holds</th></tr>
-<tr><td><b>Barley</b></td><td>Spring months 1–2</td><td>4°C</td><td>60 warm days</td><td>-3°C</td><td>20 → 70 kg</td><td>45 kg</td></tr>
-<tr><td><b>Oats</b></td><td>Spring months 1–2</td><td>4°C</td><td>75 warm days; likes rain</td><td>-4°C</td><td>16 → 56 kg</td><td>32 kg</td></tr>
-<tr><td><b>Millet</b></td><td>Spring month 3 – Summer month 1</td><td>10°C</td><td>50 warm days; hardy in drought</td><td>1°C</td><td>3 → 40 kg</td><td>50 kg</td></tr>
-<tr><td><b>Wheat</b></td><td>Autumn months 1–2</td><td>3°C</td><td>a winter, then 110 warm days</td><td>-8°C</td><td>15 → 75 kg</td><td>55 kg</td></tr>
-<tr><td><b>Rye</b></td><td>Autumn months 1–3</td><td>2°C</td><td>a winter, then 95 warm days</td><td>-16°C</td><td>16 → 64 kg</td><td>50 kg</td></tr>
+<tr><td><b>Barley</b></td><td>Spring months 1–2</td><td>4°C</td><td>60 warm days</td><td>-3°C</td><td>2 → 7 kg</td><td>45 kg</td></tr>
+<tr><td><b>Oats</b></td><td>Spring months 1–2</td><td>4°C</td><td>75 warm days; likes rain</td><td>-4°C</td><td>1.6 → 5.6 kg</td><td>32 kg</td></tr>
+<tr><td><b>Millet</b></td><td>Spring month 3 – Summer month 1</td><td>10°C</td><td>50 warm days; hardy in drought</td><td>1°C</td><td>0.3 → 4 kg</td><td>50 kg</td></tr>
+<tr><td><b>Wheat</b></td><td>Autumn months 1–2</td><td>3°C</td><td>a winter, then 110 warm days</td><td>-8°C</td><td>1.5 → 7.5 kg</td><td>55 kg</td></tr>
+<tr><td><b>Rye</b></td><td>Autumn months 1–3</td><td>2°C</td><td>a winter, then 95 warm days</td><td>-16°C</td><td>1.6 → 6.4 kg</td><td>50 kg</td></tr>
 </table>
-<p>Typically barley ripens in early summer, oats in mid to late summer, millet in late summer or early autumn, rye the next early summer and wheat after it. About one winter in five is cold enough to kill wheat. You start with 100 kg of barley, 80 of oats and rye, 75 of wheat and 18 of millet: seed for five plots of each and six of millet.</p>
+<p>Typically barley ripens in early summer, oats in mid to late summer, millet in late summer or early autumn, rye the next early summer and wheat after it. About one winter in five is cold enough to kill wheat. You start with 10 kg of barley, 8 of oats and rye, 7.5 of wheat and 1.8 of millet: seed for five plots of each and six of millet.</p>
 
 <h2>Harvest size</h2>
-<p>A plot is a tenth of a hectare. The table gives its harvest on fully fertile soil in an average season, where every cloudy day counts as average. Each day a crop grows, rain helps fill its grain and sun dries it, as much as the crop cares for water, so every harvest comes out different:</p>
+<p>A plot is 100 m², one hundredth of a hectare. Quantities are shown in kilograms, accurate to one gram, so sowing millet costs 0.3 kg per plot. The table gives a plot's harvest on fully fertile soil in an average season, where every cloudy day counts as average. Each day a crop grows, rain helps fill its grain and sun dries it, as much as the crop cares for water, so every harvest comes out different:</p>
 <ul>
 <li>Most years give 70–110% of the full harvest, about nine tenths on average, and a wet year up to a third more. Oats suffer most in a dry year, down to half; millet barely changes.</li>
 <li>On average that is three to five times the seed back, as in medieval manor accounts and 18th-century Russian black-earth records, and millet, sown thin, more than ten times.</li>

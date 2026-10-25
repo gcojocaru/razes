@@ -16,8 +16,8 @@ uniform sampler2D furrow_normal : hint_normal, filter_linear_mipmap_anisotropic,
 varying vec2 grid;
 
 void vertex() {
-	// UV spans the whole plane, so scaling it gives cell coordinates.
-	grid = UV * grid_size;
+	// One plot-width of ungridded grass surrounds the selectable field and camp.
+	grid = UV * (grid_size + 2.0) - vec2(1.0);
 }
 
 float hash(vec2 p) {
@@ -34,14 +34,15 @@ float noise(vec2 p) {
 
 void fragment() {
 	vec2 cell = floor(grid);
+	bool inside = all(greaterThanEqual(cell, vec2(0.0))) && all(lessThan(cell, vec2(grid_size)));
 	vec2 edge = min(fract(grid), 1.0 - fract(grid)) / fwidth(grid);
-	float line = 1.0 - clamp(min(edge.x, edge.y) - 0.5, 0.0, 1.0);
+	float line = inside ? 1.0 - clamp(min(edge.x, edge.y) - 0.5, 0.0, 1.0) : 0.0;
 
 	// Two scales of the grass texture hide its repeat.
 	vec3 color = mix(texture(grass_color, grid * 0.5).rgb, texture(grass_color, grid * 0.13 + 0.37).rgb, 0.35);
 	color *= 0.9 + 0.2 * hash(cell);
 	vec3 normal = texture(grass_normal, grid * 0.5).rgb;
-	vec4 crop = texelFetch(crops, ivec2(cell), 0);
+	vec4 crop = inside ? texelFetch(crops, ivec2(cell), 0) : vec4(0.0);
 	int stage = int(round(crop.r * 255.0)) % 8;
 	float roughness = 1.0;
 	color *= 1.0 - 0.3 * wet;
@@ -65,7 +66,7 @@ void fragment() {
 		roughness = mix(1.0, 0.15, puddle * (1.0 - weeds));
 	}
 	color = mix(color, vec3(0.86, 0.89, 0.93), snow * (0.75 + 0.25 * hash(cell + 7.0)));
-	if (cell == hovered) color = mix(color, vec3(0.95, 0.88, 0.55), 0.3);
+	if (inside && cell == hovered) color = mix(color, vec3(0.95, 0.88, 0.55), 0.3);
 	if (crop.b > 0.5) color = mix(color, vec3(0.95, 0.7, 0.25), 0.45);
 
 	ALBEDO = mix(color, color * 0.5, line * 0.6);

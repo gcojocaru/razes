@@ -1,10 +1,11 @@
 # Ștefan
 
 A fresh Godot desktop game, starting with a medieval Moldavian inspired main menu.
-Select **Play** or press **Enter/Space** to open the strategy field: a 16×16 grid of building plots.
+Select **Play** or press **Enter/Space** to open the strategy field: a 16×16 grid
+of 10×10 m plots (100 m² each, 2.56 hectares in total).
 Hover or click a square to highlight or select it. Move with WASD/arrows, rotate
 with Q/E or right-drag, zoom with the mouse wheel or trackpad pinch/scroll. Time runs at one day every
-2 seconds (a year is 4 seasons × 3 months × 4 weeks × 7 days); Space pauses and
+10 minutes at 1×, starting at 06:00 (a year is 4 seasons × 3 months × 4 weeks × 7 days); Space pauses and
 1/2/3 pick 1×/2×/4× speed. In debug builds, F3 opens a panel to set the day length.
 Each day rolls seeded weather (Clear, Cloudy, Rain, Storm, Snow) and a temperature
 tuned to modern Moldovan (Chișinău) climate normals, with multi-day warm, cold,
@@ -15,7 +16,7 @@ Farming is the first gameplay loop. Click a plot or drag over a rectangle of
 plots; hold **Shift** to add to the selection. Without a mouse, move the view
 and press **Enter** to select the plot at its centre (**Shift+Enter** adds). The
 farm panel shows illustrated icons for each action the selection allows; hover
-for plot counts and the kilograms of grain it costs or brings; **F** does all of them. Plow grass, stubble or
+for plot counts and the kilograms of grain it costs or brings; **F** queues all of them. Plow grass, stubble or
 dead crops (not in winter), sow plowed land, and harvest ripe crops. Sowing uses
 the crop pictured on the sowing icon, whose tooltip names it and lists its needs.
 Right-click a plot, click the **Actions** wheel icon, or press **C** to open a segmented action
@@ -25,27 +26,87 @@ icons on plowed land; and **Harvest** on ripe crops. It shows only actions that
 can be done now, with plot counts and seed costs or harvest yields in kg. Growing
 crops, frozen ground and seed shortages show an explanation instead. Mixed
 selections offer work for each eligible part of the selection.
-Click a segment, or use arrows/Tab and **Enter**. Choosing a crop sows it and
+Click a segment, or use arrows/Tab and **Enter**. Choosing a crop queues sowing and
 remembers it for the sowing icon and F. **Escape** or an outside click dismisses
 the wheel; a right-drag still rotates the view. Time continues while it is open,
 and availability refreshes as days change.
 
+One **Farmer** carries out these orders. **H** or Focus finds them; **G** opens
+the camp menu, **R** opens Sleep (or wakes the farmer early), and **Backspace**
+or Clear jobs cancels work.
+The Farmer panel shows activity, work left, food energy, fatigue, health,
+reserved seed and their carried grain. Orders reserve seed immediately;
+the farmer collects it at camp, walks to the plot and completes the work before
+the field changes. Duplicate orders on a plot are ignored. Plowing takes
+3 game hours per plot, sowing half an hour and harvesting 2 hours. Harvested
+grain travels in the farmer's sack before it reaches the store; cancelled or
+unusable seed is returned. These are initial manual-work tuning values.
+
+Eating and resting require your command. The farmer does not stop work for
+hunger, exhaustion or night. Click the camp to open the same segmented action
+wheel used for fields, with **Eat** and **Sleep** icons. Choose **Eat**, then select a grain
+bag and a quantity in whole grams in the inventory-style **Prepare food** window.
+It previews calories and preparation time. **Prepare & Eat Porridge** reserves
+exactly that grain and sends the farmer to camp to cook and eat it; energy is
+added when preparation finishes. A 300 g portion takes half an hour; time scales
+with quantity, and calories also depend on the grain. Only unreserved grain is
+available, with one meal pending at a time. Opening or closing the window spends
+nothing. **G** opens the same camp menu; **Escape** closes the menu or window.
+There is no starting flour. Arrows/Tab and Enter choose either wheel action;
+the first focused action is Eat. The hub/outside click dismisses it.
+
+| Dry edible grain | kcal per 100 g | kcal in 300 g porridge |
+| --- | --- | --- |
+| Barley | 354 | 1,062 |
+| Oats | 389 | 1,167 |
+| Millet | 378 | 1,134 |
+| Wheat | 327 | 981 |
+| Rye | 338 | 1,014 |
+
+These are modern reference values from [USDA SR28, cereal grains](https://www.ars.usda.gov/ARSUserFiles/80400535/Data/SR/SR28/reports/sr28fg20.pdf),
+using hard red winter wheat as the wheat proxy. Bag tooltips and the food
+preview show the selected grain's calorie density; meal output uses the same
+data and retains fractional calories. Added water contributes no energy.
+Quantities stand for dry edible grain; dehulling/milling losses are abstracted.
+See [nutrition source notes](docs/historical-research.md#grain-calorie-reference--25-october-2026).
+
+Choose **Sleep** in the camp menu to enter the hours you want to sleep (up to
+24, with quarter-hour controls). Its live preview shows restedness, food energy,
+health and total time including the walk to camp. Sleep recovers 20 fatigue
+points per hour and burns 60 kcal per hour; it does not create food calories.
+Confirmation preserves field work, walks home and sleeps for the chosen hours,
+including during daytime. Work resumes when that time ends; **Wake up** or
+**R** ends sleep early. Opening or closing the window starts nothing. Finish a
+pending meal before sleeping, and wake before preparing another meal.
+Food energy supports daily life and work and can
+fall below zero. Once depleted, health starts falling. At zero health a centred
+**Game Over** message appears and gameplay, time and debug skips stop. Restart
+or Enter begins a fresh farm. F4 skips otherwise advance the farmer as well as
+the crops. Pause stops both; weather audio continues. Water, cooking fuel, milling losses,
+diet quality and weather exposure are still abstracted, and food/work rates
+are game tuning rather than a verified historical survival model.
+
+The person and cereal heights share the plot's metre scale; **H** zooms in to
+make the farmer easy to see. The camp and clothing are original low-poly art,
+not a verified reconstruction. The grass outside the grid grounds the camp
+and cannot be farmed.
+
 | Crop | Sown | Grows above | Needs | Dies at | Seed → harvest a plot | Bag |
 | --- | --- | --- | --- | --- | --- | --- |
-| Barley | Spring months 1–2 | 4°C | 60 warm days | -3°C | 20 → 70 kg | 45 kg |
-| Oats | Spring months 1–2 | 4°C | 75 warm days, likes rain | -4°C | 16 → 56 kg, copes with poor soil | 32 kg |
-| Millet | Spring month 3 – Summer month 1 | 10°C | 50 warm days, hardy in drought | 1°C | 3 → 40 kg | 50 kg |
-| Wheat | Autumn months 1–2 | 3°C | a winter, then 110 warm days | -8°C | 15 → 75 kg, wears soil most | 55 kg |
-| Rye | Autumn months 1–3 | 2°C | a winter, then 95 warm days | -16°C | 16 → 64 kg, copes with poor soil | 50 kg |
+| Barley | Spring months 1–2 | 4°C | 60 warm days | -3°C | 2 → 7 kg | 45 kg |
+| Oats | Spring months 1–2 | 4°C | 75 warm days, likes rain | -4°C | 1.6 → 5.6 kg, copes with poor soil | 32 kg |
+| Millet | Spring month 3 – Summer month 1 | 10°C | 50 warm days, hardy in drought | 1°C | 0.3 → 4 kg | 50 kg |
+| Wheat | Autumn months 1–2 | 3°C | a winter, then 110 warm days | -8°C | 1.5 → 7.5 kg, wears soil most | 55 kg |
+| Rye | Autumn months 1–3 | 2°C | a winter, then 95 warm days | -16°C | 1.6 → 6.4 kg, copes with poor soil | 50 kg |
 
 Across 50 weather seeds, barley ripens in early summer, oats mid-to-late
 summer, millet late summer to early autumn, rye the next early summer and wheat
 after it; about one winter in five is cold enough to kill wheat. Each crop has
 its own store: sowing uses that crop's grain as seed and its harvest goes back
-to it. Grain is counted in kilograms: a plot is a tenth of a hectare, sown at
+to it. Grain is shown in kilograms, accurate to one gram: a plot is 100 m², sown at
 medieval manor rates of 2–4 bushels an acre (130–215 kg/ha; millet, sown thin,
-30 kg/ha). You start with 100 kg of barley, 80 of oats and rye, 75 of wheat and
-18 of millet, seed for five plots each and six of millet; the inventory shows
+30 kg/ha). You start with 10 kg of barley, 8 of oats and rye, 7.5 of wheat and
+1.8 of millet, seed for five plots each and six of millet; the inventory shows
 the total and each crop. Harvests vary with the season: each growing
 day's rain or sun counts towards the grain, so most years give 70–110% of the
 table's full harvest and a wet year up to a third more, oats fall to half in a
@@ -129,6 +190,11 @@ script), then run the tests:
 ./godot/run.sh --headless --script tests/test_audio.gd
 
 ./godot/run.sh --headless --script tests/test_wheel.gd
+./godot/run.sh --headless --script tests/test_human.gd
+./godot/run.sh --headless --script tests/test_human_actor.gd
+./godot/run.sh --headless --script tests/test_person_scene.gd
+./godot/run.sh --headless --script tests/test_camp_food.gd
+./godot/run.sh --headless --script tests/test_camp_sleep.gd
 ```
 
 The menu test checks title spelling/font coverage, version, initial keyboard focus,
@@ -146,11 +212,26 @@ converter, that the wiki's crop table matches the game, the F1 wiki window, the
 agriculture debug window and the field texture in the running game screen.
 The wheel test also covers seed shortages, season changes, mixed states, live
 refresh, keyboard activation and dismissal, and viewport-edge placement.
+The human tests cover exact reservations and refunds, timed work, walking,
+hauling, stale orders, timed sleep and meals, food exhaustion and death,
+subdivision of time, physical mesh scale and poses, and actual scene input,
+pause, focus, cancellation and debug skips.
+The camp food test follows real camp clicks, menu and bag selection, typed
+portions and their live previews, exact grain reservation, proportional cooking,
+stale stock, dismissal, viewport resizing and Game Over input isolation.
+It also checks wheel hit targets, first-opening keyboard focus, left/right camp
+clicks and the calorie preview for all five grains. Model tests verify each
+grain's actual completed meal and one-gram precision.
+The sleep test follows camp and keyboard choices, typed duration, live recovery
+and starvation predictions, pause, early waking, preserved work, meal conflicts
+and Game Over/Restart. Model checks compare predictions with real travel and
+sleep, including death and non-frame-aligned waking across midnight.
 To capture actual GPU-rendered screens:
 
 ```sh
 ./godot/run.sh --script tests/capture_menu.gd -- /tmp/stefan-menu
 ./godot/run.sh --script tests/capture_wheel.gd -- /tmp/stefan-wheel
+./godot/run.sh --script tests/capture_human.gd -- /tmp/stefan-human
 ```
 
 The default window is 1280×800; the minimum is 1000×700. The title uses bundled

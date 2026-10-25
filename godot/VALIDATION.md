@@ -2,6 +2,193 @@
 
 Godot 4.7.2.stable.official.ed1daf0bf, macOS, Apple M4, Compatibility renderer.
 
+## Camp wheel and grain calories — 25 October 2026
+
+- Camp Eat/Sleep now inherit the actual field action wheel, sharing rings,
+  annular mouse targets, focus, arrow/Tab/Enter controls, dismissal, resize and
+  viewport fitting. Original bowl/spoon and bedroll/moon SVGs match the other
+  64px gold icons. Field preview/revalidation stays in the base wheel; camp
+  supplies its own descriptions and activation without farm-job assumptions.
+- USDA SR28 dry edible grain values are stored in Farm.CROPS: barley 354,
+  oats 389, millet 378, wheat 327 and rye 338 kcal/100g. Source records, PDF
+  pages and proxy/processing limits are in docs/historical-research.md.
+  Human.porridge(crop, grams), bag tooltips, the live food preview and completed
+  meals share that data. Fractional calories are retained. Cooking time still
+  scales from 30 minutes/300g, and water adds no calories.
+- New completion tests failed for all five grains against the old blanket
+  energy value; they now pass with exact stock/energy accounting. Camp input
+  failed against the rectangular menu first. A new first-opening Enter test
+  caught empty crop keys being treated as a remembered sowing choice; the base
+  wheel now remembers only nonempty crop names. The regression passes.
+- All nine suites pass with exit 0: human, human_actor, person_scene, camp_food,
+  camp_sleep, crops, wheel, menu and audio. Tests cover every grain's preview and
+  completed meal, 1g/fractional energy, latched portions, actual annular Eat/Sleep
+  clicks, hub and outside dismissal, left/right camp picking, keyboard focus,
+  shrinking the viewport, preserved field selection and Game Over isolation.
+  The inventory test retains its exact mass check on the tooltip's first line
+  while allowing the new nutrition line. No script errors or failed assertions.
+- GPU captures in `/private/tmp/stefan-camp-wheel/` were inspected: focused
+  Eat/Sleep wheels, bottom-right placement at 1000×700, and the 375g oat preview
+  at both window sizes showing 1,458.75 kcal. Existing certificate/settings and
+  shutdown shader warnings remain.
+- Independent read-only review of the scoped change and all nine passing logs
+  found no actionable issues or deferred items.
+
+Not checked: long-term survival balance, full accessibility, other platforms
+or exports. Modern dry edible grain proxies do not establish medieval cultivar
+nutrition; dehulling/milling losses and digestibility remain abstracted.
+
+## Camp sleep — 25 October 2026
+
+- Camp now offers Sleep beside Eat, with mouse, arrows and focused Enter
+  activation. Sleep opens a shared-style hours window; typing updates a preview
+  of restedness, food energy, health and total travel/sleep time. Closing earns
+  no recovery. R opens this configuration or wakes a pending sleeper early.
+- Timed sleep replaces indefinite Rest/Resume. The farmer walks home before
+  the timer starts, sleeps day or night for the chosen hours, then resumes
+  preserved field work. Fatigue recovers 20 points/hour; sleep burns 60 kcal/hour.
+  Full recovery does not shorten the requested time. Wake up ends it early.
+  Sleep and meals cannot overlap or spend grain while the other is pending.
+- Forecasts run an isolated Human through the actual needs/travel simulation.
+  Tests compare forecast and execution, including one hour travelling home,
+  depleted energy, early death, and non-frame-aligned wake times across midnight.
+  The preview visibly warns when the person would not survive the sleep.
+- Model and camp-input tests were observed failing before implementation.
+  All nine headless suites pass (exit 0): human, human_actor, person_scene,
+  camp_food, camp_sleep, crops, wheel, menu and audio. Actual input covers typed
+  hours, invalid/corrected durations, camp keyboard choice, pause, early waking,
+  meal conflicts, preserved work, field isolation, death and hidden-window
+  keyboard Restart. Existing certificate/settings and shutdown warnings remain.
+- Actual GPU captures in `/private/tmp/stefan-sleep-final/` cover the two-item camp
+  menu, recovery preview at 1280×800 and 1000×700, and the sleeping pose. The
+  preview separates fatigue recovery from the calories supplied by eating.
+  The death warning and dynamic text sizing were also inspected. Independent
+  review of the exact change and all nine passing logs found no issues.
+
+Not checked: long-term sleep/food balance, full accessibility, other platforms
+or exports. Sleep rates are game tuning; circadian rhythms and sleep quality
+are not simulated. Water/fuel and nutrition abstractions remain.
+
+## Camp food preparation — 25 October 2026
+
+- Replaces direct Eat/G with camp → Eat → inventory-style grain selection →
+  whole-gram quantity → Prepare & Eat Porridge. Left/right camp clicks and the
+  G keyboard shortcut share the menu. Camp interaction preserves field selection;
+  dismissal consumes its click, and Escape closes without spending grain.
+- Confirmation reserves exactly the selected crop and mass, revalidating free
+  stock and rejecting malformed, unavailable or duplicate requests. The pending
+  meal records its ingredient and amount. Calories and cooking time scale from
+  300 g / 1,020 kcal / 30 minutes, with energy added only at completion. Seed
+  reservations cannot be spent on food. Manual rest and Game Over remain intact.
+- Model and scene regressions were observed failing before implementation.
+  Independent review caught stale previews while typing and menu placement on
+  viewport resize; both now have failing-then-passing regressions and were
+  re-reviewed as resolved. A rendered capture exposed unreadable bag weights;
+  retaining the shared slot's font resource fixed them.
+- All eight suites pass with exit 0: human, human_actor, person_scene, camp_food,
+  crops, wheel, menu and audio. Coverage includes live quantity previews,
+  changing stock, cancellation/death, exact portions, proportional preparation,
+  field-selection isolation, keyboard access and hidden controls after death.
+- Real GPU captures in `/private/tmp/stefan-camp-food-final/` were inspected:
+  the camp menu and food window at 1280×800 and the 1000×700 minimum window.
+  Labels, quantity units, preview and confirmation remain visible. Existing
+  restricted-execution certificate/settings diagnostics and renderer/audio
+  shutdown resource warnings remain; no new script errors or failed assertions.
+
+Not checked: long-term food balance, full accessibility, other hardware/platforms
+or exports. Porridge is the only recipe, prepared and eaten in one command;
+water, fuel, milling losses and diet quality remain abstracted.
+
+## Manual needs and Game Over — 25 October 2026
+
+- Supersedes the original automatic-needs behavior below. Starting flour is
+  removed, including its HUD entry and camp label. Eat/G requests one meal
+  from 300 g of existing unreserved grain; repeated requests cannot duplicate
+  meals or spend reserved seed. Hunger, night and exhaustion do not trigger
+  meals or rest. R toggles Rest/Resume, including while paused; full recovery
+  does not resume work on its own.
+- Energy may fall below zero. Health loss is charged only for time spent
+  depleted. Human advancement reports the actual hours consumed, so long
+  skips stop precisely when health reaches zero. A centred Game Over overlay
+  blocks gameplay and presents Restart/Enter. Time controls and skips cannot
+  resume play. F10 and Tab cannot reopen/focus underlying sound controls or
+  steal Restart's input; the death → F10 → Tab → Enter regression passes.
+- New model and scene expectations were observed failing before their fixes.
+  All seven suites pass with exit 0: human, actor, person scene, crops, wheel,
+  menu and audio. No new script errors; the existing restricted-execution
+  certificate/user-settings and renderer shutdown warnings remain.
+- Real GPU captures in `/private/tmp/stefan-manual-survival/` were inspected
+  for the manual controls and Game Over at normal and minimum window sizes.
+
+Not checked: long-term food balance after removing the flour reserve, other
+hardware/platforms or full accessibility. Existing water/fuel, milling and
+weather-exposure abstractions remain.
+
+## First human — 25 October 2026
+
+- One autonomous farmer now reserves seed, walks to ordered plots, performs
+  timed work, and carries harvested grain home before the store receives it.
+  Duplicate jobs are refused, cancellation returns unspent seed, and stale
+  orders revalidate through Farm before committing. Whole-plot work times are
+  initial tuning; movement within each furrow is not simulated.
+- A shared clock starts at 06:00, with a 600-second day at 1×. Pause and speed
+  controls apply to the person, and F4 skips advance work, meals and rest too.
+  F3 changes day length while preserving the current hour. The hour is shown
+  in the existing date panel.
+- Food energy, fatigue, sleep/rest, camp meals, starvation/death and a fresh
+  restart are exercised. Starting provisions are 100 kg of flour, separate
+  from planting grain. H focuses the person, R requests recovery and Backspace
+  clears jobs; Enter can restart after death without requiring a mouse.
+- Person geometry is 1.718 m tall, scaled to 0.3436 scene units to match 10 m
+  plots. Cereal heights use the same conversion. A grass margin grounds the
+  camp, keeps field selection bounded and extends camera panning around it.
+- All seven suites pass (exit 0): `test_human`, `test_human_actor`,
+  `test_person_scene`, `test_crops`, `test_wheel`, `test_menu`, `test_audio`.
+  New behavior was observed failing first, including keyboard restart and the
+  review regressions for already-queued previews, panning west from camp and
+  refreshing available actions after a frost-invalidated harvest job ends.
+  Independent review confirmed all findings resolved.
+- Real OpenGL captures were inspected at 1280×800 and 1000×700, with close
+  views of idle, walking, working, carrying, cooking and sleeping poses, plus
+  the camp, needs panel, inventory and death state. Regenerate using
+  `tests/capture_human.gd`; local outputs are in `/private/tmp/stefan-human/`.
+- Restricted headless execution retains the known macOS certificate and
+  user-settings access warnings, plus dummy-shader shutdown warnings. Some
+  rapid scene/capture shutdowns also report weather audio stream resources
+  awaiting release; verbose output identifies the existing weather clips.
+  GPU runs retain the existing weather-particle shader shutdown warnings.
+
+Not checked: long-term food/work balance, full VoiceOver interaction, other
+hardware/platforms or exports. Cooking water, fuel, milling losses, diet
+quality and weather exposure are explicitly abstracted. Clothes/tools and
+work/calorie rates are game interpretations, not verified historical models.
+Vegetables, further people and saves are outside this change.
+
+## Smaller plots — 25 October 2026
+
+- Existing plots now represent 10 × 10 m (100 m²), making the 16 × 16 map
+  2.56 ha. Seed costs, full harvests and initial stocks are one tenth of their
+  former size; per-hectare rates and physical sack capacities are retained.
+- Mass is integer grams internally and displayed in kilograms to gram
+  precision. Tests exercise a 2 kg sowing / 7 kg harvest, exact exhaustion of
+  six 300 g millet sowings, 740 g harvests, the one-gram floor, whole and partial
+  bags, and kilogram values in the wheel, HUD, ledger, inventory and wiki.
+- The new sow/harvest fixture failed against the old model before the change.
+  Crop, wheel, menu and audio tests subsequently all passed (exit 0).
+- GPU captures were inspected for the millet and spring action wheels and
+  the inventory and crop ledger at 1280×800 and 1000×700, including stocks of
+  123.456 and 45.678 kg. Local captures are in
+  `/private/tmp/stefan-smaller-plots-wheel/` and
+  `/private/tmp/stefan-smaller-plots-panels/`.
+- A separate read-only code review found no actionable issues. Restricted
+  headless execution still reports the known macOS certificate, user-directory
+  and dummy-shader warnings. GPU captures run with desktop access show the
+  existing weather particle shader warnings at shutdown.
+
+Not checked: human food or labour balance, long-term player pacing, other
+hardware/platforms, accessibility or exports. Vegetables and people are not
+part of this plot-sizing change.
+
 - Asset import and the full headless menu test pass: Romanian Ș glyph, title,
   settings-driven v0.1.0, initial Play focus, focus style, three layout sizes,
   Enter/Space activation, mouse activation and the grid field with

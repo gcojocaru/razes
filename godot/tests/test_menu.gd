@@ -92,6 +92,8 @@ func run() -> void:
 		check(Calendar.date(336).year == 2 and Calendar.date(336).season == 0, "Year rolls over into spring")
 		check(Calendar.date(28).month == 2 and Calendar.date(84).season == 1, "Months and seasons roll over")
 		var start_day: int = current_scene.day
+		# Calendar acceleration is tested separately from starvation and Game Over.
+		current_scene.human.calories = 100000
 		current_scene.advance_time(current_scene.seconds_per_day * 3)
 		check(current_scene.day == start_day + 3, "Game time advances whole days")
 		check(current_scene.find_child("TimeHud", true, false) != null, "Game shows the time panel")

@@ -7,28 +7,31 @@ extends RefCounted
 ## which recovers while land rests; stubble and dead crops go back to grass.
 ## Crops and numbers are tuning choices, not verified history for 1495 Moldavia.
 
-## Kg of each crop in store at the start: seed for five plots, six of millet.
+const PLOT_AREA_M2 := 100
+
+## Grams of each crop in store at the start: seed for five plots, six of millet.
 ## Sowing a crop uses its own grain as seed.
-const STARTING_STOCK := {"Barley": 100, "Oats": 80, "Millet": 18, "Wheat": 75, "Rye": 80}
+const STARTING_STOCK := {"Barley": 10000, "Oats": 8000, "Millet": 1800, "Wheat": 7500, "Rye": 8000}
 ## sow: months of the year it may be sown (0 is the first month of spring, 11 the
 ## last of winter). base, best: °C where growth starts and where it is fastest.
 ## water: how much rain helps and sun dries it (1 average). ripe: days of full
 ## growth to ripen. frost: °C at or below which it dies. winter: must live
-## through a winter before it can ripen. seed, grain: kg sown and harvested on a
-## plot of a tenth of a hectare, fully fertile, in a season of cloudy days. Seed
+## through a winter before it can ripen. seed, grain: grams sown and harvested on
+## a 100 m² plot, fully fertile, in a season of cloudy days. Seed
 ## follows medieval manor rates of 2–4 bushels an acre (130–215 kg/ha); a season's
 ## weather averages about 0.9 of grain, giving the 3–5-fold returns of medieval
 ## and 18th-century records, and millet, sown thin, over tenfold. soil: how much the
-## harvest depends on fertility. wear: the fertility a harvest takes. bag: kg in a
+## harvest depends on fertility. wear: the fertility a harvest takes. bag: grams in a
 ## sack of about 70 litres, so heavier grain fills it to more. color, height: how
 ## the ripe crop looks (the crop shader holds one entry per crop, so adding a crop
-## means resizing its arrays).
+## means resizing its arrays). kcal_per_100g: dry edible grain energy, USDA SR28;
+## see docs/historical-research.md for records and processing assumptions.
 const CROPS := {
-	"Barley": {"sow": [0, 1], "base": 4, "best": 18, "water": 1.0, "ripe": 60.0, "frost": -3, "winter": false, "seed": 20, "grain": 70, "soil": 0.8, "wear": 0.3, "bag": 45, "color": Color(0.93, 0.8, 0.47), "height": 0.65},
-	"Oats": {"sow": [0, 1], "base": 4, "best": 18, "water": 1.5, "ripe": 75.0, "frost": -4, "winter": false, "seed": 16, "grain": 56, "soil": 0.5, "wear": 0.25, "bag": 32, "color": Color(0.86, 0.83, 0.6), "height": 0.8},
-	"Millet": {"sow": [2, 3], "base": 10, "best": 26, "water": 0.4, "ripe": 50.0, "frost": 1, "winter": false, "seed": 3, "grain": 40, "soil": 0.7, "wear": 0.3, "bag": 50, "color": Color(0.92, 0.6, 0.18), "height": 0.6},
-	"Wheat": {"sow": [6, 7], "base": 3, "best": 20, "water": 1.0, "ripe": 110.0, "frost": -8, "winter": true, "seed": 15, "grain": 75, "soil": 1.0, "wear": 0.35, "bag": 55, "color": Color(0.88, 0.67, 0.27), "height": 0.9},
-	"Rye": {"sow": [6, 7, 8], "base": 2, "best": 18, "water": 0.8, "ripe": 95.0, "frost": -16, "winter": true, "seed": 16, "grain": 64, "soil": 0.4, "wear": 0.25, "bag": 50, "color": Color(0.72, 0.65, 0.47), "height": 1.1},
+	"Barley": {"kcal_per_100g": 354, "sow": [0, 1], "base": 4, "best": 18, "water": 1.0, "ripe": 60.0, "frost": -3, "winter": false, "seed": 2000, "grain": 7000, "soil": 0.8, "wear": 0.3, "bag": 45000, "color": Color(0.93, 0.8, 0.47), "height": 0.65},
+	"Oats": {"kcal_per_100g": 389, "sow": [0, 1], "base": 4, "best": 18, "water": 1.5, "ripe": 75.0, "frost": -4, "winter": false, "seed": 1600, "grain": 5600, "soil": 0.5, "wear": 0.25, "bag": 32000, "color": Color(0.86, 0.83, 0.6), "height": 0.8},
+	"Millet": {"kcal_per_100g": 378, "sow": [2, 3], "base": 10, "best": 26, "water": 0.4, "ripe": 50.0, "frost": 1, "winter": false, "seed": 300, "grain": 4000, "soil": 0.7, "wear": 0.3, "bag": 50000, "color": Color(0.92, 0.6, 0.18), "height": 0.6},
+	"Wheat": {"kcal_per_100g": 327, "sow": [6, 7], "base": 3, "best": 20, "water": 1.0, "ripe": 110.0, "frost": -8, "winter": true, "seed": 1500, "grain": 7500, "soil": 1.0, "wear": 0.35, "bag": 55000, "color": Color(0.88, 0.67, 0.27), "height": 0.9},
+	"Rye": {"kcal_per_100g": 338, "sow": [6, 7, 8], "base": 2, "best": 18, "water": 0.8, "ripe": 95.0, "frost": -16, "winter": true, "seed": 1600, "grain": 6400, "soil": 0.4, "wear": 0.25, "bag": 50000, "color": Color(0.72, 0.65, 0.47), "height": 1.1},
 }
 ## How far a season's average watering (1 is all cloudy days) moves the harvest:
 ## long seasons average out their spells, so the difference is scaled up to the
@@ -48,15 +51,19 @@ const MIN_FERTILITY := 0.1
 const STAGES := ["Grass", "Plowed", "Sown", "Ripe", "Stubble", "Withered"]
 const ACTIONS := ["Plow", "Sow", "Harvest"]
 
-## Crop name -> kg in store.
+## Crop name -> grams in store. All mass in the model is integer grams.
 var stock: Dictionary = STARTING_STOCK.duplicate()
 ## Vector2i cell -> {"stage": one of STAGES, "crop": a CROPS name or "",
 ## "fertility": 0.1–1, "growth": 0–1 towards ripe for crops, or towards grass for
 ## stubble and dead crops, "wintered": a winter crop has lived through a winter,
 ## "moisture", "days": watering summed over the days the crop grew, and those days}.
 var plots := {}
-## Year number -> crop name -> {"sown", "frost", "harvested": plots, "seed", "gathered": kg}.
+## Year number -> crop name -> {"sown", "frost", "harvested": plots, "seed", "gathered": grams}.
 var years := {}
+
+## Display kilograms without losing gram precision or adding trailing zeroes.
+static func kg(grams: int) -> String:
+	return String.num(grams / 1000.0, 3).trim_suffix(".0")
 
 func stage(cell: Vector2i) -> String:
 	return plots[cell].stage if plots.has(cell) else "Grass"
@@ -70,7 +77,7 @@ func growth(cell: Vector2i) -> float:
 func fertility(cell: Vector2i) -> float:
 	return plots[cell].fertility if plots.has(cell) else 1.0
 
-## Kg the plot's crop gives, or is on course to: its full yield, less on worn
+## Grams the plot's crop gives, or is on course to: its full yield, less on worn
 ## soil, and more or less as its growing days so far were wet or dry.
 func harvest_yield(cell: Vector2i) -> int:
 	var kind: Dictionary = CROPS[crop(cell)]
@@ -79,7 +86,7 @@ func harvest_yield(cell: Vector2i) -> int:
 	# Real weather stays within about 0.45–1.35; a season of nothing but rain is capped.
 	return maxi(1, roundi(kind.grain * lerpf(1.0, fertility(cell), kind.soil) * minf(season, 1.5)))
 
-## A crop's store as the kg in each bag: full bags, then any part-filled one.
+## A crop's store as the grams in each bag: full bags, then any part-filled one.
 func bags(name: String) -> Array:
 	var full: int = CROPS[name].bag
 	var filled := []
@@ -124,7 +131,7 @@ func action(cell: Vector2i, day: int, seed_crop := "") -> Dictionary:
 				return {"name": "Sow", "reason": "Next sowing: " + next_sowing(day)}
 			if seed_crop not in sowable(day):
 				return {"name": "Sow", "reason": "%s is sown in %s" % [seed_crop, sowing_window(seed_crop)] if CROPS.has(seed_crop) else "Choose a crop to sow"}
-			return {"name": "Sow", "reason": "" if stock[seed_crop] >= CROPS[seed_crop].seed else "Needs %d kg %s seed" % [CROPS[seed_crop].seed, seed_crop.to_lower()]}
+			return {"name": "Sow", "reason": "" if stock[seed_crop] >= CROPS[seed_crop].seed else "Needs %s kg %s seed" % [kg(CROPS[seed_crop].seed), seed_crop.to_lower()]}
 		"Sown":
 			return {"name": "Harvest", "reason": "Not ripe yet"}
 		"Ripe":
@@ -172,7 +179,7 @@ func work(cells: Array, day: int, name := "", seed_crop := "") -> int:
 			done += 1
 	return done
 
-## What `work` would do, without doing it: {"plots": worked, "grain": change in kg stored}.
+## What `work` would do, without doing it: {"plots": worked, "grain": change in grams stored}.
 func preview(cells: Array, day: int, name := "", seed_crop := "") -> Dictionary:
 	var trial := Farm.new()
 	trial.stock = stock.duplicate()
@@ -180,7 +187,7 @@ func preview(cells: Array, day: int, name := "", seed_crop := "") -> Dictionary:
 	var done := trial.work(cells, day, name, seed_crop)
 	return {"plots": done, "grain": trial.stored() - stored()}
 
-## All grain in store, in kg.
+## All grain in store, in grams.
 func stored() -> int:
 	return stock.values().reduce(func(sum: int, amount: int) -> int: return sum + amount, 0)
 
