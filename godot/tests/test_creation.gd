@@ -23,8 +23,9 @@ func _initialize() -> void:
 	check(seen.size() > 1, "Random name varies")
 	for i in 20:
 		creation._random_looks()
-		for key in ["skin"]:
+		for key in creation.looks:
 			check(creation.peasant[key] in creation.looks[key].keys(), "Random %s is one of its options" % key)
+	check(creation.looks.keys() == ["skin"] + creation.HumanActor.HAIR.keys() + ["hair_colour"] + creation.HumanActor.CLOTHES.keys(), "The looks offer a skin tone, hair, a beard, hair colour and each kind of clothes")
 	var before: float = creation._turn
 	creation.find_child("TurnRight", true, false).button_down.emit()
 	creation._process(0.5)

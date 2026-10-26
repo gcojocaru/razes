@@ -66,7 +66,19 @@ func run() -> void:
 	root.add_child(actor)
 	actor.show_person(person, 0.0)
 	var body: Node3D = actor.get_node("Body")
-	check(["Shirt", "Skirt", "Collar", "Cuff", "Belt", "Trousers", "Laces", "Opinci"].all(func(part: String) -> bool: return actor._skeleton.has_node(part)), "The farmer wears an embroidered shirt, belt, trousers and opinci")
+	check(["Shirt", "Skirt", "Belt", "Trousers", "Laces", "Opinci"].all(func(part: String) -> bool: return actor._skeleton.has_node(part)), "The farmer wears a shirt, belt, trousers and opinci")
+	var shirt: MeshInstance3D = actor._skeleton.get_node("Shirt")
+	check(shirt.mesh.get_surface_count() == 2 and shirt.mesh.surface_get_material(0).normal_enabled, "The shirt is woven linen with embroidery")
+	var worn := func() -> Array:
+		return ["HairCropped", "HairBowl", "HairLong", "Beard", "Moustache", "Belt", "Chimir", "Cusma", "Palarie", "Opinci", "Laces"].filter(func(part: String) -> bool: return actor._skeleton.get_node(part).visible)
+	check(worn.call() == ["HairCropped", "Moustache", "Belt", "Opinci", "Laces"] and shirt.get_surface_override_material(1) == null, "The farmer starts with cropped hair and a moustache, in an embroidered shirt, the brâu and opinci, bareheaded")
+	actor.dress({"skin": "Tanned", "hair": "Long", "beard": "Beard", "hair_colour": "Grey", "shirt": "Plain", "belt": "Chimir", "hat": "Pălărie", "footwear": "Barefoot"})
+	check(worn.call() == ["HairLong", "Beard", "Moustache", "Chimir", "Palarie"] and shirt.get_surface_override_material(1) == shirt.mesh.surface_get_material(0), "Dressing changes hair, beard and clothes: long hair, a full beard with its moustache, a plain shirt, the chimir, the pălărie, bare feet")
+	check(actor._hair.all(func(material: StandardMaterial3D) -> bool: return material.albedo_color == actor.HAIR_COLOURS.Grey), "The hair and beard take the chosen colour")
+	actor.dress({"skin": "Tanned", "hair": "Bald", "beard": "Shaven", "hat": "Cușmă"})
+	check(worn.call() == ["Belt", "Cusma", "Opinci", "Laces"], "A bald, shaven farmer wears no hair; looks not chosen are the first of their kind")
+	# The first looks again, for the heights below.
+	actor.dress({"skin": "Tanned"})
 	var standing := mesh_bounds(body)
 	check(standing.size.y >= 1.65 and standing.size.y <= 1.8, "The adult's standing mesh is about 1.7 metres tall")
 	check(absf(standing.position.y) < 0.02, "Standing boots meet the ground rather than hovering or sinking")
@@ -120,9 +132,12 @@ func run() -> void:
 	check(pose(body) != empty, "Grain in transit shows a carried sack")
 	person.carried = 0
 	person.height = 1.85
+	# Bald, as height is measured: hair stands a little above the scalp.
+	actor.dress({"skin": "Tanned", "hair": "Bald"})
 	actor.show_person(person, 0.0)
 	var tall := mesh_bounds(body)
 	check(absf(tall.size.y - 1.85) < 0.005 and absf(tall.position.y) < 0.02 and actor.get_node("Name").position.y > 1.85, "A taller peasant stands at their own height, boots on the ground, under their name")
+	actor.dress({"skin": "Tanned"})
 	person.height = 1.718
 	person.weight = 88.0
 	actor.show_person(person, 0.0)

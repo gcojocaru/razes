@@ -3,22 +3,23 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://cnpyima7dftkr"
-path="res://.godot/imported/peasant_111_basecolor.jpg-746785b6b9173346df517b8b8ead190c.ctex"
+path.s3tc="res://.godot/imported/peasant_111_basecolor.jpg-746785b6b9173346df517b8b8ead190c.s3tc.ctex"
 metadata={
-"vram_texture": false
+"imported_formats": ["s3tc_bptc"],
+"vram_texture": true
 }
 generator_parameters={
-"md5": "cf5ff11394e55587dbae75d78e42cd1e"
+"md5": "404b271e87089faa26cca7c833ec790a"
 }
 
 [deps]
 
 source_file="res://assets/peasant/peasant_111_basecolor.jpg"
-dest_files=["res://.godot/imported/peasant_111_basecolor.jpg-746785b6b9173346df517b8b8ead190c.ctex"]
+dest_files=["res://.godot/imported/peasant_111_basecolor.jpg-746785b6b9173346df517b8b8ead190c.s3tc.ctex"]
 
 [params]
 
-compress/mode=0
+compress/mode=2
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0
@@ -40,4 +41,4 @@ process/normal_map_invert_y=false
 process/hdr_as_srgb=false
 process/hdr_clamp_exposure=false
 process/size_limit=0
-detect_3d/compress_to=1
+detect_3d/compress_to=0

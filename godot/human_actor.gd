@@ -1,11 +1,30 @@
 extends Node3D
-## The farmer is a Tripo body rigged to the peasant skeleton and dressed in a linen shirt,
-## trousers and opinci built around it (assets/peasant/SOURCE.md); the tools, sack and camp are original low-poly meshes,
+## The farmer is a Tripo body rigged to the peasant skeleton, with clothes built around it to
+## choose from (assets/peasant/SOURCE.md); the tools, sack and camp are original low-poly meshes,
 ## interpreted rather than reconstructed. Geometry is in metres; only this root and the
 ## separate camp convert units.
 
 ## Skin tones the creation screen offers; the farmer starts with the first.
 const SKINS := {"Tanned": Color("b6805c"), "Fair": Color("e0b89a"), "Rosy": Color("d39a7e"), "Olive": Color("9d7651"), "Brown": Color("7a523a")}
+## Hair and facial hair the creation screen offers; the farmer starts with the first of each.
+const HAIR := {
+	"hair": ["Cropped", "Bald", "Bowl", "Long"],
+	"beard": ["Moustache", "Shaven", "Beard"],
+}
+## Hair colours, for the hair and the beard alike; the farmer starts with the first.
+const HAIR_COLOURS := {"Dark brown": Color("4a3426"), "Black": Color("2a211c"), "Brown": Color("6e5039"), "Fair": Color("b0905e"), "Grey": Color("9a948c")}
+## Clothes the creation screen offers, by what they are worn as; the farmer starts in the first of each.
+const CLOTHES := {
+	"shirt": ["Embroidered", "Plain"],
+	"belt": ["Brâu", "Chimir"],
+	"hat": ["None", "Cușmă", "Pălărie"],
+	"footwear": ["Opinci", "Barefoot"],
+}
+## The model's parts each choice of hair or clothes puts on; the parts of the others are taken off.
+const WORN := {
+	"Cropped": ["HairCropped"], "Bowl": ["HairBowl"], "Long": ["HairLong"], "Moustache": ["Moustache"], "Beard": ["Beard", "Moustache"],
+	"Brâu": ["Belt"], "Chimir": ["Chimir"], "Cușmă": ["Cusma"], "Pălărie": ["Palarie"], "Opinci": ["Opinci", "Laces"],
+}
 
 ## Which clip, and which seconds of it, each pose plays: loops repeat the span,
 ## holds sway through it and back every four seconds, and once plays and stays.
@@ -45,6 +64,7 @@ var _wood := _material(Color("775336"))
 var _iron := _material(Color("606665"))
 var _burlap := _material(Color("a78c60"))
 var _skin: Array[StandardMaterial3D] = []
+var _hair: Array[StandardMaterial3D] = []
 
 func _init(metres_to_units: float) -> void:
 	_metres_to_units = metres_to_units
@@ -59,6 +79,8 @@ func _init(metres_to_units: float) -> void:
 	_player.callback_mode_process = AnimationMixer.ANIMATION_CALLBACK_MODE_PROCESS_MANUAL
 	for surface in _skeleton.get_node("Skin").mesh.get_surface_count():
 		_skin.append(_recolour("Skin", surface))
+	for part in ["HairCropped", "HairBowl", "HairLong", "Moustache", "Beard"]:
+		_hair.append(_recolour(part, 0))
 	_player.play("LayToIdle")
 	_player.seek(0.0, true)
 	var feet := (_bone("foot_l") + _bone("foot_r")) / 2
@@ -96,11 +118,30 @@ func _init(metres_to_units: float) -> void:
 	add_child(_label)
 	dress({"skin": SKINS.keys()[0]})
 
-## Colours the farmer's skin. Hair and facial hair wait for their models.
+## Colours the farmer's skin and hair and puts on the hair and clothes `peasant`
+## chose, the first of each kind where it chose none.
 func dress(peasant: Dictionary) -> void:
 	# The texture is light skin; the choice tints it.
 	for material in _skin:
 		material.albedo_color = _ratio(SKINS[peasant.skin], SKINS.Fair)
+	# The hair's texture is near white, tinted to the colour.
+	for material in _hair:
+		material.albedo_color = HAIR_COLOURS[peasant.get("hair_colour", HAIR_COLOURS.keys()[0])]
+	# Choices can share a part (a beard has a moustache), so a part is on if any choice wears it.
+	var worn := []
+	var parts := []
+	var kinds := HAIR.merged(CLOTHES)
+	for kind in kinds:
+		worn.append_array(WORN.get(peasant.get(kind, kinds[kind][0]), []))
+		for option in kinds[kind]:
+			parts.append_array(WORN.get(option, []))
+	for part in parts:
+		_skeleton.get_node(part).visible = part in worn
+	# A plain shirt has linen where the embroidery would be.
+	var plain: bool = peasant.get("shirt", CLOTHES.shirt[0]) == "Plain"
+	for part in ["Shirt", "Skirt"]:
+		var cloth: MeshInstance3D = _skeleton.get_node(part)
+		cloth.set_surface_override_material(1, cloth.mesh.surface_get_material(0) if plain else null)
 
 func show_person(person, seconds: float) -> void:
 	seconds = maxf(seconds, 0.0)

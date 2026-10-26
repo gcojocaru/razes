@@ -28,7 +28,8 @@ var next := Button.new()
 var begin := Button.new()
 ## "Height", "Weight", "Body fat", "Hills" and "Ponds".
 var sliders := {}
-## Each look ("skin") -> option -> its button.
+## Each look ("skin", "hair", "beard", "hair_colour" and each kind of clothes in
+## HumanActor.CLOTHES) -> option -> its button.
 var looks := {}
 ## What Begin starts the game with; Human.create() and HumanActor.dress() read it.
 var peasant := {}
@@ -57,17 +58,24 @@ func _init() -> void:
 	name = "Creation"
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_theme_stylebox_override("panel", TimeHud.box(Color(TimeHud.INK, 1.0), Color(0, 0, 0, 0), 0, 0, Vector2(28, 20)))
-	_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	# The preview stays in view beside the form, which scrolls on its own: the window's scroll area moves into a row
+	# after the preview.
 	var main := HBoxContainer.new()
 	main.add_theme_constant_override("separation", 32)
 	main.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	body.add_child(main)
+	var column := _scroll.get_parent()
+	column.add_child(main)
+	column.move_child(main, _scroll.get_index())
+	column.remove_child(_scroll)
 	main.add_child(_preview())
+	main.add_child(_scroll)
+	_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	var form := VBoxContainer.new()
 	form.add_theme_constant_override("separation", 16)
 	form.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	form.custom_minimum_size.x = 520
-	main.add_child(form)
+	body.add_child(form)
 	form.add_child(_character)
 	form.add_child(_land_page)
 	_land_page.add_theme_constant_override("separation", 16)
@@ -102,13 +110,17 @@ func _init() -> void:
 	section.add_child(about)
 	section = _section(_character, "Looks")
 	var grid := _grid(section)
-	# Hair and facial hair come back with their models; everyone wears the same clothes.
 	_choices(grid, "skin", HumanActor.SKINS)
+	for kind in HumanActor.HAIR:
+		_choices(grid, kind, HumanActor.HAIR[kind])
+	_choices(grid, "hair_colour", HumanActor.HAIR_COLOURS)
+	for kind in HumanActor.CLOTHES:
+		_choices(grid, kind, HumanActor.CLOTHES[kind])
 	var random_look := Button.new()
 	random_look.name = "RandomLook"
-	random_look.text = "Random skin"
+	random_look.text = "Random look"
 	_choice_style(random_look, 15)
-	random_look.tooltip_text = "Chooses a skin tone at random"
+	random_look.tooltip_text = "Chooses a skin tone, hair and clothes at random"
 	random_look.pressed.connect(_random_looks)
 	section.add_child(random_look)
 	section = _section(_land_page, "Land")
@@ -189,6 +201,9 @@ func open() -> void:
 func _preview() -> VBoxContainer:
 	var column := VBoxContainer.new()
 	column.add_theme_constant_override("separation", 8)
+	# Shares the width with the form, at a little over a third, so the peasant has room to be seen.
+	column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	column.size_flags_stretch_ratio = 0.6
 	var stage := Control.new()
 	stage.name = "Preview"
 	stage.custom_minimum_size = Vector2(280, 480)
