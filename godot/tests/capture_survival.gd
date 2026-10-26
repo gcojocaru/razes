@@ -7,11 +7,20 @@ func shot(title: String) -> void:
 	game._woodland.show_conditions(game._human_actor.position,game._camera.position,Vector2(0.2,0.04),game.snow_cover)
 	await RenderingServer.frame_post_draw
 	root.get_texture().get_image().save_png(output.path_join(title+".png"))
-func timing(label: String) -> void:
-	for i in 12: await process_frame
+	# Change scene transforms outside the renderer callback.
+	await process_frame
+func timing(label: String) -> Dictionary:
+	for i in 12:
+		await process_frame
+		await RenderingServer.frame_post_draw
 	var started := Time.get_ticks_usec()
-	for i in 60: await process_frame
-	print("PERF %s: %.2f ms/frame; %d draw calls" % [label,(Time.get_ticks_usec()-started)/60000.0,RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_DRAW_CALLS_IN_FRAME)])
+	for i in 60:
+		await process_frame
+		await RenderingServer.frame_post_draw
+	var sample := {"ms":(Time.get_ticks_usec()-started)/60000.0, "draws":RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_DRAW_CALLS_IN_FRAME)}
+	print("PERF %s: %.2f ms/frame; %d draw calls; viewport %s" % [label,sample.ms,sample.draws,root.size])
+	await process_frame
+	return sample
 func run() -> void:
 	DirAccess.make_dir_recursive_absolute(output)
 	DisplayServer.window_set_vsync_mode(DisplayServer.VSYNC_DISABLED)
@@ -20,9 +29,10 @@ func run() -> void:
 	root.add_child(game);current_scene=game;game.set_speed(0);game.set_process(false);game.set_process_unhandled_input(false)
 	game.day=100;game._day_time=game.seconds_per_day*0.5;game._start_day()
 	game._woodland.visible=false
-	await timing("same scene without trees")
+	var baseline: Dictionary = await timing("same scene without trees")
 	game._woodland.visible=true
-	await timing("summer woodland")
+	var wooded: Dictionary = await timing("summer woodland")
+	assert(wooded.draws>baseline.draws, "Performance sample must actually render the trees")
 	await shot("woodland-overview")
 	var cell: Vector2i=game.farm.woodland.keys()[game.farm.woodland.size()/2]
 	game.human.position=Human.plot_centre(cell)

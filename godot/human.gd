@@ -296,11 +296,12 @@ func sleep_prediction(hours: Variant, context: Farm = null, day := 0, hour := 0.
 	forecast._farm = farm
 	if not forecast.sleep(hours): return {}
 	var elapsed := 0.0
+	# Full speed bounds arrival; a minimum tail step keeps slow walks above the clock epsilon.
 	while forecast.position != forecast.home and forecast.activity != "Dead":
-		forecast.advance(farm, day, hour + elapsed, forecast.position.distance_to(forecast.home) / (WALK_SPEED * forecast.pace()))
+		forecast.advance(farm, day, hour + elapsed, maxf(EPSILON * 2.0, forecast.position.distance_to(forecast.home) / WALK_SPEED))
 		elapsed += forecast.advanced_hours
 		if forecast.sleep_remaining == 0.0 and forecast.activity != "Dead": return {}
-	forecast.advance(farm, day, hour + elapsed, float(hours))
+	forecast.advance(farm, day, hour + elapsed, forecast.sleep_remaining)
 	return {"fatigue":forecast.fatigue, "glycogen":forecast.glycogen, "mass":forecast.mass(), "health":forecast.health, "hours":elapsed + forecast.advanced_hours, "core":forecast.exposure.core, "wetness":forecast.exposure.wetness, "exposure_health":forecast.exposure.health, "wood":farm.wood}
 
 static func porridge(crop: String, grams: int) -> Dictionary:
@@ -496,7 +497,8 @@ func _spend(hours: float, action: String) -> float:
 	var tired_rate := tiring(action)
 	var digesting := digestion() if stomach_kcal > EPSILON else 0.0
 	var used := hours
-	var fire := _farm != null and position == home and (_farm.heating_enabled or eating_requested)
+	var at_home := position == home and action != "Walking"
+	var fire := _farm != null and at_home and (_farm.heating_enabled or eating_requested)
 	var fuel: int = (meal_fuel if eating_requested else _farm.wood) if _farm != null else 0
 	fire = fire and fuel > _farm.fuel_remainder + EPSILON
 	if _farm != null: _farm.fire_lit = fire
@@ -513,13 +515,13 @@ func _spend(hours: float, action: String) -> float:
 		starved = (glycogen + _reserve()) / (cost - digesting)
 		used = minf(used, starved)
 	if weather != null:
-		var key := [floori((_absolute_hour + EPSILON) * 60.0), action, position == home, _farm.shelter, fire]
+		var key := [floori((_absolute_hour + EPSILON) * 60.0), action, at_home, _farm.shelter, fire]
 		if key != _thermal_key:
 			_thermal_key = key
 			var absolute_minute: float = key[0] / 60.0
 			var climate := weather.at(floori(absolute_minute / 24.0), fposmod(absolute_minute, 24.0))
-			_thermal_rate = exposure.rates(climate, EFFORT[action], mass(), basal(), position == home and _farm.shelter, fire)
-		used = exposure.advance(used, _thermal_rate, position == home and action in ["Idle", "Sleeping", "Recovering"])
+			_thermal_rate = exposure.rates(climate, EFFORT[action], mass(), basal(), at_home and _farm.shelter, fire)
+		used = exposure.advance(used, _thermal_rate, at_home and action in ["Idle", "Sleeping", "Recovering"])
 	var absorbed := digesting * used
 	if absorbed > 0.0:
 		stomach -= stomach * absorbed / stomach_kcal

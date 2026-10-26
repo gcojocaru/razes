@@ -16,6 +16,9 @@ func run() -> void:
 	var game = load("res://game.tscn").instantiate()
 	game.terrain_seed=42;root.add_child(game);current_scene=game;game.set_speed(0)
 	await process_frame;await process_frame
+	key(KEY_G)
+	check(game._camp_menu.hub_detail.text.contains("48 kg") and game._camp_menu.hub_detail.text.contains("96"), "Camp visibly shows deposited wood and remaining fuel duration")
+	key(KEY_ESCAPE)
 	var cell: Vector2i=game.farm.woodland.keys()[0]
 	game._start_selection(cell,false);key(KEY_C)
 	check(game._farm_hud.action_wheel.entries[0].action=="Chop", "Woodland offers Chop through the actual field wheel")

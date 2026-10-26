@@ -44,6 +44,8 @@ func run() -> void:
 		current_scene.free()
 		quit(1)
 		return
+	# This suite isolates the existing body/UI arithmetic from randomized exposure weather.
+	person.weather = null
 	game.set_speed(0)
 	check(game.find_child("HumanActor", true, false) != null and game.find_child("HumanHud", true, false) != null, "The person and their needs appear in the game")
 	check(not game._human_hud._supplies.text.contains("Flour"), "The farmer has no initial flour supply")

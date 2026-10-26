@@ -32,8 +32,14 @@ func show_camp(farm: Farm, person: Human) -> void:
 		for index in mini(_buttons.size(), entries.size()):
 			_buttons[index].text = _label(entries[index]) + ": " + _effect(entries[index])
 			_buttons[index].tooltip_text = _tooltip(entries[index])
-		_hub_title.text = _title
+		_show_hub()
 		queue_redraw()
+
+func _show_hub() -> void:
+	super._show_hub()
+	if _camp_farm != null:
+		hub_detail.text = "%s kg wood\n%s h fuel" % [Farm.kg(_camp_farm.wood), String.num(_camp_farm.fuel_hours(), 1)]
+		hub_detail.tooltip_text = _detail + "\n" + ("Heating enabled" if _camp_farm.heating_enabled else "Heating off")
 
 func open_at(at: Vector2) -> void:
 	_focused = 0
@@ -63,8 +69,8 @@ func _summary(entry: Dictionary) -> String:
 		"Sleep": return "Choose hours"
 		"Build": return "300 kg · 8 h"
 		"Heat": return "0.5 kg/h at home"
-		"Recover": return "Preserves field work"
-	return "Permanent shelter" if _camp_farm != null and _camp_farm.shelter else "Move camp"
+		"Recover": return "Dry and rest"
+	return "Fixed in place" if _camp_farm != null and _camp_farm.shelter else "Move camp"
 
 func _activate(index: int) -> void:
 	if entries[index].action == "Move" and _camp_farm != null and _camp_farm.shelter:

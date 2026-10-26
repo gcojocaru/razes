@@ -242,7 +242,9 @@ and a first-year walkthrough. It shows [`godot/wiki/wiki.html`](godot/wiki/wiki.
 which also opens in any browser; the game converts its headings, paragraphs,
 lists, tables, bold, italics and keys to RichTextLabel BBCode, so the page keeps
 to those tags. It is not a Godot resource, so an export preset must include
-`wiki/*.html` (Export → Resources → filters to export non-resource files).
+`wiki/*.html, assets/woodland/*.txt, assets/woodland/*.md` (Export → Resources →
+filters to export non-resource files), so the wiki and bundled art licenses travel
+with the game.
 
 The field uses CC0 grass and ploughed-soil textures (see their
 [sources](godot/assets/textures/SOURCE.md)); crops are instanced stalks sized

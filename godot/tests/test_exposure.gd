@@ -80,6 +80,30 @@ func _initialize() -> void:
 	person.exposure.core = 32; person.exposure.health = 0.1
 	person.advance(Farm.new(),0,6,10)
 	check(person.activity=="Dead" and person.advanced_hours<1, "Exposure death stops a long skip at the fatal instant")
+	var departing_one := person_at(true,ControlledWeather.new(-10,"Snow",6))
+	var departing_frames := person_at(true,ControlledWeather.new(-10,"Snow",6))
+	var home_one := Farm.new();home_one.shelter=true
+	var home_frames := Farm.new();home_frames.shelter=true
+	for worker in [departing_one,departing_frames]: worker.order(home_one,[Vector2i(15,15)],0,"Plow")
+	departing_one.advance(home_one,0,6,0.02)
+	for i in 100: departing_frames.advance(home_frames,0,6+i*0.0002,0.0002)
+	check(home_one.wood==48000 and home_frames.wood==48000 and home_one.fuel_remainder==0 and home_frames.fuel_remainder==0, "Departing walks never burn home heating fuel, regardless of frame size")
+	check(absf(departing_one.exposure.core-departing_frames.exposure.core)<0.0001, "The first departing segment receives outdoor exposure, not shelter")
+	var warming_weather := ControlledWeather.new(15,"Clear",0)
+	var forecast_person := person_at(false,warming_weather)
+	var actual_person := person_at(false,warming_weather)
+	var forecast_farm := Farm.new();forecast_farm.shelter=true
+	var actual_farm := Farm.new();actual_farm.shelter=true
+	for worker in [forecast_person,actual_person]:
+		worker.position=worker.home+Vector2(150,0);worker.fatigue=100;worker.exposure.core=35.999
+		worker.order(forecast_farm,[Vector2i(15,15)],0,"Plow")
+	var warming_preview: Dictionary=forecast_person.sleep_prediction(6,forecast_farm,0,6)
+	actual_person.sleep(6)
+	var elapsed := 0.0
+	while actual_person.sleep_remaining>0 and actual_person.activity!="Dead":
+		actual_person.advance(actual_farm,0,6+elapsed,0.0001)
+		elapsed+=actual_person.advanced_hours
+	check(absf(warming_preview.hours-elapsed)<0.00011 and warming_preview.wood==45000 and warming_preview.fatigue<0.01, "Warming during the return cannot make a forecast run past the requested wake time")
 	person = person_at(true, ControlledWeather.new(-15,"Snow",8))
 	person.exposure.core=32;person.exposure.health=0.1
 	farm=Farm.new();farm.heating_enabled=false
