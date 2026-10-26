@@ -25,8 +25,11 @@ func run() -> void:
 	key(KEY_ENTER)
 	check(game.human.queue.size()==1 and game.farm.wood_piles.is_empty(), "Keyboard chopping queues physical work, not instant wood")
 	game.advance_time(game.seconds_per_day/24.0)
+	check(game._farm_hud._plot_label.text.contains("% cut") and game._farm_hud._plot_label.text != "Woodland · 0% cut", "Selected chopping progress updates live")
+	var progress: String = game._farm_hud._plot_label.text
 	key(KEY_BACKSPACE)
 	check(game.farm.woodland[cell]<6 and game.farm.woodland[cell]>4.9, "Clear jobs preserves partial chopping through scene input")
+	check(game._farm_hud._plot_label.text == progress and game._farm_hud._detail_label.text.contains("h left"), "Interrupted chopping keeps its displayed percentage and remaining hours")
 	var paused: float=game.farm.woodland[cell];var wood: int=game.farm.wood
 	game._process(1)
 	check(game.farm.woodland[cell]==paused and game.farm.wood==wood, "Pause freezes woodland work and fuel")

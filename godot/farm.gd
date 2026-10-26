@@ -52,6 +52,7 @@ const MIN_FERTILITY := 0.1
 ## Index order is what the field shaders draw; a cell missing from plots is untouched grass.
 const STAGES := ["Grass", "Plowed", "Sown", "Ripe", "Stubble", "Withered"]
 const ACTIONS := ["Plow", "Sow", "Harvest", "Chop", "Haul wood"]
+const PLOW_HOURS := 3.0
 const CHOP_HOURS := 6.0
 const WOOD_YIELD := 240000
 const REGROW_DAYS := 2 * Calendar.DAYS_PER_YEAR
@@ -70,6 +71,8 @@ var fuel_remainder := 0.0
 var woodland := {}
 var wood_piles := {}
 var regrowth := {}
+## Cell -> plowing hours left; clearing a farmer's orders keeps the worked land.
+var plowing := {}
 
 ## Crop name -> grams in store. All mass in the model is integer grams.
 var stock: Dictionary = STARTING_STOCK.duplicate()
@@ -125,6 +128,7 @@ func copy_state() -> Farm:
 	copy.woodland = woodland.duplicate()
 	copy.wood_piles = wood_piles.duplicate()
 	copy.regrowth = regrowth.duplicate()
+	copy.plowing = plowing.duplicate()
 	return copy
 
 ## Display kilograms without losing gram precision or adding trailing zeroes.
@@ -232,6 +236,7 @@ func act(cell: Vector2i, day: int, seed_crop := "") -> bool:
 		"Plow":
 			plot.stage = "Plowed"
 			plot.crop = ""
+			plowing.erase(cell)
 		"Sow":
 			var kind: Dictionary = CROPS[seed_crop]
 			stock[seed_crop] -= kind.seed
@@ -301,6 +306,7 @@ func grow(weather: Dictionary, day: int) -> void:
 			regrowth[cell] = day
 		elif day - regrowth[cell] >= REGROW_DAYS:
 			woodland[cell] = CHOP_HOURS
+			plowing.erase(cell)
 			regrowth.erase(cell)
 	var winter: bool = Calendar.date(day).season == 3
 	var warmth: float = clampf((weather.temperature - 5) / 15.0, 0.0, 1.0)
