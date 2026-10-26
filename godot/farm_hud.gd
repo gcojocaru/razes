@@ -157,11 +157,15 @@ func show_farm(farm: Farm, cells: Array, day: int, seed_crop: String, queued: Ar
 		if farm.terrain != null and farm.terrain.cell_reason(cell) != "":
 			_plot_label.text = farm.terrain.cell_reason(cell)
 		if farm.woodland.has(cell):
-			_plot_label.text = "Woodland"
-			notes.append("%s h chopping left · 240 kg wood" % String.num(farm.woodland[cell], 1))
+			_plot_label.text = "Woodland · %d%% cut" % floori((1.0 - farm.woodland[cell] / Farm.CHOP_HOURS) * 100)
+			notes.append("%s h left · 240 kg wood" % String.num(farm.woodland[cell], 1))
 		elif farm.wood_piles.has(cell):
 			_plot_label.text = "Wood pile"
 			notes.append("%s kg waiting for hauling" % Farm.kg(farm.wood_piles[cell]))
+		elif farm.plowing.has(cell):
+			_plot_label.text = "Plowing %d%%" % floori((1.0 - farm.plowing[cell] / Farm.PLOW_HOURS) * 100)
+			notes.append("%s h left" % String.num(farm.plowing[cell], 1))
+			if reasons: notes.append(reasons.keys()[0])
 		else:
 			notes.append(reasons.keys()[0] if reasons else NOTES[stage])
 		if stage in ["Sown", "Ripe"]:

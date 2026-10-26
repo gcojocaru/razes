@@ -7,7 +7,7 @@ const Exposure := preload("res://exposure.gd")
 ## any surplus and pay any deficit. Health follows body mass; tiredness slows work.
 
 const WALK_SPEED := 4500.0
-const WORK_HOURS := {"Plow": 3.0, "Sow": 0.5, "Harvest": 2.0, "Chop": 6.0, "Haul wood": 0.01}
+const WORK_HOURS := {"Plow": Farm.PLOW_HOURS, "Sow": 0.5, "Harvest": 2.0, "Chop": Farm.CHOP_HOURS, "Haul wood": 0.01}
 const BAG_CAPACITY := 15000
 const MEAL_GRAMS := 300
 const MEAL_HOURS := 0.5
@@ -138,7 +138,10 @@ func order(farm: Farm, cells: Array, day: int, action := "", crop := "") -> int:
 		var seed: int = Farm.CROPS[crop].seed if next.name == "Sow" else 0
 		if seed:
 			farm.stock[crop] -= seed
-		queue.append({"action": next.name, "cell": cell, "crop": crop if next.name == "Sow" else farm.crop(cell), "remaining": farm.woodland[cell] if next.name == "Chop" else WORK_HOURS[next.name], "seed": seed})
+		var remaining: float = WORK_HOURS[next.name]
+		if next.name == "Chop": remaining = farm.woodland[cell]
+		elif next.name == "Plow": remaining = farm.plowing.get(cell, remaining)
+		queue.append({"action": next.name, "cell": cell, "crop": crop if next.name == "Sow" else farm.crop(cell), "remaining": remaining, "seed": seed})
 		added += 1
 	if added:
 		message = "%d job%s queued" % [added, "" if added == 1 else "s"]
@@ -440,6 +443,10 @@ func _step(farm: Farm, day: int, _hour: float, hours: float) -> float:
 	job.remaining = maxf(0.0, job.remaining - used * rate)
 	if job.action == "Chop" and farm.woodland.has(job.cell):
 		farm.woodland[job.cell] = job.remaining
+		_farm_changed = true
+	elif job.action == "Plow":
+		farm.plowing[job.cell] = job.remaining
+		_farm_changed = true
 	if job.remaining <= EPSILON and activity != "Dead":
 		_finish_job(farm, day)
 	return used

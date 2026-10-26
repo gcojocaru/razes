@@ -42,6 +42,10 @@ after two game years; cultivation and camp occupation keep it clear. Trees are
 walkable and use the terrain's metre scale, seasonal leaves, wind and snow.
 Their models and texture licenses are in [woodland credits](godot/assets/woodland/SOURCE.md).
 
+Plowing and chopping keep their progress per plot when interrupted, including
+**Clear jobs**. Select a plot to see its percentage complete and work hours left;
+order the same work again to resume. Progress lasts for the current game only.
+
 At camp, **Build shelter** reserves **300 kg wood** for **8 hours of work**.
 Meals, sleep and recovery preserve its progress and queued field jobs. Clear
 jobs cancels unfinished construction and returns its reserved wood; moving an

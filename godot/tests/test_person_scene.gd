@@ -71,6 +71,12 @@ func run() -> void:
 	check(person.position == position and game._day_time == clock, "Pause stops the person and the calendar together")
 	game.advance_time(game.seconds_per_day / 24.0)
 	check(game.farm.stage(cell) == "Grass" and person.position.distance_to(position) > 10.0, "The farmer walks to the field and works before its stage changes")
+	check(game._farm_hud._plot_label.text.begins_with("Plowing ") and game._farm_hud._detail_label.text.contains("h left"), "Selected plowing progress updates while work is running")
+	var remaining: float = person.job.remaining
+	key(KEY_BACKSPACE)
+	check(game._farm_hud._plot_label.text.begins_with("Plowing ") and game._farm_hud.buttons.Plow.visible, "Cleared plowing keeps its visible progress and offers resuming")
+	key(KEY_F)
+	check(is_equal_approx(person.queue[0].remaining, remaining), "Requeued scene plowing resumes the saved remaining hours")
 	check(until(game, func(): return game.farm.stage(cell) == "Plowed", 6.0), "Timed plowing eventually completes")
 	key(KEY_C)
 	key(KEY_RIGHT)
