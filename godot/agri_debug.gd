@@ -40,6 +40,22 @@ func _init(owner_game: Node3D) -> void:
 			game.farm.stock[name] += 100000
 		game._show_farm())
 	column.add_child(fill)
+	for action in ["Add 300 kg wood", "Recover exposure", "Wood selected plots"]:
+		var button := Button.new()
+		button.text = action
+		button.pressed.connect(func() -> void:
+			match action:
+				"Add 300 kg wood": game.farm.wood += 300000
+				"Recover exposure":
+					game.human.exposure.core = 37.0
+					game.human.exposure.wetness = 0.0
+					game.human.exposure.health = 100.0
+					game.human._thermal_key.clear()
+				"Wood selected plots":
+					for cell in game.selected:
+						if game.farm.terrain.cell_reason(cell) == "" and game.farm.stage(cell) == "Grass" and not game.farm.wood_piles.has(cell): game.farm.woodland[cell] = Farm.CHOP_HOURS
+			game._show_farm())
+		column.add_child(button)
 	var skips := HBoxContainer.new()
 	for skip in [["+1 day", 1], ["+1 week", Calendar.DAYS_PER_WEEK], ["+1 month", Calendar.DAYS_PER_MONTH], ["Next season", 0]]:
 		var button := Button.new()
@@ -92,6 +108,9 @@ func apply_to_selected() -> void:
 	for cell in game.selected:
 		if game.farm.terrain != null and game.farm.terrain.cell_reason(cell) != "":
 			continue
+		game.farm.woodland.erase(cell)
+		game.farm.wood_piles.erase(cell)
+		game.farm.regrowth.erase(cell)
 		# Winter counts as lived through, so a winter crop set mid-growth keeps ripening.
 		game.farm.plots[cell] = {"stage": stage_name, "crop": crop_name, "growth": 1.0 if stage_name == "Ripe" else growth.value, "fertility": fertility.value, "wintered": true, "moisture": 0.0, "days": 0}
 	game._show_farm()

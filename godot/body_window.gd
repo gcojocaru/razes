@@ -7,7 +7,7 @@ extends "res://hud_window.gd"
 const BAR := 110.0
 const WIDTHS := [120.0, 190.0, BAR]
 ## Activities the effort table lists, by the name it shows.
-const EFFORTS := {"Sleeping": "Sleeping", "Idle": "Idle", "Cooking": "Cooking", "Walking": "Walking", "Sow": "Sowing, harvesting", "Plow": "Hoeing"}
+const EFFORTS := {"Sleeping": "Sleeping", "Idle": "Idle", "Cooking": "Cooking", "Walking": "Walking", "Sow": "Sowing, harvesting", "Plow": "Hoeing", "Chop": "Chopping", "Build": "Building"}
 
 ## Per row title: its value label and its third cell, a bar or a second label.
 var _values := {}
@@ -19,13 +19,18 @@ func _init() -> void:
 	_heading("Build")
 	for title in ["Height", "Weight", "Body fat", "Lean mass", "BMI"]:
 		_line(title)
-	_line("Health", Color(0.55, 0.75, 0.35), "Full down to a BMI of 18.5, gone at 12.5")
+	_line("Health", Color(0.55, 0.75, 0.35), "The lower of starvation and exposure health; starvation health is full at BMI 18.5 and gone at 12.5")
 	_heading("Energy")
 	_line("Basal", Color.TRANSPARENT, "Metabolism at rest, set by lean mass")
 	_line("Ready energy", TimeHud.GOLD, "Glycogen. Digested food refills it; once it is empty the body burns fat and muscle")
 	_line("Stomach", Color(0.75, 0.6, 0.4), "Porridge waiting to be digested")
 	_line("Digestion", Color.TRANSPARENT, "The gut absorbs at most 2.5 times basal metabolism")
 	_line("Burning now")
+	_heading("Exposure")
+	_line("Temperature")
+	_line("Wetness", Color("7195a6"))
+	_line("Exposure health", Color("97a76e"))
+	_line("Exposure")
 	_heading("Rest")
 	_line("Fatigue", Color(0.6, 0.65, 0.85), "Work and walking slow to 80% from 70% fatigue and to 60% from 90%")
 	_heading("Effort", "kcal an hour", "fatigue an hour")
@@ -47,6 +52,10 @@ func show_body(person: Human) -> void:
 	_show("Digestion", "up to %d kcal an hour" % roundi(person.digestion()))
 	var action: String = person.job.get("action", "Idle") if person.activity == "Working" else person.activity
 	_show("Burning now", "%s · %d kcal an hour" % [person.activity, roundi(person.burn(action))] if action in Human.EFFORT else person.activity)
+	_show("Temperature", "%.1f°C" % person.exposure.core)
+	_show("Wetness", "%d%%" % roundi(person.exposure.wetness * 100), person.exposure.wetness)
+	_show("Exposure health", "%d%%" % roundi(person.exposure.health), person.exposure.health / 100)
+	_show("Exposure", person.exposure.warning())
 	_show("Fatigue", "%d%% · pace %d%%" % [roundi(person.fatigue), roundi(person.pace() * 100.0)], person.fatigue / 100.0)
 	for effort in EFFORTS:
 		_show(EFFORTS[effort], "%d" % roundi(person.burn(effort)), "%+.1f" % person.tiring(effort))

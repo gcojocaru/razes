@@ -43,3 +43,12 @@ func on(day: int) -> Dictionary:
 	elif wetness > wet - CLOUD_MARGIN[season]:
 		condition = "Cloudy"
 	return {"temperature": roundi(temperature), "condition": condition}
+
+## Hourly exposure weather; daily crop means remain the on(day) contract.
+func at(day: int, hour: float) -> Dictionary:
+	var sample_day := day + floori(hour / 24.0)
+	var clock := fposmod(hour, 24.0)
+	var daily := on(sample_day)
+	var winds := {"Clear":2.0, "Cloudy":3.0, "Rain":4.0, "Storm":8.0, "Snow":4.0}
+	var sunlight: float = maxf(0.0, Calendar.sun(sample_day, clock).y) * {"Clear":1.0, "Cloudy":0.35, "Rain":0.15, "Storm":0.1, "Snow":0.2}[daily.condition]
+	return {"temperature":daily.temperature + 4.0 * sin(TAU * (clock - 9.0) / 24.0), "condition":daily.condition, "wind":winds[daily.condition], "sunlight":sunlight}

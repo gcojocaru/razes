@@ -114,7 +114,7 @@ func run() -> void:
 	var millet_day := Calendar.DAYS_PER_MONTH * 2
 	var beds: Array = [Vector2i(0, 0), Vector2i(1, 0), Vector2i(2, 0), Vector2i(3, 0), Vector2i(4, 0), Vector2i(5, 0), Vector2i(6, 0)]
 	small.work(beds, millet_day, "Plow")
-	check(small.preview(beds, millet_day, "Sow", "Millet") == {"plots": 6, "grain": -1800}, "Six millet beds cost exactly 1.8 kg; a seventh is unaffordable")
+	check(small.preview(beds, millet_day, "Sow", "Millet") == {"plots": 6, "grain": -1800, "wood": 0}, "Six millet beds cost exactly 1.8 kg; a seventh is unaffordable")
 	check(small.work(beds, millet_day, "Sow", "Millet") == 6 and small.stock.Millet == 0 and small.stage(beds[-1]) == "Plowed", "The last 300 g of millet seed sows a bed without rounding or overdraft")
 	var worn: Dictionary = small.plots[beds[0]]
 	worn.fertility = 0.1
@@ -210,7 +210,7 @@ func run() -> void:
 	check(farm.preview(field, SPRING, "Sow", "Barley").plots == 0, "Sowing grass does nothing")
 	check(farm.work(field, SPRING, "Plow") == 4 and farm.stage(field[3]) == "Plowed", "Work plows every selected plot")
 	var forecast := farm.preview(field, SPRING, "", "Barley")
-	check(forecast == {"plots": 2, "grain": -barley.seed * 2} and farm.stage(field[0]) == "Plowed", "Preview forecasts sowing as far as grain lasts, changing nothing")
+	check(forecast == {"plots": 2, "grain": -barley.seed * 2, "wood": 0} and farm.stage(field[0]) == "Plowed", "Preview forecasts sowing as far as grain lasts, changing nothing")
 	check(farm.work(field, SPRING, "", "Barley") == forecast.plots and farm.stock.Barley == 1, "Work matches its preview")
 	check(farm.stage(field[1]) == "Sown" and farm.stage(field[2]) == "Plowed", "Sowing stops in order when that crop's seed runs out")
 	check(farm.action(field[2], SPRING, "Barley").reason == "Needs 2 kg barley seed" and farm.action(field[2], SPRING, "Oats").reason == "", "Each crop needs its own seed")
@@ -242,6 +242,9 @@ func run() -> void:
 	await process_frame
 	await process_frame
 	var game: Node3D = current_scene
+	# Crop fixtures start cleared and isolate weather-independent farming arithmetic.
+	game.farm.woodland.clear()
+	game.human.weather = null
 	game.farm.stock = OLD_STOCK.duplicate()
 	# A script error would stop this coroutine before quit() and hang the run.
 	if game == null or game.find_child("FarmHud", true, false) == null:

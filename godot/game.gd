@@ -86,12 +86,15 @@ var _stalks: ShaderMaterial
 var _water: ShaderMaterial
 var terrain_seed := randi()
 var terrain: RefCounted
+var _woodland: Node3D
 var _zoom := 36.0
 
 func _ready() -> void:
 	terrain = Terrain.new(terrain_seed, Terrain.land)
 	farm.terrain = terrain
+	farm.generate_woodland(terrain_seed)
 	human.terrain = terrain
+	human.weather = weather
 	_sun = DirectionalLight3D.new()
 	_sun.shadow_enabled = true
 	add_child(_sun)
@@ -143,6 +146,8 @@ func _ready() -> void:
 	water.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(water)
 	add_child(_crop_stalks())
+	_woodland = preload("res://woodland.gd").new(terrain, METRES_TO_UNITS, _crop_texture)
+	add_child(_woodland)
 	_human_actor = preload("res://human_actor.gd").new(METRES_TO_UNITS)
 	_human_actor.name = "HumanActor"
 	if not Human.peasant.is_empty():
@@ -191,6 +196,9 @@ func _ready() -> void:
 	hud.add_child(_wiki)
 	_food_window = preload("res://food_window.gd").new()
 	_food_window.prepare_requested.connect(_prepare_porridge)
+	_food_window.cancel_requested.connect(func() -> void:
+		human.cancel_meal(farm)
+		_show_farm())
 	hud.add_child(_food_window)
 	_sleep_window = preload("res://sleep_window.gd").new()
 	_sleep_window.sleep_requested.connect(_start_sleep)
@@ -216,6 +224,15 @@ func _ready() -> void:
 	_camp_menu.eat_selected.connect(_open_food)
 	_camp_menu.sleep_selected.connect(_open_sleep)
 	_camp_menu.move_selected.connect(_start_camp_placement)
+	_camp_menu.build_selected.connect(func() -> void:
+		human.build_shelter(farm)
+		_show_farm())
+	_camp_menu.recover_selected.connect(func() -> void:
+		human.recover()
+		_show_person())
+	_camp_menu.heat_selected.connect(func() -> void:
+		farm.heating_enabled = not farm.heating_enabled
+		_show_person())
 	hud.add_child(_camp_menu)
 	_camp_hint = Label.new()
 	_camp_hint.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
@@ -237,7 +254,7 @@ func _ready() -> void:
 
 ## Pauses and waits for a left click on dry, walkable ground for the camp.
 func _start_camp_placement() -> void:
-	if human.activity == "Dead":
+	if human.activity == "Dead" or farm.shelter:
 		return
 	_camp_menu.hide()
 	_farm_hud.action_wheel.hide()
@@ -248,6 +265,7 @@ func _start_camp_placement() -> void:
 
 ## Moves the camp under the pointer; a first camp also places the peasant there.
 func place_camp(screen_position: Vector2) -> bool:
+	if farm.shelter: return false
 	var hit = terrain.ray_hit(_camera.project_ray_origin(screen_position), _camera.project_ray_normal(screen_position))
 	if hit == null:
 		return false
@@ -260,6 +278,9 @@ func place_camp(screen_position: Vector2) -> bool:
 			_camp_hint.text = "Too steep for a camp; choose flatter ground"
 			return false
 	var cell := cell_at_world(Vector3(spot.x, 0, spot.y))
+	if not farm.can_camp(cell):
+		_camp_hint.text = "Clear and haul the woodland before camping there"
+		return false
 	if farm.stage(cell) in ["Sown", "Ripe"]:
 		_camp_hint.text = "Crops grow there; harvest or choose another plot"
 		return false
@@ -272,7 +293,7 @@ func place_camp(screen_position: Vector2) -> bool:
 		return false
 	human.home = terrain.camp / METRES_TO_UNITS
 	# Queued plots may no longer be reachable from the new camp.
-	if not human.queue.is_empty() or not human.job.is_empty():
+	if not human.queue.is_empty() or not human.job.is_empty() or human.build_reserved > 0:
 		human.cancel(farm)
 	if _first_camp:
 		human.position = human.home
@@ -336,20 +357,25 @@ func _end_game() -> void:
 
 func _show_date() -> void:
 	var hour := _day_time / seconds_per_day * 24.0
-	_time_hud.show_time(day, speed, today, hour)
+	_time_hud.show_time(day, speed, weather.at(day, hour), hour)
 	_weather_effects.show_time(day, hour)
 
 func _show_person(seconds := 0.0) -> void:
 	_human_actor.show_person(human, seconds)
 	_human_actor.position.y = terrain.height_at(human.position * METRES_TO_UNITS)
 	_human_hud.show_person(human)
+	farm.fire_lit = human.activity != "Dead" and human.position == human.home and (farm.heating_enabled or human.eating_requested) and (human.meal_fuel if human.eating_requested else farm.wood) > farm.fuel_remainder
+	_camp.get_node("Shelter").show_camp(farm, human)
+	_camp.get_node("Firelight").visible = farm.fire_lit
+	_camp.get_node("FireEmber").visible = farm.fire_lit
+	if _camp_menu != null: _camp_menu.show_camp(farm, human)
 	_human_hud.visible = not _inventory.visible and not _wiki.visible and not _food_window.visible and not _sleep_window.visible and not _body.visible
 	if _body.visible:
 		_body.show_body(human)
 	if _food_window.visible:
 		_food_window.show_food(farm, human)
 	if _sleep_window.visible:
-		_sleep_window.show_sleep(human)
+		_sleep_window.show_sleep(human, farm, day, _day_time / seconds_per_day * 24.0)
 
 func _focus_person() -> void:
 	_zoom = minf(_zoom, 8.0)
@@ -366,6 +392,7 @@ func _open_camp_menu(at := Vector2(-1, -1)) -> void:
 		_zoom = minf(_zoom, 8.0)
 		_place_camera(camp)
 		at = _camera.unproject_position(camp)
+	_camp_menu.show_camp(farm, human)
 	_camp_menu.open_at(at)
 
 func _open_food() -> void:
@@ -392,7 +419,7 @@ func _open_sleep() -> void:
 	_inventory.hide()
 	_body.hide()
 	_food_window.hide()
-	_sleep_window.show_sleep(human)
+	_sleep_window.show_sleep(human, farm, day, _day_time / seconds_per_day * 24.0)
 	_sleep_window.show()
 	_sleep_window.hours.get_line_edit().grab_focus()
 
@@ -470,6 +497,7 @@ func toggle(window: Control) -> void:
 
 ## Redraws crops and selection on the field and refreshes the farm panels.
 func _show_farm() -> void:
+	if is_instance_valid(_woodland): _woodland.refresh(farm, day)
 	for x in GRID_SIZE:
 		for y in GRID_SIZE:
 			var cell := Vector2i(x, y)
@@ -600,6 +628,7 @@ func _process(delta: float) -> void:
 	if is_instance_valid(_weather_audio):
 		_weather_effects.set_wind(_weather_audio.wind_direction, _weather_audio.wind_strength)
 		_stalks.set_shader_parameter("wind", _weather_audio.wind_direction * _weather_audio.wind_strength)
+		_woodland.show_conditions(_human_actor.position, _camera.position, _weather_audio.wind_direction * _weather_audio.wind_strength, snow_cover)
 	if speed > 0:
 		advance_time(delta * speed)
 		# Real time, not game time: at 144x a game-time stride only flickers.
@@ -669,7 +698,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_B: toggle(_body)
 			KEY_H: _focus_person()
 			KEY_R:
-				if human.sleep_remaining > 0:
+				if human.sleep_remaining > 0 or human.recovering:
 					_wake_up()
 				else:
 					_open_sleep()

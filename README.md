@@ -26,12 +26,57 @@ ponds: the least farmland) or **Custom** (0–24 m and 0–4 ponds). Farm dry,
 gentle slopes as usual; water, wet banks and steep plots show why they cannot
 be worked. The farmer follows dry routes around ponds for jobs, hauling, meals
 and sleep. A new game first pauses for you to click dry, gentle ground for the camp;
-the camp menu's **Move** shifts it later (Escape cancels). People, crops, picking and the camera follow the terrain. The ledger lists
+the camp menu's **Move** shifts it until a permanent shelter is completed (Escape cancels). People, crops, picking and the camera follow the terrain. The ledger lists
 usable plots and water; the field covers 2.56 hectares, with its farmable area
 varying by land and seed. Each start uses a fresh seed, with repeatable terrain
 for a given seed and land; **Restart** keeps the land on a fresh seed.
 
-Farming is the first gameplay loop. Click a plot or drag over a rectangle of
+Woodland now grows in seeded groves on about a quarter of usable plots. Select
+wooded plots and choose **Chop** in the field wheel, the axe button or **F**.
+Six game hours clears a plot and leaves **240 kg of usable wood** on the ground;
+the farmer then hauls it home in trips of at most **15 kg**. Ground piles and
+carried logs cannot fund construction or cooking. Cancellation keeps unfinished
+chopping and remaining piles; **Haul wood** resumes collection. Once the pile
+is gone, farm the cleared grass normally. Unused cleared grass regrows woodland
+after two game years; cultivation and camp occupation keep it clear. Trees are
+walkable and use the terrain's metre scale, seasonal leaves, wind and snow.
+Their models and texture licenses are in [woodland credits](godot/assets/woodland/SOURCE.md).
+
+At camp, **Build shelter** reserves **300 kg wood** for **8 hours of work**.
+Meals, sleep and recovery preserve its progress and queued field jobs. Clear
+jobs cancels unfinished construction and returns its reserved wood; moving an
+unfinished camp does the same. The completed timber hut becomes permanent.
+Its roof keeps rain and snow off, reduces wind and cold exposure, and shades the
+farmer. Comfortable sleep clears full fatigue in **6 hours** inside, **8 hours**
+outdoors. Its roof and walls fade while the farmer is home so the interior stays
+visible. The hut is an artistic interpretation inspired by a Romanian pastoral shelter.
+
+You begin with **48 kg wood**. Camp heating is enabled and burns **0.5 kg per
+game hour only while the farmer is home**. Toggle **Heat on/off** in the camp
+wheel; turn it off in hot weather. **Eat** reserves grain and cooking fuel
+atomically: a 300 g portion takes 30 minutes and 250 g of wood, sharing its
+fire with heating. A fractional-gram burn remainder retains precision. **Cancel
+pending meal** in Prepare food refunds unprepared grain and unused reserved
+fuel. Clear jobs preserves pending meals. The camp shows wood and burn duration;
+the flame and light extinguish when fuel runs out. Time controls pause fuel too.
+
+The farmer now gets wet and cold or overheats. The panel and **Body** show core
+temperature, wetness and exposure health. Hourly temperature varies around the
+daily crop mean; weather, wind, exertion, sweating, body mass, shivering, shelter
+and fire affect thermal balance. Cold costs extra calories. Warnings begin below
+36°C or above 38°C; damage begins below 35°C or above 39°C. Both starvation and
+exposure can end the game. These rates are game tuning, not medical predictions;
+[exposure notes](docs/historical-research.md#exposure--26-october-2026) record assumptions.
+
+**Recover** in the camp wheel preserves work and returns home to rest until wetness
+is at most 10% and temperature is 36.5–37.5°C. It provides no sleep bonus; **R** or
+Stop recovery ends it early. Recovery may need a roof, wood, or heating switched
+off. Warnings never automatically abandon work. Sleep previews now replay the
+actual walk, future weather, shelter and fuel exhaustion and show temperature,
+wetness and remaining wood. Clothing choices remain cosmetic; water, diet quality,
+illnesses and individual cold injuries are still abstracted.
+
+Farming is the farming loop. Click a plot or drag over a rectangle of
 plots; hold **Shift** to add to the selection. Without a mouse, move the view
 and press **Enter** to select the plot at its centre (**Shift+Enter** adds). The
 farm panel shows illustrated icons for each action the selection allows; hover
@@ -92,7 +137,7 @@ See [nutrition source notes](docs/historical-research.md#grain-calorie-reference
 
 Choose **Sleep** in the camp menu to enter the hours you want to sleep (up to
 24, with quarter-hour controls). Its live preview shows restedness, energy,
-weight, health and total time including the walk to camp. Eight hours of sleep
+weight, health and total time including the walk to camp. Eight comfortable hours outdoors or six in the shelter
 clear a full day's fatigue; sleep burns basal metabolism and creates no calories.
 Confirmation preserves field work, walks home and sleeps for the chosen hours,
 including during daytime. Work resumes when that time ends; **Wake up** or
@@ -133,8 +178,8 @@ Sixteen idle hours awake build 70% fatigue and a day with nine hours of hoeing
 at 80% pace, from 90% at 60%. At zero health a centred **Game Over** message
 appears and gameplay, time and debug skips stop. Restart or Enter begins a fresh
 farm. F4 skips otherwise advance the farmer as well as the crops. Pause stops
-both; weather audio continues. Water, cooking fuel, hulls and milling losses,
-diet quality and weather exposure are still abstracted, and the fatigue and pace
+both; weather audio continues. Water, hulls and milling losses,
+diet quality and illnesses are still abstracted, and the fatigue and pace
 figures are game tuning. See the
 [body sources](docs/historical-research.md#body-and-needs-model--25-october-2026).
 
@@ -252,6 +297,10 @@ script), then run the tests:
 ./godot/run.sh --headless --script tests/test_terrain.gd
 ./godot/run.sh --headless --script tests/test_terrain_scene.gd
 ./godot/run.sh --headless --script tests/test_terrain_human.gd
+./godot/run.sh --headless --script tests/test_woodland.gd
+./godot/run.sh --headless --script tests/test_shelter.gd
+./godot/run.sh --headless --script tests/test_exposure.gd
+./godot/run.sh --headless --script tests/test_woodland_scene.gd
 ```
 
 The menu test checks title spelling/font coverage, version, initial keyboard focus,
@@ -330,3 +379,15 @@ part of this reset and first menu.
 The menu now uses a generated fortress landscape and aurochs game icon. See
 [artwork and generation prompts](godot/assets/ART.md) for the bundled assets and
 how the painting, gold ornament and accessible controls fit together.
+
+For terrain/weather survival checks and native captures:
+
+```sh
+LAND=Hills TARGET=20 WORK=6 YEARS=2 ./godot/run.sh --headless --script tests/sim_first_year.gd -- 3 plan
+./godot/run.sh --rendering-method gl_compatibility --script tests/capture_survival.gd
+```
+
+`LAND` accepts Steppe, Hills, Lakeland and Custom (the highest hills/four ponds).
+The scripted player explicitly orders chopping, building, food, sleep and recovery;
+it does not grant these decisions to the in-game farmer. Captures and frame-time
+comparisons are written to `/private/tmp/razes-survival-captures` and stdout.

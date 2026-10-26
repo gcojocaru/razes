@@ -112,6 +112,8 @@ func show_farm(farm: Farm, cells: Array, day: int, seed_crop: String, queued: Ar
 		buttons[action].visible = result.plots > 0
 		buttons[action].accessibility_name = verb
 		buttons[action].tooltip_text = "%s %d" % [verb, result.plots] + ("" if result.grain == 0 else "  %s%s kg" % ["+" if result.grain > 0 else "", Farm.kg(result.grain)]) + "\nQueues work for the farmer; F queues every ready action"
+		if result.wood > 0:
+			buttons[action].tooltip_text = "%s %d plots · %s kg wood to haul\nF queues every ready action" % [action, result.plots, Farm.kg(result.wood)]
 	action_button.visible = not cells.is_empty()
 	action_wheel.show_farm(farm, cells, day, seed_crop, queued)
 	if seed_crop != "":
@@ -154,7 +156,14 @@ func show_farm(farm: Farm, cells: Array, day: int, seed_crop: String, queued: Ar
 				_plot_label.text = stage
 		if farm.terrain != null and farm.terrain.cell_reason(cell) != "":
 			_plot_label.text = farm.terrain.cell_reason(cell)
-		notes.append(reasons.keys()[0] if reasons else NOTES[stage])
+		if farm.woodland.has(cell):
+			_plot_label.text = "Woodland"
+			notes.append("%s h chopping left · 240 kg wood" % String.num(farm.woodland[cell], 1))
+		elif farm.wood_piles.has(cell):
+			_plot_label.text = "Wood pile"
+			notes.append("%s kg waiting for hauling" % Farm.kg(farm.wood_piles[cell]))
+		else:
+			notes.append(reasons.keys()[0] if reasons else NOTES[stage])
 		if stage in ["Sown", "Ripe"]:
 			_detail_label.tooltip_text = ("Expected harvest: about %s kg" if stage == "Sown" else "Harvest: %s kg") % Farm.kg(farm.harvest_yield(cell))
 	else:

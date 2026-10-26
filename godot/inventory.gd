@@ -49,6 +49,7 @@ func show_inventory(farm: Farm, day: int) -> void:
 	# Empty slots fill out the last row, and at least two rows show.
 	for i in maxi(2 * COLUMNS, ceili(bags / float(COLUMNS)) * COLUMNS) - bags:
 		grid.add_child(_slot("", 0, 0))
+	body.add_child(_label("Wood: %s kg deposited · %s kg on the ground" % [Farm.kg(farm.wood), Farm.kg(farm.ground_wood())], TimeHud.GOLD))
 	var gap := Control.new()
 	gap.custom_minimum_size.y = 10
 	body.add_child(gap)

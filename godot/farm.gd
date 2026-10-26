@@ -51,7 +51,25 @@ const YEARLY_REST := 0.25
 const MIN_FERTILITY := 0.1
 ## Index order is what the field shaders draw; a cell missing from plots is untouched grass.
 const STAGES := ["Grass", "Plowed", "Sown", "Ripe", "Stubble", "Withered"]
-const ACTIONS := ["Plow", "Sow", "Harvest"]
+const ACTIONS := ["Plow", "Sow", "Harvest", "Chop", "Haul wood"]
+const CHOP_HOURS := 6.0
+const WOOD_YIELD := 240000
+const REGROW_DAYS := 2 * Calendar.DAYS_PER_YEAR
+
+## Wood is usable dry mass, separate from grain. Values are initial game tuning.
+const SHELTER_WOOD := 300000
+const FUEL_PER_HOUR := 500.0
+var wood := 48000
+var shelter := false
+var heating_enabled := true
+var fire_lit := false
+## Fractional grams accrued since the last whole gram was burned.
+var fuel_remainder := 0.0
+
+## Cell -> chopping hours left, ground grams, and day cleared/last cultivated.
+var woodland := {}
+var wood_piles := {}
+var regrowth := {}
 
 ## Crop name -> grams in store. All mass in the model is integer grams.
 var stock: Dictionary = STARTING_STOCK.duplicate()
@@ -64,6 +82,50 @@ var plots := {}
 var years := {}
 ## Optional shared playable terrain; standalone crop simulations stay flat.
 var terrain: RefCounted
+
+func fuel_hours() -> float:
+	return maxf(0.0, wood - fuel_remainder) / FUEL_PER_HOUR
+
+func generate_woodland(seed_value: int) -> void:
+	var usable: Array[Vector2i] = []
+	for x in 16:
+		for y in 16:
+			var cell := Vector2i(x, y)
+			if terrain == null or terrain.cell_reason(cell) == "":
+				usable.append(cell)
+	var count := mini(floori(usable.size() * 0.25), maxi(0, usable.size() - 16))
+	var noise := FastNoiseLite.new()
+	noise.seed = seed_value
+	noise.frequency = 0.24
+	usable.sort_custom(func(a: Vector2i, b: Vector2i) -> bool:
+		return noise.get_noise_2d(a.x, a.y) > noise.get_noise_2d(b.x, b.y))
+	for index in count:
+		woodland[usable[index]] = CHOP_HOURS
+
+func ground_wood() -> int:
+	var total := 0
+	for grams: int in wood_piles.values(): total += grams
+	return total
+
+func can_camp(cell: Vector2i) -> bool:
+	return not woodland.has(cell) and not wood_piles.has(cell)
+
+## Preview/forecast copies own every mutable resource and plot collection.
+func copy_state() -> Farm:
+	var copy := Farm.new()
+	copy.terrain = terrain
+	copy.stock = stock.duplicate()
+	copy.plots = plots.duplicate(true)
+	copy.years = years.duplicate(true)
+	copy.wood = wood
+	copy.shelter = shelter
+	copy.heating_enabled = heating_enabled
+	copy.fire_lit = fire_lit
+	copy.fuel_remainder = fuel_remainder
+	copy.woodland = woodland.duplicate()
+	copy.wood_piles = wood_piles.duplicate()
+	copy.regrowth = regrowth.duplicate()
+	return copy
 
 ## Display kilograms without losing gram precision or adding trailing zeroes.
 static func kg(grams: int) -> String:
@@ -132,6 +194,10 @@ func action(cell: Vector2i, day: int, seed_crop := "") -> Dictionary:
 		var reason: String = terrain.cell_reason(cell)
 		if reason != "":
 			return {"name": "Plow", "reason": reason}
+	if wood_piles.has(cell):
+		return {"name": "Haul wood", "reason": ""}
+	if woodland.has(cell):
+		return {"name": "Chop", "reason": ""}
 	var season: int = Calendar.date(day).season
 	match stage(cell):
 		"Plowed":
@@ -152,6 +218,15 @@ func act(cell: Vector2i, day: int, seed_crop := "") -> bool:
 	var next := action(cell, day, seed_crop)
 	if next.reason != "":
 		return false
+	if next.name == "Chop":
+		woodland.erase(cell)
+		wood_piles[cell] = WOOD_YIELD
+		regrowth[cell] = day
+		return true
+	if next.name == "Haul wood":
+		wood += wood_piles[cell]
+		wood_piles.erase(cell)
+		return true
 	var plot: Dictionary = plots.get(cell, {"fertility": 1.0, "crop": ""})
 	match next.name:
 		"Plow":
@@ -189,12 +264,19 @@ func work(cells: Array, day: int, name := "", seed_crop := "") -> int:
 
 ## What `work` would do, without doing it: {"plots": worked, "grain": change in grams stored}.
 func preview(cells: Array, day: int, name := "", seed_crop := "") -> Dictionary:
-	var trial := Farm.new()
-	trial.terrain = terrain
-	trial.stock = stock.duplicate()
-	trial.plots = plots.duplicate(true)
-	var done := trial.work(cells, day, name, seed_crop)
-	return {"plots": done, "grain": trial.stored() - stored()}
+	var trial := copy_state()
+	var done := 0
+	var to_haul := 0
+	var counted := {}
+	for cell in cells:
+		var next := trial.action(cell, day, seed_crop)
+		if name not in ["", next.name] or next.reason != "": continue
+		var grams: int = WOOD_YIELD if next.name == "Chop" else trial.wood_piles.get(cell, 0) if next.name == "Haul wood" else 0
+		if trial.act(cell, day, seed_crop):
+			done += 1
+			if not counted.has(cell): to_haul += grams
+			if grams > 0: counted[cell] = true
+	return {"plots": done, "grain": trial.stored() - stored(), "wood": to_haul}
 
 ## All grain in store, in grams.
 func stored() -> int:
@@ -214,6 +296,12 @@ static func daily_growth(name: String, weather: Dictionary) -> float:
 ## them, growing days count towards the harvest's size, warmth lets grass back
 ## onto stubble and dead crops, and land without a crop regains fertility.
 func grow(weather: Dictionary, day: int) -> void:
+	for cell in regrowth.keys():
+		if stage(cell) != "Grass" or (terrain != null and terrain.cell_reason(cell) == "Camp") or wood_piles.has(cell):
+			regrowth[cell] = day
+		elif day - regrowth[cell] >= REGROW_DAYS:
+			woodland[cell] = CHOP_HOURS
+			regrowth.erase(cell)
 	var winter: bool = Calendar.date(day).season == 3
 	var warmth: float = clampf((weather.temperature - 5) / 15.0, 0.0, 1.0)
 	for plot in plots.values():

@@ -2,6 +2,7 @@ extends "res://hud_window.gd"
 ## Inventory-style ingredient choice and an explicit porridge preparation order.
 
 signal prepare_requested(crop: String, grams: int)
+signal cancel_requested
 
 const Inventory := preload("res://inventory.gd")
 const GrainSlot := preload("res://grain_slot.gd")
@@ -9,6 +10,7 @@ const GrainSlot := preload("res://grain_slot.gd")
 var selected_crop := ""
 var quantity := SpinBox.new()
 var prepare := Button.new()
+var cancel_meal := Button.new()
 var grain_buttons: Array[Button] = []
 var _grid := GridContainer.new()
 var _selection := Label.new()
@@ -62,6 +64,11 @@ func _init() -> void:
 	TimeHud.style_button(prepare, TimeHud.serif_font())
 	prepare.pressed.connect(_prepare)
 	recipe.add_child(prepare)
+	cancel_meal.text = "Cancel pending meal"
+	TimeHud.style_button(cancel_meal, TimeHud.serif_font())
+	cancel_meal.pressed.connect(cancel_requested.emit)
+	cancel_meal.hide()
+	recipe.add_child(cancel_meal)
 
 func show_food(farm: Farm, person) -> void:
 	_farm = farm
@@ -109,6 +116,7 @@ func _refresh_recipe() -> void:
 	_selection.text = "%s · %s kg available" % [selected_crop if selected_crop != "" else "No grain", Farm.kg(available)]
 	var valid_amount: bool = is_finite(quantity.value) and quantity.value >= 1 and quantity.value == floor(quantity.value) and quantity.value <= available
 	_reason.text = ""
+	cancel_meal.visible = _person.eating_requested
 	if _person.activity == "Dead":
 		_reason.text = "Game Over"
 	elif _person.eating_requested:
@@ -119,15 +127,19 @@ func _refresh_recipe() -> void:
 		_reason.text = "Your inventory has no available grain."
 	elif not valid_amount:
 		_reason.text = "Choose an amount from the available grain."
+	elif valid_amount and _farm.wood < ceili(Human.porridge(selected_crop, int(quantity.value)).hours * Farm.FUEL_PER_HOUR + _farm.fuel_remainder - Human.EPSILON):
+		_reason.text = "Not enough wood for the cooking fire."
 	elif quantity.value > room:
 		_reason.text = "Too full: the stomach has room for %d g." % room
 	prepare.disabled = _reason.text != ""
 	var now := "Energy now: %d kcal · Stomach room: %d g" % [roundi(_person.glycogen), room]
 	if valid_amount:
 		var recipe: Dictionary = Human.porridge(selected_crop, int(quantity.value))
-		_preview.text = "%d kcal / 100 g dry grain\nMeal: %s kcal · %s min preparation\n%s" % [Farm.CROPS[selected_crop].kcal_per_100g, String.num(recipe.calories, 2).trim_suffix(".0"), String.num(recipe.hours * 60, 1).trim_suffix(".0"), now]
+		_preview.text = "%d kcal / 100 g dry grain\nMeal: %s kcal · %s min preparation\nCooking fuel: %s kg · deposited wood: %s kg\n%s" % [Farm.CROPS[selected_crop].kcal_per_100g, String.num(recipe.calories, 2).trim_suffix(".0"), String.num(recipe.hours * 60, 1).trim_suffix(".0"), Farm.kg(ceili(recipe.hours * Farm.FUEL_PER_HOUR + _farm.fuel_remainder - Human.EPSILON)), Farm.kg(_farm.wood), now]
 	else:
 		_preview.text = now
+	if _person.exposure.core < 36 or _person.exposure.core > 38:
+		_preview.text += "\n" + _person.exposure.warning()
 	_reason.visible = _reason.text != ""
 
 func _prepare() -> void:

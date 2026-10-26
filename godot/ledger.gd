@@ -41,6 +41,7 @@ func show_ledger(farm: Farm, day: int) -> void:
 	_fit()
 
 func _show_fields(farm: Farm) -> void:
+	body.add_child(_label("Woodland: %d plots · Ground wood: %s kg · Store: %s kg" % [farm.woodland.size(), Farm.kg(farm.ground_wood()), Farm.kg(farm.wood)], TimeHud.GOLD))
 	var by_crop := {}
 	var land := {}
 	var soil := 0.0

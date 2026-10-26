@@ -1,15 +1,17 @@
 class_name Human
 extends RefCounted
+const Exposure := preload("res://exposure.gd")
 ## One farmer; positions are metres and all carried/reserved mass is integer grams.
 ## Needs follow from a simulated body: lean mass sets basal metabolism, each activity
 ## burns a multiple of it, meals digest into glycogen, and fat and lean tissue store
 ## any surplus and pay any deficit. Health follows body mass; tiredness slows work.
 
 const WALK_SPEED := 4500.0
-const WORK_HOURS := {"Plow": 3.0, "Sow": 0.5, "Harvest": 2.0}
+const WORK_HOURS := {"Plow": 3.0, "Sow": 0.5, "Harvest": 2.0, "Chop": 6.0, "Haul wood": 0.01}
 const BAG_CAPACITY := 15000
 const MEAL_GRAMS := 300
 const MEAL_HOURS := 0.5
+const BUILD_HOURS := 8.0
 const MAX_SLEEP_HOURS := 24.0
 const EPSILON := 0.00000001
 
@@ -20,7 +22,7 @@ const START_FAT := 9.75
 const START_LEAN := 55.25
 ## Energy use as multiples of basal metabolism: FAO 2004 physical activity ratios,
 ## and about 5 METs for hoeing (Compendium of Physical Activities).
-const EFFORT := {"Sleeping": 1.0, "Idle": 1.4, "Cooking": 2.1, "Walking": 3.2, "Sow": 4.1, "Harvest": 4.1, "Plow": 5.0}
+const EFFORT := {"Sleeping": 1.0, "Idle": 1.4, "Cooking": 2.1, "Walking": 3.2, "Sow": 4.1, "Harvest": 4.1, "Plow": 5.0, "Chop": 5.5, "Haul wood": 2.1, "Build": 4.1, "Recovering": 1.4}
 ## kcal in a kilogram of fat and of lean tissue, which is mostly water. By Forbes' rule
 ## each kilogram of fat lost takes FORBES / fat kilograms of lean with it (Hall 2008).
 const FAT_KCAL := 9400.0
@@ -76,13 +78,23 @@ var fatigue := 0.0
 ## 100 down to 0 as the body falls from a BMI of 18.5 to 12.5.
 var health: float:
 	get:
-		return 0.0 if activity == "Dead" else clampf(inverse_lerp(DEATH_BMI, HEALTHY_BMI, bmi()), 0.0, 1.0) * 100.0
+		return 0.0 if activity == "Dead" else minf(exposure.health, clampf(inverse_lerp(DEATH_BMI, HEALTHY_BMI, bmi()), 0.0, 1.0) * 100.0)
 var message := "Ready for work"
 var sleep_remaining := 0.0
 var eating_requested := false
 var meal_crop := ""
 var meal_grams := 0
 var advanced_hours := 0.0
+var build_remaining := 0.0
+var build_reserved := 0
+var meal_fuel := 0
+var _farm: Farm
+var weather: Weather
+var exposure = Exposure.new()
+var recovering := false
+var _absolute_hour := 0.0
+var _thermal_key := []
+var _thermal_rate := {"wet":0.0, "temperature":0.0}
 ## Navigation is in world units; the needs simulation keeps metres.
 var terrain: RefCounted
 var terrain_scale := 0.2
@@ -126,7 +138,7 @@ func order(farm: Farm, cells: Array, day: int, action := "", crop := "") -> int:
 		var seed: int = Farm.CROPS[crop].seed if next.name == "Sow" else 0
 		if seed:
 			farm.stock[crop] -= seed
-		queue.append({"action": next.name, "cell": cell, "crop": crop if next.name == "Sow" else farm.crop(cell), "remaining": WORK_HOURS[next.name], "seed": seed})
+		queue.append({"action": next.name, "cell": cell, "crop": crop if next.name == "Sow" else farm.crop(cell), "remaining": farm.woodland[cell] if next.name == "Chop" else WORK_HOURS[next.name], "seed": seed})
 		added += 1
 	if added:
 		message = "%d job%s queued" % [added, "" if added == 1 else "s"]
@@ -156,13 +168,16 @@ func basal() -> float:
 ## step of effort above basal (one MET), so weight and loads make it dearer.
 func burn(action: String) -> float:
 	var effort: float = EFFORT[action]
-	if action == "Walking" or action in WORK_HOURS:
-		return basal() + (effort - 1.0) * (mass() + carried / 1000.0)
-	return basal() * effort
+	var cost := basal() * effort
+	if action == "Walking" or action in WORK_HOURS or action == "Build":
+		cost = basal() + (effort - 1.0) * (mass() + carried / 1000.0)
+	return cost + (exposure.extra_energy(basal()) if weather != null else 0.0)
 
 ## Fatigue points an hour `action` adds, or clears when negative.
 func tiring(action: String) -> float:
-	return -100.0 / SLEEP_HOURS if action == "Sleeping" else AWAKE_TIRING + EFFORT_TIRING * (EFFORT[action] - EFFORT.Idle)
+	if action == "Sleeping":
+		return -100.0 / (6.0 if _farm != null and _farm.shelter and position == home else SLEEP_HOURS) * (1.0 if exposure.comfortable() else 0.6)
+	return AWAKE_TIRING + EFFORT_TIRING * (EFFORT[action] - EFFORT.Idle)
 
 ## kcal an hour the gut absorbs while there is food in it.
 func digestion() -> float:
@@ -174,6 +189,8 @@ func pace() -> float:
 	for tired in TIRED_PACE:
 		if fatigue >= tired - EPSILON:
 			result = TIRED_PACE[tired]
+	if exposure.core < 35.0 or exposure.core > 39.0: result *= 0.6
+	elif not exposure.comfortable(): result *= 0.8
 	return result
 
 ## Grams of dry grain the stomach has room for.
@@ -188,10 +205,45 @@ func cancel(farm: Farm) -> void:
 			farm.stock[waiting.crop] += waiting.seed
 	if not job.is_empty() and job.seed:
 		farm.stock[job.crop] += job.seed - (carried if _carrying_seed else 0)
+	if build_reserved > 0:
+		farm.wood += build_reserved
+	build_reserved = 0
+	build_remaining = 0.0
+	recovering = false
 	queue.clear()
 	job = {}
 	_returning_home = true
 	message = "Jobs cleared; returning home"
+
+func build_shelter(farm: Farm) -> bool:
+	if activity == "Dead" or health <= 0 or farm.shelter or build_reserved > 0:
+		return false
+	if eating_requested or sleep_remaining > 0:
+		message = "Finish the meal or wake before starting construction"
+		return false
+	if farm.wood < Farm.SHELTER_WOOD:
+		message = "Shelter needs 300 kg deposited wood"
+		return false
+	if not _reachable(position, home):
+		message = "No dry route to camp"
+		return false
+	_farm = farm
+	farm.wood -= Farm.SHELTER_WOOD
+	build_reserved = Farm.SHELTER_WOOD
+	build_remaining = BUILD_HOURS
+	message = "Returning home to build the shelter"
+	return true
+
+func cancel_meal(farm: Farm) -> void:
+	if not eating_requested: return
+	farm.stock[meal_crop] += meal_grams
+	farm.wood += meal_fuel
+	meal_fuel = 0
+	meal_crop = ""
+	meal_grams = 0
+	_cooking_remaining = 0.0
+	eating_requested = false
+	_farm_changed = true
 
 func sleep(hours: Variant) -> bool:
 	if activity == "Dead" or health <= 0.0 or sleep_remaining > 0.0 or eating_requested:
@@ -206,39 +258,59 @@ func sleep(hours: Variant) -> bool:
 	message = "Returning home to sleep"
 	return true
 
+func recover() -> bool:
+	if activity == "Dead" or health <= 0 or eating_requested or sleep_remaining > 0:
+		message = "Finish the meal or wake before recovering"
+		return false
+	if not _reachable(position, home):
+		message = "No dry route to camp"
+		return false
+	recovering = true
+	message = "Returning to camp to recover; field work preserved"
+	return true
+
 func wake_up() -> void:
+	if recovering:
+		recovering = false
+		activity = "Idle"
+		message = "Recovery ended; resuming work"
 	if activity != "Dead" and health > 0.0 and sleep_remaining > 0.0:
 		sleep_remaining = 0.0
 		if activity == "Sleeping":
 			activity = "Idle"
 		message = "Awake; resuming work"
 
-func sleep_prediction(hours: Variant) -> Dictionary:
+func sleep_prediction(hours: Variant, context: Farm = null, day := 0, hour := 0.0) -> Dictionary:
 	var forecast := Human.new()
-	for property in ["position", "home", "carried", "carried_crop", "height", "fat", "lean", "glycogen", "stomach", "stomach_kcal", "fatigue", "terrain", "terrain_scale"]:
+	for property in ["position", "home", "carried", "carried_crop", "height", "fat", "lean", "glycogen", "stomach", "stomach_kcal", "fatigue", "terrain", "terrain_scale", "weather", "activity", "eating_requested", "sleep_remaining", "build_remaining", "build_reserved", "recovering", "_carrying_seed", "_returning_home", "_absolute_hour"]:
 		forecast.set(property, get(property))
+	forecast.exposure = exposure.copy_state()
+	forecast.job = job.duplicate(true)
+	forecast.queue = queue.duplicate(true)
 	forecast._route = _route.duplicate()
 	forecast._route_destination = _route_destination
-	if not forecast.sleep(hours):
-		return {}
-	var farm := Farm.new()
+	forecast._thermal_key = _thermal_key.duplicate()
+	forecast._thermal_rate = _thermal_rate.duplicate()
+	var source: Farm = context if context != null else _farm
+	var farm := source.copy_state() if source != null else Farm.new()
+	forecast._farm = farm
+	if not forecast.sleep(hours): return {}
 	var elapsed := 0.0
-	# Tiredness can slow the walk home, so walk until there before sleeping.
 	while forecast.position != forecast.home and forecast.activity != "Dead":
-		forecast.advance(farm, 0, 0, forecast.position.distance_to(forecast.home) / (WALK_SPEED * forecast.pace()))
+		forecast.advance(farm, day, hour + elapsed, forecast.position.distance_to(forecast.home) / (WALK_SPEED * forecast.pace()))
 		elapsed += forecast.advanced_hours
-		if forecast.sleep_remaining == 0.0 and forecast.activity != "Dead":
-			return {}
-	forecast.advance(farm, 0, 0, float(hours))
-	return {"fatigue": forecast.fatigue, "glycogen": forecast.glycogen, "mass": forecast.mass(), "health": forecast.health, "hours": elapsed + forecast.advanced_hours}
+		if forecast.sleep_remaining == 0.0 and forecast.activity != "Dead": return {}
+	forecast.advance(farm, day, hour + elapsed, float(hours))
+	return {"fatigue":forecast.fatigue, "glycogen":forecast.glycogen, "mass":forecast.mass(), "health":forecast.health, "hours":elapsed + forecast.advanced_hours, "core":forecast.exposure.core, "wetness":forecast.exposure.wetness, "exposure_health":forecast.exposure.health, "wood":farm.wood}
 
 static func porridge(crop: String, grams: int) -> Dictionary:
-	# shortcut: water, fuel, milling losses and weather exposure are abstracted; model them before expanding survival.
+	# shortcut: water and milling losses are abstracted; model them before adding thirst or processing.
 	if crop not in Farm.CROPS or grams <= 0:
 		return {}
 	return {"hours": MEAL_HOURS * grams / MEAL_GRAMS, "calories": grams * Farm.CROPS[crop].kcal_per_100g / 100.0}
 
 func eat(farm: Farm, crop: String, grams: Variant) -> bool:
+	_farm = farm
 	if activity == "Dead" or health <= 0.0 or eating_requested or sleep_remaining > 0.0:
 		return false
 	if crop not in Farm.CROPS or typeof(grams) != TYPE_INT or grams <= 0:
@@ -253,7 +325,13 @@ func eat(farm: Farm, crop: String, grams: Variant) -> bool:
 	if not _reachable(position, home):
 		message = "No dry route to camp"
 		return false
+	var fuel := ceili(porridge(crop, grams).hours * Farm.FUEL_PER_HOUR + farm.fuel_remainder - EPSILON)
+	if farm.wood < fuel:
+		message = "Not enough wood for cooking: needs %s kg" % Farm.kg(fuel)
+		return false
 	farm.stock[crop] -= grams
+	farm.wood -= fuel
+	meal_fuel = fuel
 	meal_crop = crop
 	meal_grams = grams
 	_cooking_remaining = porridge(crop, grams).hours
@@ -264,12 +342,15 @@ func eat(farm: Farm, crop: String, grams: Variant) -> bool:
 ## The caller owns the calendar and splits at midnight; events also split each minute.
 func advance(farm: Farm, day: int, hour: float, hours: float) -> bool:
 	advanced_hours = 0.0
+	_farm = farm
 	if activity == "Dead" or hours <= 0.0:
 		return false
 	_farm_changed = false
 	while hours - advanced_hours > EPSILON:
-		var now := fposmod(hour + advanced_hours, 24.0)
-		var step := minf(hours - advanced_hours, 1.0 / 60.0)
+		_absolute_hour = day * 24.0 + hour + advanced_hours
+		var now := fposmod(_absolute_hour, 24.0)
+		var minute_end := (floorf((_absolute_hour + EPSILON) * 60.0) + 1.0) / 60.0
+		var step := minf(hours - advanced_hours, maxf(EPSILON * 2.0, minute_end - _absolute_hour))
 		for boundary in [6.0, 22.0, 24.0]:
 			if boundary - now > EPSILON:
 				step = minf(step, boundary - now)
@@ -277,6 +358,7 @@ func advance(farm: Farm, day: int, hour: float, hours: float) -> bool:
 		advanced_hours += used
 		if activity == "Dead":
 			break
+	farm.fire_lit = activity != "Dead" and position == home and (eating_requested or farm.heating_enabled) and (meal_fuel if eating_requested else farm.wood) > farm.fuel_remainder + EPSILON
 	return _farm_changed
 
 func _step(farm: Farm, day: int, _hour: float, hours: float) -> float:
@@ -287,7 +369,7 @@ func _step(farm: Farm, day: int, _hour: float, hours: float) -> float:
 		position = home
 		_deposit(farm)
 		_returning_home = false
-	var return_home := eating_requested or sleep_remaining > 0.0 or _returning_home or (carried > 0 and (not _carrying_seed or job.is_empty()))
+	var return_home := eating_requested or sleep_remaining > 0.0 or build_remaining > 0.0 or recovering or _returning_home or (carried > 0 and (not _carrying_seed or job.is_empty()))
 	if return_home and position != home:
 		return _walk(farm, home, hours)
 	if eating_requested:
@@ -297,6 +379,8 @@ func _step(farm: Farm, day: int, _hour: float, hours: float) -> float:
 		if _cooking_remaining <= EPSILON and activity != "Dead":
 			stomach += meal_grams
 			stomach_kcal += porridge(meal_crop, meal_grams).calories
+			farm.wood += meal_fuel
+			meal_fuel = 0
 			eating_requested = false
 			meal_crop = ""
 			meal_grams = 0
@@ -310,6 +394,29 @@ func _step(farm: Farm, day: int, _hour: float, hours: float) -> float:
 			sleep_remaining = 0.0
 			activity = "Idle"
 			message = "Awake; resuming work"
+		return used
+	if recovering:
+		if exposure.recovered():
+			recovering = false
+			message = "Recovered; resuming work"
+		else:
+			activity = "Recovering"
+			message = "Recovering at camp; queued work preserved"
+			if exposure.core < 36.5 and (not farm.heating_enabled or farm.wood <= 0): message = "Too cold: enable heating and supply wood"
+			elif exposure.core > 38 and farm.heating_enabled: message = "Too hot: turn heating off while recovering"
+			elif exposure.wetness > 0.1 and not farm.shelter: message = "Open camp may stay wet in rain; build a shelter"
+			return _spend(hours, "Recovering")
+	if build_remaining > 0.0:
+		activity = "Building"
+		var rate := pace()
+		var used := _spend(minf(hours, build_remaining / rate), "Build")
+		build_remaining = maxf(0.0, build_remaining - used * rate)
+		_farm_changed = true
+		if build_remaining <= EPSILON and activity != "Dead":
+			build_remaining = 0.0
+			build_reserved = 0
+			farm.shelter = true
+			message = "Shelter complete"
 		return used
 	if job.is_empty() and not queue.is_empty():
 		job = queue.pop_front()
@@ -330,6 +437,8 @@ func _step(farm: Farm, day: int, _hour: float, hours: float) -> float:
 	var rate := pace()
 	var used := _spend(minf(hours, job.remaining / rate), job.action)
 	job.remaining = maxf(0.0, job.remaining - used * rate)
+	if job.action == "Chop" and farm.woodland.has(job.cell):
+		farm.woodland[job.cell] = job.remaining
 	if job.remaining <= EPSILON and activity != "Dead":
 		_finish_job(farm, day)
 	return used
@@ -352,14 +461,14 @@ func _walk(farm: Farm, destination: Vector2, hours: float) -> float:
 					farm.stock[job.crop] += job.seed - (carried if _carrying_seed else 0)
 					_farm_changed = true
 				job = {}
-			if eating_requested:
-				farm.stock[meal_crop] += meal_grams
+			cancel_meal(farm)
+			if build_reserved:
+				farm.wood += build_reserved
+				build_reserved = 0
+				build_remaining = 0.0
 				_farm_changed = true
-				eating_requested = false
-				meal_crop = ""
-				meal_grams = 0
-				_cooking_remaining = 0.0
 			sleep_remaining = 0.0
+			recovering = false
 			_returning_home = false
 			activity = "Idle"
 			message = "No dry route; work cancelled and unused grain returned"
@@ -387,6 +496,12 @@ func _spend(hours: float, action: String) -> float:
 	var tired_rate := tiring(action)
 	var digesting := digestion() if stomach_kcal > EPSILON else 0.0
 	var used := hours
+	var fire := _farm != null and position == home and (_farm.heating_enabled or eating_requested)
+	var fuel: int = (meal_fuel if eating_requested else _farm.wood) if _farm != null else 0
+	fire = fire and fuel > _farm.fuel_remainder + EPSILON
+	if _farm != null: _farm.fire_lit = fire
+	if fire:
+		used = minf(used, (fuel - _farm.fuel_remainder) / Farm.FUEL_PER_HOUR)
 	if digesting > 0.0:
 		used = minf(used, stomach_kcal / digesting)
 	for tired in TIRED_PACE.keys() + [100.0]:
@@ -397,6 +512,14 @@ func _spend(hours: float, action: String) -> float:
 	if cost > digesting:
 		starved = (glycogen + _reserve()) / (cost - digesting)
 		used = minf(used, starved)
+	if weather != null:
+		var key := [floori((_absolute_hour + EPSILON) * 60.0), action, position == home, _farm.shelter, fire]
+		if key != _thermal_key:
+			_thermal_key = key
+			var absolute_minute: float = key[0] / 60.0
+			var climate := weather.at(floori(absolute_minute / 24.0), fposmod(absolute_minute, 24.0))
+			_thermal_rate = exposure.rates(climate, EFFORT[action], mass(), basal(), position == home and _farm.shelter, fire)
+		used = exposure.advance(used, _thermal_rate, position == home and action in ["Idle", "Sleeping", "Recovering"])
 	var absorbed := digesting * used
 	if absorbed > 0.0:
 		stomach -= stomach * absorbed / stomach_kcal
@@ -406,7 +529,14 @@ func _spend(hours: float, action: String) -> float:
 			stomach_kcal = 0.0
 	fatigue = clampf(fatigue + used * tired_rate, 0.0, 100.0)
 	_store(absorbed - cost * used)
-	if used >= starved - EPSILON:
+	if fire:
+		var burn_grams := _farm.fuel_remainder + used * Farm.FUEL_PER_HOUR
+		var whole := mini(fuel, floori(burn_grams + EPSILON))
+		_farm.fuel_remainder = maxf(0.0, burn_grams - whole)
+		if eating_requested: meal_fuel -= whole
+		else: _farm.wood -= whole
+		if whole > 0: _farm_changed = true
+	if used >= starved - EPSILON or exposure.health <= 0.0:
 		_die()
 	return used
 
@@ -432,6 +562,21 @@ func _reserve() -> float:
 	return maxf(0.0, mass() - DEATH_BMI * height * height) / (1.0 + lean_per_fat) * (FAT_KCAL + LEAN_KCAL * lean_per_fat)
 
 func _finish_job(farm: Farm, day: int) -> void:
+	if job.action == "Haul wood":
+		var grams: int = mini(farm.wood_piles.get(job.cell, 0), BAG_CAPACITY)
+		if grams > 0:
+			carried = grams
+			carried_crop = "Wood"
+			farm.wood_piles[job.cell] -= grams
+			_farm_changed = true
+			job.remaining = WORK_HOURS["Haul wood"]
+			if farm.wood_piles[job.cell] == 0:
+				farm.wood_piles.erase(job.cell)
+				job = {}
+			message = "Hauling wood home"
+		else:
+			job = {}
+		return
 	# Temporarily restore held seed so Farm validates and consumes the same reserved grams.
 	if job.seed:
 		farm.stock[job.crop] += job.seed
@@ -445,6 +590,11 @@ func _finish_job(farm: Farm, day: int) -> void:
 	var before: int = farm.stock.get(job.crop, 0)
 	if valid and farm.act(job.cell, day, job.crop):
 		_farm_changed = true
+		if job.action == "Chop":
+			job.action = "Haul wood"
+			job.remaining = WORK_HOURS["Haul wood"]
+			message = "Wood cut; hauling it to camp"
+			return
 		if job.action == "Sow":
 			carried = 0
 			carried_crop = ""
@@ -464,7 +614,10 @@ func _deposit(farm: Farm) -> void:
 	if carried <= 0:
 		return
 	if not _carrying_seed or job.is_empty():
-		farm.stock[carried_crop] += carried
+		if carried_crop == "Wood":
+			farm.wood += carried
+		else:
+			farm.stock[carried_crop] += carried
 		_farm_changed = true
 	carried = 0
 	carried_crop = ""
@@ -472,4 +625,4 @@ func _deposit(farm: Farm) -> void:
 
 func _die() -> void:
 	activity = "Dead"
-	message = "Game Over. Health reached zero."
+	message = "Game Over. " + ("Exposure health reached zero." if exposure.health <= 0 else "Starvation health reached zero.")

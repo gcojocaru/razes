@@ -31,9 +31,12 @@ const WORN := {
 const POSES := {
 	"Idle": ["Idle", 0.0, 2.5, "loop"],
 	"Walking": ["Walk", 0.0, 1.333, "loop"],
+	"Chop": ["TreeChopping", 0.0, 0.958, "loop"],
 	"Plow": ["TreeChopping", 0.0, 0.958, "loop"],
 	"Sow": ["Farm_PlantSeed", 0.0, 2.75, "loop"],
 	"Harvest": ["Farm_Harvest", 0.0, 2.5, "loop"],
+	"Building": ["Fixing_Kneeling", 0.8, 4.0, "loop"],
+	"Recovering": ["Fixing_Kneeling", 0.8, 4.0, "hold"],
 	"Cooking": ["Fixing_Kneeling", 0.8, 4.0, "hold"],
 	"Resting": ["LayToIdle", 0.42, 0.48, "hold"],
 	"Sleeping": ["LayToIdle", 0.0, 0.05, "hold"],
@@ -56,6 +59,8 @@ var _lying: Transform3D
 var _sack: Node3D
 var _hoe: Node3D
 var _sickle: Node3D
+var _axe: Node3D
+var _logs: Node3D
 var _label: Label3D
 
 var _linen := _material(Color("c4b393"))
@@ -154,8 +159,10 @@ func show_person(person, seconds: float) -> void:
 	_label.text = person.name
 	_label.position.y = person.height + 0.43
 	_label.modulate = Color("bc8c81") if person.activity == "Dead" else Color("f3e4bc")
-	_sack.visible = person.carried > 0 and person.activity not in ["Sleeping", "Dead"]
+	_sack.visible = person.carried > 0 and person.carried_crop != "Wood" and person.activity not in ["Sleeping", "Dead"]
+	_logs.visible = person.carried > 0 and person.carried_crop == "Wood" and person.activity not in ["Sleeping", "Dead"]
 	var action: String = person.job.get("action", "") if person.activity == "Working" else ""
+	_axe.visible = action == "Chop"
 	_hoe.visible = action == "Plow"
 	_sickle.visible = action == "Harvest"
 	var pose: String = action if POSES.has(action) else person.activity if POSES.has(person.activity) else "Idle"
@@ -199,7 +206,8 @@ func create_camp() -> Node3D:
 	ember.emission_enabled = true
 	ember.emission = Color("c75d26")
 	ember.emission_energy_multiplier = 0.5
-	_part(camp, _cylinder(0.0, 0.15, 0.18), ember, fire_at + Vector3(0, 0.15, 0))
+	var flame := _part(camp, _cylinder(0.0, 0.15, 0.18), ember, fire_at + Vector3(0, 0.15, 0))
+	flame.name = "FireEmber"
 	var firelight := OmniLight3D.new()
 	firelight.name = "Firelight"
 	firelight.light_color = Color(1.0, 0.6, 0.3)
@@ -226,6 +234,7 @@ func create_camp() -> Node3D:
 	grain.modulate = Color("3d3023")
 	grain.outline_size = 0
 	camp.add_child(grain)
+	camp.add_child(preload("res://camp_shelter.gd").new())
 	return camp
 
 func _make_tools() -> void:
@@ -240,6 +249,15 @@ func _make_tools() -> void:
 		var angle := -0.9 + index * 0.55
 		var blade := _part(_sickle, _box(Vector3(0.11, 0.025, 0.025)), _iron, Vector3(0.14 + sin(angle) * 0.14, -0.22 - cos(angle) * 0.14, 0))
 		blade.rotation.z = angle
+	_axe = _attach("hand_r", "Axe", grip)
+	_part(_axe, _cylinder(0.024, 0.021, 0.8), _wood, Vector3(0, -0.3, 0))
+	_part(_axe, _box(Vector3(0.28, 0.14, 0.045)), _iron, Vector3(0.08, -0.65, 0))
+	_logs = _attach("spine_03", "CarriedWood", Transform3D(Basis(), Vector3(0, 0.9, -0.3)))
+	for x in [-0.12, 0.0, 0.12]:
+		var log_piece := _part(_logs, _cylinder(0.065, 0.075, 0.7), _wood, Vector3(x, 0, 0))
+		log_piece.rotation.x = PI / 2
+	_logs.visible = false
+	_axe.visible = false
 	_hoe.visible = false
 	_sickle.visible = false
 
