@@ -5,6 +5,18 @@ Godot 4.7.2.stable.official.ed1daf0bf, macOS, Apple M4, Compatibility renderer.
 Run every suite with `./run_tests.sh` (set `GODOT_BIN` if `godot` is not on the path).
 The per-feature notes below record suite counts at their time.
 
+## Woodland, shelter and exposure — 26 October 2026
+
+- New suites cover seeded woodland, preview purity, partial chopping, real repeated 15 kg hauling and cancellation, regrowth, construction reservations/refunds/interruption, shared cooking/heating fuel, fractional one-gram meals, unreachable refunds, hourly weather, wet/cold/heat, shelter/recovery, cloned sleep forecasts across midnight/fuel exhaustion, irregular frame subdivisions and exposure death. A scene suite uses real keyboard input for field/camp actions, pause, fixed shelter, heating, recovery, food fuel, minimum viewport and Restart.
+- All 17 headless suites pass, with exit status and script-error logs checked. The woodland/camp and terrain scene suites also pass on the native Compatibility renderer.
+- Existing crop fixtures begin cleared; crop/person arithmetic fixtures use neutral exposure so random weather cannot invalidate their unrelated energy assertions. Dedicated exposure and scene suites retain real weather coverage. The actor fixture includes its carried item. Clear jobs keeps the established pending-meal behavior; an explicit Cancel pending meal action handles its unused fuel refund.
+- Extended `tests/sim_first_year.gd` with real terrain/woodland/weather, manual scripted chopping/building/heating/recovery decisions. With TARGET=20, WORK=6, YEARS=2 and policy plan, all 12 runs survive: seeds0–2 on Steppe, Hills, Lakeland and maximum Custom. Every shelter completes on zero-based day1 (the second day). Final wood is 202–226 kg; minimum BMI17.7–18.2 and minimum core34.8–35.5°C. This proves one policy can survive; it does not establish healthy or enjoyable balance.
+- Native Compatibility captures at 1280×800 and 1000×700 cover summer woodland, selected-tree visibility, chopping controls, construction, shelter interior/exterior, camp controls, autumn, winter/night, sleep and Body. Two shared 7,384-triangle variants are rendered in instanced batches; licensed textures and source instructions are bundled.
+- Independent review found two timing errors: the first departing walk segment was counted as home heating/shelter, and a warming return could let sleep forecasts continue past waking. Both were reproduced with failing tests and corrected; departure subdivision and actual sleep-end regressions now pass. The final 17-suite run is green. Native captures also exposed a hidden camp stock/fuel readout; the hub now keeps those values visible.
+- Apple M4, OpenGL4.1 Metal Compatibility, 1280×800, vsync off: 60 completed GPU-frame same-scene measurement is 10.62 ms/frame and158 draw calls with trees hidden, 11.52 ms and170 calls with summer foliage shown. The capture asserts that tree draw calls actually increase. These are local samples, not low-end hardware or sustained frame-time evidence. Native shader/RID teardown warnings and existing headless resource/RID warnings remain.
+
+Not checked: subjective play, VoiceOver, Intel/low-end devices, Windows/Linux, release exports, or survival beyond the two-year/12-seed sample. No save system or migration was added.
+
 ## Starting store and first-year balance — 25 October 2026
 
 - New `tests/sim_first_year.gd` plays years headlessly with the real Farm,

@@ -8,6 +8,9 @@ var start := Button.new()
 var _preview := Label.new()
 var _reason := Label.new()
 var _person: Human
+var _farm: Farm
+var _day := 0
+var _hour := 0.0
 ## What the shown forecast was made from; the 24-hour forecast is too slow to redo every frame.
 var _forecast_key := []
 
@@ -48,9 +51,12 @@ func _init() -> void:
 	start.pressed.connect(_start)
 	header.get_parent().add_child(start)
 
-func show_sleep(person: Human) -> void:
+func show_sleep(person: Human, farm: Farm = null, day := 0, hour := 0.0) -> void:
 	_person = person
-	var key := [hours.value, person.position, snappedf(person.fatigue, 0.1), roundi(person.glycogen), person.sleep_remaining, person.eating_requested, person.activity]
+	_farm = farm
+	_day = day
+	_hour = hour
+	var key := [hours.value, person.position, snappedf(person.fatigue, 0.1), roundi(person.glycogen), person.sleep_remaining, person.eating_requested, person.activity, day, floori(hour * 60), snappedf(person.exposure.core, 0.01), snappedf(person.exposure.wetness, 0.01), roundi(person.exposure.health), farm.shelter if farm != null else false, floori(farm.fuel_hours() * 60) if farm != null else 0, farm.heating_enabled if farm != null else false]
 	if key != _forecast_key:
 		_forecast_key = key
 		_refresh_prediction()
@@ -66,14 +72,17 @@ func _refresh_prediction() -> void:
 		_reason.text = "Sleep is already planned. Choose Wake up to end it early."
 	elif _person.eating_requested:
 		_reason.text = "Finish preparing your meal before sleeping."
-	var prediction: Dictionary = {} if _reason.text != "" else _person.sleep_prediction(hours.value)
+	var prediction: Dictionary = {} if _reason.text != "" else _person.sleep_prediction(hours.value, _farm, _day, _hour)
 	if prediction.is_empty() and _reason.text == "":
 		_reason.text = "Choose hours above zero and up to 24."
 	start.disabled = prediction.is_empty()
 	if not prediction.is_empty():
 		_preview.text = "Restedness: %d%% → %d%%\nEnergy: %d → %d kcal\nWeight: %.1f → %.1f kg\nHealth: %d%% → %d%%\nTime including walk to camp: %s h" % [roundi(100 - _person.fatigue), roundi(100 - prediction.fatigue), roundi(_person.glycogen), roundi(prediction.glycogen), _person.mass(), prediction.mass, roundi(_person.health), roundi(prediction.health), String.num(prediction.hours, 2).trim_suffix("0").trim_suffix(".")]
+		_preview.text += "\nTemperature: %.1f → %.1f°C · Wet: %d → %d%%\nWood after sleep: %s kg" % [_person.exposure.core, prediction.core, roundi(_person.exposure.wetness * 100), roundi(prediction.wetness * 100), Farm.kg(prediction.wood)]
 		if prediction.health <= 0:
-			_reason.text = "You will not survive this sleep. Eat before sleeping."
+			_reason.text = "You will not survive this sleep. Check food, shelter and heating."
+		elif prediction.core < 36 or prediction.core > 38:
+			_reason.text = "Unsafe temperature is predicted. Check shelter, heating and fuel."
 		elif prediction.glycogen <= 0:
 			_reason.text = "Ready energy will run out; the body will burn fat and muscle."
 	_reason.visible = _reason.text != ""

@@ -17,6 +17,7 @@ extends SceneTree
 ## "seed ok" means the store at year end holds next spring's seed for TARGET plots.
 
 const MEALS := [6.0, 12.0, 18.0]
+const Terrain := preload("res://terrain.gd")
 const SPRING := ["Barley", "Oats", "Millet"]
 
 var stock_scale := float(OS.get_environment("STOCK")) if OS.has_environment("STOCK") else 1.0
@@ -48,7 +49,15 @@ func play(seed: int, policy: String) -> Dictionary:
 	var farm := Farm.new()
 	for crop in farm.stock:
 		farm.stock[crop] = roundi(Farm.STARTING_STOCK[crop] * stock_scale)
+	farm.terrain = Terrain.new(seed, Terrain.PRESETS.get(OS.get_environment("LAND"), {"hills":Terrain.MAX_HILLS,"ponds":4} if OS.get_environment("LAND")=="Custom" else Terrain.PRESETS.Hills))
+	farm.generate_woodland(seed)
 	var person := Human.new()
+	person.terrain = farm.terrain
+	person.weather = weather
+	person.home = farm.terrain.camp / person.terrain_scale
+	person.position = person.home
+	var shelter_day := -1
+	var min_core := 37.0
 	var cells: Array = []
 	for x in 16:
 		for y in 16:
@@ -59,6 +68,8 @@ func play(seed: int, policy: String) -> Dictionary:
 	var hour := 6.0
 	farm.grow(weather.on(day), day)
 	while day < Calendar.DAYS_PER_YEAR * years:
+		survival(farm, person, cells, weather, day, hour)
+		if farm.shelter and shelter_day < 0: shelter_day = day
 		if hour == MEALS[0]:
 			plan(farm, person, cells, day)
 		if hour in MEALS:
@@ -71,6 +82,7 @@ func play(seed: int, policy: String) -> Dictionary:
 				until = minf(until, stop)
 		person.advance(farm, day, hour, until - hour)
 		min_bmi = minf(min_bmi, person.bmi())
+		min_core = minf(min_core, person.exposure.core)
 		if person.activity == "Dead":
 			break
 		hour = until
@@ -100,11 +112,12 @@ func play(seed: int, policy: String) -> Dictionary:
 	var seed_ok := person.activity != "Dead"
 	for crop in SPRING:
 		seed_ok = seed_ok and farm.stock[crop] >= Farm.CROPS[crop].seed * maxi(target, 1)
-	return {"seed_ok": seed_ok, "alive": person.activity != "Dead", "day": day, "min_bmi": min_bmi, "bmi": person.bmi(), "sown": sown, "harvested": gathered, "store": ", ".join(store)}
+	return {"seed_ok": seed_ok, "alive": person.activity != "Dead", "day": day, "min_bmi": min_bmi, "bmi": person.bmi(), "sown": sown, "harvested": gathered, "store": ", ".join(store) + " | shelter day %d; wood %s kg; min %.1f°C" % [shelter_day, Farm.kg(farm.wood), min_core]}
 
 ## Queues harvests, then plowing and sowing for as many plots as the open crops'
 ## seed covers, until a day's work is queued.
 func plan(farm: Farm, person: Human, cells: Array, day: int) -> void:
+	if not farm.shelter or person.recovering: return
 	var busy := {}
 	if not person.job.is_empty():
 		busy[person.job.cell] = true
@@ -163,3 +176,26 @@ func kept(farm: Farm, person: Human, policy: String, crop: String, day: int) -> 
 			var plots: int = target - (farm.record(day, crop).sown if before_window else 0)
 			return mini(farm.stock[crop], Farm.CROPS[crop].seed * maxi(plots, 0))
 	return 0
+
+## Explicit scripted-player decisions, never automatic behavior in the game.
+func survival(farm: Farm, person: Human, cells: Array, weather: Weather, day: int, hour: float) -> void:
+	var climate := weather.at(day, hour)
+	farm.heating_enabled = climate.temperature < 15.0 or person.exposure.core < 36.5
+	if not farm.shelter and person.build_reserved == 0 and farm.wood >= Farm.SHELTER_WOOD:
+		person.build_shelter(farm)
+	if not person.eating_requested and person.sleep_remaining == 0:
+		if farm.shelter and (person.exposure.core < 36.2 or person.exposure.core > 38.0 or person.exposure.wetness > 0.7): person.recover()
+	var needed := 60000 if farm.shelter else Farm.SHELTER_WOOD + 20000
+	var coming := person.carried if person.carried_crop == "Wood" else 0
+	if not person.job.is_empty():
+		if person.job.action == "Chop": coming += Farm.WOOD_YIELD
+		elif person.job.action == "Haul wood": coming += int(farm.wood_piles.get(person.job.cell,0))
+	for job in person.queue:
+		if job.action == "Chop": coming += Farm.WOOD_YIELD
+		elif job.action == "Haul wood": coming += int(farm.wood_piles.get(job.cell,0))
+	for cell in cells:
+		if farm.wood + coming >= needed: break
+		if farm.wood_piles.has(cell) and person.order(farm,[cell],day,"Haul wood"):
+			coming += farm.wood_piles[cell]
+		elif farm.woodland.has(cell) and person.order(farm,[cell],day,"Chop"):
+			coming += Farm.WOOD_YIELD

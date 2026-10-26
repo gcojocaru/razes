@@ -9,6 +9,11 @@ const RADIUS := 182.0
 const HUB := 82.0
 const MARGIN := 12.0
 const ICONS := {
+	"Chop": preload("res://assets/actions/chop.svg"),
+	"Haul wood": preload("res://assets/actions/wood.svg"),
+	"Build": preload("res://assets/actions/build.svg"),
+	"Heat": preload("res://assets/actions/heat.svg"),
+	"Recover": preload("res://assets/actions/recover.svg"),
 	"Plow": preload("res://assets/actions/plow.svg"),
 	"Harvest": preload("res://assets/actions/harvest.svg"),
 	"Eat": preload("res://assets/actions/eat.svg"),
@@ -85,7 +90,7 @@ func show_farm(farm: Farm, cells: Array, day: int, seed_crop: String, queued: Ar
 		for crop: String in crops:
 			var result := farm.preview(_cells, day, action, crop)
 			if result.plots > 0:
-				next.append({"action": action, "crop": crop, "plots": result.plots, "grain": result.grain})
+				next.append({"action": action, "crop": crop, "plots": result.plots, "grain": result.grain, "wood": result.wood})
 	_title = "Fields"
 	_detail = "Select land to work"
 	if not cells.is_empty():
@@ -93,7 +98,7 @@ func show_farm(farm: Farm, cells: Array, day: int, seed_crop: String, queued: Ar
 		_detail = "Choose an action"
 		if cells.size() == 1:
 			var cell: Vector2i = cells[0]
-			_title = farm.stage(cell)
+			_title = "Woodland" if farm.woodland.has(cell) else "Wood pile" if farm.wood_piles.has(cell) else farm.stage(cell)
 			if _title == "Sown":
 				_title = "%s %d%%" % [farm.crop(cell), floori(farm.growth(cell) * 100)]
 			elif _title == "Ripe":
@@ -232,12 +237,16 @@ func _label(entry: Dictionary) -> String:
 	return "Sow " + entry.crop if entry.action == "Sow" else entry.action
 
 func _effect(entry: Dictionary) -> String:
+	if entry.get("wood", 0) > 0:
+		return "%d plots\n%s kg wood to haul" % [entry.plots, Farm.kg(entry.wood)]
 	return "%d plot%s" % [entry.plots, "s" if entry.plots != 1 else ""] + ("\n%s%s kg %s" % ["+" if entry.grain > 0 else "", Farm.kg(entry.grain), entry.crop.to_lower() + " seed" if entry.action == "Sow" else "grain"] if entry.grain != 0 else "\nPrepare for sowing")
 
 func _tooltip(entry: Dictionary) -> String:
 	return _label(entry) + ": " + _effect(entry) + "\nQueue this work for the farmer" + ("\nSown " + Farm.sowing_window(entry.crop) if entry.crop != "" else "")
 
 func _summary(entry: Dictionary) -> String:
+	if entry.get("wood", 0) > 0:
+		return "%d plots · %s kg wood" % [entry.plots, Farm.kg(entry.wood)]
 	return "%d plot%s" % [entry.plots, "s" if entry.plots != 1 else ""] + (" · %s%s kg" % ["+" if entry.grain > 0 else "", Farm.kg(entry.grain)] if entry.grain != 0 else "")
 
 func _draw() -> void:

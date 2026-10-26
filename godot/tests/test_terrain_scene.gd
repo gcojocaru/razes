@@ -15,6 +15,7 @@ func run() -> void:
 	var game = load("res://game.tscn").instantiate()
 	game.terrain_seed = 42
 	root.add_child(game)
+	game.farm.woodland.clear()
 	current_scene = game
 	await process_frame
 	await process_frame

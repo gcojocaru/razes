@@ -11,6 +11,7 @@ class Person extends RefCounted:
 	var activity := "Idle"
 	var job := {}
 	var carried := 0
+	var carried_crop := "Barley"
 	func mass() -> float:
 		return weight
 

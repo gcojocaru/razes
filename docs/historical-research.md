@@ -136,3 +136,11 @@ of fifteenth-century peasant dress or dyes.
 Not modelled: water, hulls (about a quarter of oat weight) and milling losses,
 threshing and dehulling labour, fitness and strength, sex and age, circadian
 timing of sleep, heat and cold, illness and injury.
+
+## Exposure — 26 October 2026
+
+The game now tracks core temperature, wetness and exposure health alongside the existing body model. [CDC cold-stress notes](https://www.cdc.gov/niosh/cold-stress/about/related-illness.html) support cold-related heat loss, stored-energy use and loss of coordination; [CDC heat notes](https://www.cdc.gov/niosh/heat-stress/about/illnesses.html) support overheating during hot work and cooling through rest/shade. These references inform the direction of the mechanics, not their rates or historical clothing performance.
+
+`exposure.gd` documents game coefficients: precipitation/sweat increase wetness, drying is faster with wind/warmth/fire, and body temperature approaches an environment/activity target with a mass-scaled 1.2-hour response. Shivering adds up to twice basal energy use, scaled at 0.6 basal per degree below 36.5°C. Exposure health loses four points per degree-hour below 35°C or above 39°C and recovers two points/hour during comfortable camp rest. Warning bands are 36–38°C. Rates are frozen per calendar minute and clipped at thermal/wetness/fuel/death boundaries for deterministic time subdivision. These are gameplay approximations, not a medical heat-balance solver.
+
+All outfits use one fixed insulation assumption. Drinking water, dehydration, illnesses, frostbite, heat acclimation and detailed material insulation are omitted. Roof protection and a vented wood hearth are simplified thermal effects, not a historical reconstruction. Wood yield (240 kg/plot), work (6h clearing, 8h building), hut cost (300 kg), fuel (0.5 kg/h), and two-year regrowth are initial tuning choices.
