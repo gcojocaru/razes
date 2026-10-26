@@ -45,6 +45,9 @@ var _land_page := VBoxContainer.new()
 var _back := Button.new()
 var _person := Human.new()
 var _actor := HumanActor.new(1.0)
+## The preview's render and where it is shown.
+var _view := SubViewport.new()
+var _frame := TextureRect.new()
 var _turn := 0.6
 ## -1 while the left turn button is held, 1 for the right, else 0.
 var _turning := 0.0
@@ -192,15 +195,18 @@ func _preview() -> VBoxContainer:
 	stage.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	stage.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	column.add_child(stage)
-	var frame := SubViewportContainer.new()
-	frame.stretch = true
-	frame.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	stage.add_child(frame)
-	var view := SubViewport.new()
+	# Shown as a texture rather than in a SubViewportContainer, which renders at the layout's size and stretches it
+	# when the window scales the layout up; _process sizes the render to the screen pixels it covers.
+	_frame.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_frame.stretch_mode = TextureRect.STRETCH_SCALE
+	_frame.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	stage.add_child(_frame)
+	var view := _view
 	view.own_world_3d = true
 	view.transparent_bg = true
 	view.msaa_3d = Viewport.MSAA_4X
-	frame.add_child(view)
+	_frame.add_child(view)
+	_frame.texture = view.get_texture()
 	# Over the view, so the drag reaches it before the viewport does.
 	var drag := Control.new()
 	drag.name = "Turn"
@@ -238,15 +244,25 @@ func _preview() -> VBoxContainer:
 	var sun := DirectionalLight3D.new()
 	sun.transform = Transform3D(Basis(), Vector3(-1.2, 2.5, 2.0)).looking_at(Vector3(0, 0.9, 0))
 	sun.light_color = Color(1.0, 0.95, 0.86)
+	# The lights and ambient add up to about white on the linen: this renderer clips anything brighter flat.
+	sun.light_energy = 0.65
 	sun.shadow_enabled = true
+	sun.shadow_blur = 2.0
 	view.add_child(sun)
+	# A cool fill from the other side, and a rim from behind to lift the figure off the dark panel.
+	for light in [[Vector3(2.0, 1.2, 1.5), Color(0.75, 0.82, 1.0), 0.2], [Vector3(0.8, 2.2, -2.5), Color(1.0, 0.92, 0.8), 0.45]]:
+		var lamp := DirectionalLight3D.new()
+		lamp.transform = Transform3D(Basis(), light[0]).looking_at(Vector3(0, 0.9, 0))
+		lamp.light_color = light[1]
+		lamp.light_energy = light[2]
+		view.add_child(lamp)
 	var camera := Camera3D.new()
 	camera.fov = 30.0
 	camera.transform = Transform3D(Basis(), Vector3(0, 1.3, 4.4)).looking_at(Vector3(0, 0.9, 0))
 	camera.environment = Environment.new()
 	camera.environment.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
 	camera.environment.ambient_light_color = Color(0.52, 0.48, 0.43)
-	camera.environment.ambient_light_energy = 0.6
+	camera.environment.ambient_light_energy = 0.45
 	view.add_child(camera)
 	return column
 
@@ -429,6 +445,9 @@ func _begin() -> void:
 
 func _process(delta: float) -> void:
 	if visible:
+		var pixels := Vector2i((_frame.size * (get_viewport().get_final_transform() * _frame.get_global_transform_with_canvas()).get_scale()).ceil())
+		if _view.size != pixels:
+			_view.size = pixels
 		_turn += _turning * TURN_SPEED * delta
 		_person.facing = Vector2(sin(_turn), cos(_turn))
 		_actor.show_person(_person, delta)

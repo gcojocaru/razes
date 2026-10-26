@@ -223,7 +223,8 @@ def material(name, colour=None, img=None, roughness=0.95):
 	bsdf = m.node_tree.nodes["Principled BSDF"]
 	bsdf.inputs["Roughness"].default_value = roughness
 	if img is None:
-		bsdf.inputs["Base Color"].default_value = (*colour, 1.0)
+		# The colours are sRGB, as painted into the textures; the base colour wants them linear.
+		bsdf.inputs["Base Color"].default_value = (*(c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4 for c in colour), 1.0)
 	else:
 		node = m.node_tree.nodes.new("ShaderNodeTexImage")
 		node.image = img

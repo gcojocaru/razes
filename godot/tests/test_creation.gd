@@ -37,4 +37,8 @@ func _initialize() -> void:
 	creation._process(0.25)
 	check(is_equal_approx(creation._turn - before, -creation.TURN_SPEED * 0.25), "The left turn button turns left")
 	creation.find_child("TurnLeft", true, false).button_up.emit()
+	# Twice the layout's 1440 x 900, as a full-screen Retina window gives.
+	root.size = Vector2i(2880, 1800)
+	creation._process(0.0)
+	check(creation._view.size == Vector2i((creation._frame.size * 2).ceil()), "In a window twice the layout's size, the preview renders at the pixels it covers instead of stretching")
 	quit(1 if failures > 0 else 0)
