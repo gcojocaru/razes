@@ -602,7 +602,8 @@ func _process(delta: float) -> void:
 		_stalks.set_shader_parameter("wind", _weather_audio.wind_direction * _weather_audio.wind_strength)
 	if speed > 0:
 		advance_time(delta * speed)
-		_show_person(delta * speed)
+		# Real time, not game time: at 144x a game-time stride only flickers.
+		_show_person(delta)
 	if human.activity == "Dead" or _sound_control.panel.visible or _farm_hud.action_wheel.visible or _camp_menu.visible or _food_window.visible or _sleep_window.visible:
 		return
 	var input := Input.get_vector("ui_left", "ui_right", "ui_up", "ui_down")

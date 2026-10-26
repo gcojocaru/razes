@@ -37,14 +37,15 @@ func capture() -> void:
 	creation.sliders.Height.value = 1.85
 	creation.sliders.Weight.value = 90
 	creation.sliders["Body fat"].value = 24
-	for look in [["skin", "Olive"], ["hair", "Red"], ["beard", "Beard"], ["clothes", "Woad blue"]]:
-		creation.looks[look[0]][look[1]].button_pressed = true
+	creation.looks.skin.Olive.button_pressed = true
 	creation.lands.Custom.button_pressed = true
 	creation.sliders.Hills.value = 22
 	creation.sliders.Ponds.value = 3
-	# Face the camera for the close look at the beard.
+	# Face the camera for the close look.
 	creation._turn = 0.0
 	await save(output, "creation-custom.png")
+	await click(creation.next)
+	await save(output, "creation-land.png")
 	await click(creation.begin)
 	await save(output, "game.png")
 	current_scene._focus_person()

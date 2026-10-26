@@ -3,8 +3,9 @@ extends Control
 var creation := preload("res://creation.gd").new()
 
 func _ready() -> void:
-	add_child(creation)
 	add_child(preload("res://sound_control.gd").new())
+	# Full screen over the menu, so it sits above the Sound button.
+	add_child(creation)
 	$MenuMusic.bus = "Music"
 	$Version.text = "v" + str(ProjectSettings.get_setting("application/config/version"))
 	$Layout/Play.pressed.connect(creation.open)

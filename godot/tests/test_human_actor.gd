@@ -36,11 +36,13 @@ func mesh_bounds(node: Node3D) -> AABB:
 	return result
 
 ## Where the posed skeleton's joints are; skinned meshes keep their rest-pose bounds.
+## The skirt's bones hang from the cloth around the hips, outside the body, so they are left out.
 func joint_bounds(node: Node3D) -> AABB:
 	var skeleton: Skeleton3D = node.find_children("*", "Skeleton3D", true, false)[0]
 	var result := AABB(skeleton.global_transform * skeleton.get_bone_global_pose(0).origin, Vector3.ZERO)
 	for bone in skeleton.get_bone_count():
-		result = result.expand(skeleton.global_transform * skeleton.get_bone_global_pose(bone).origin)
+		if not skeleton.get_bone_name(bone).begins_with("skirt_"):
+			result = result.expand(skeleton.global_transform * skeleton.get_bone_global_pose(bone).origin)
 	return result
 
 func pose(node: Node3D) -> Array:
@@ -64,6 +66,7 @@ func run() -> void:
 	root.add_child(actor)
 	actor.show_person(person, 0.0)
 	var body: Node3D = actor.get_node("Body")
+	check(["Shirt", "Skirt", "Collar", "Cuff", "Belt", "Trousers", "Laces", "Opinci"].all(func(part: String) -> bool: return actor._skeleton.has_node(part)), "The farmer wears an embroidered shirt, belt, trousers and opinci")
 	var standing := mesh_bounds(body)
 	check(standing.size.y >= 1.65 and standing.size.y <= 1.8, "The adult's standing mesh is about 1.7 metres tall")
 	check(absf(standing.position.y) < 0.02, "Standing boots meet the ground rather than hovering or sinking")
@@ -125,14 +128,11 @@ func run() -> void:
 	actor.show_person(person, 0.0)
 	check(mesh_bounds(body).size.x > standing.size.x * 1.1 and is_equal_approx(mesh_bounds(body).size.y, standing.size.y), "A heavier body is wider, not taller")
 	person.weight = 65.0
-	actor.dress({"skin": "Olive", "hair": "Red", "beard": "Beard", "clothes": "Madder red"})
+	actor.dress({"skin": "Olive"})
 	person.name = "Toader"
 	actor.show_person(person, 0.0)
-	var bearded := mesh_bounds(body)
-	check(actor._hands.albedo_color == actor.SKINS.Olive and actor._hair[0].albedo_color.r > actor._hair[0].albedo_color.b * 2 and actor._clothes[0].albedo_color.r > actor._clothes[0].albedo_color.g * 1.5 and actor._beard.visible and actor._moustache.visible and actor.get_node("Name").text == "Toader", "Dressing colours skin, hair and clothes, grows the beard, and the label names the peasant")
-	check(bearded.size.y <= standing.size.y + 0.001 and bearded.size.z <= standing.size.z + 0.001, "The beard stays within the figure's height and depth")
-	actor.dress({"skin": "Tanned", "hair": "Dark brown", "beard": "Moustache", "clothes": "Undyed linen"})
-	check(actor._moustache.visible and not actor._beard.visible, "A moustache alone shows no beard")
+	check(actor._skin[0].albedo_color == actor._ratio(actor.SKINS.Olive, actor.SKINS.Fair) and actor.get_node("Name").text == "Toader", "Dressing colours the skin, and the label names the peasant")
+	actor.dress({"skin": "Tanned"})
 	for activity in ["Sleeping", "Resting", "Dead"]:
 		person.activity = activity
 		# Falling down takes the death clip's length.
@@ -157,6 +157,19 @@ func run() -> void:
 	var cooking := pose(body)
 	actor.show_person(person, 0.12)
 	check(pose(body) != cooking, "Cooking uses the rig rather than an idle pose")
+	# Each column of the skirt hangs from two bones, the upper one at the belt.
+	var skeleton: Skeleton3D = body.find_children("*", "Skeleton3D", true, false)[0]
+	person.job = {"action": "Harvest", "cell": Vector2i.ZERO, "crop": "Barley", "remaining": 1.0}
+	for activity in ["Walking", "Cooking", "Working"]:
+		person.activity = activity
+		var drop := INF
+		for step in 40:
+			actor.show_person(person, 0.1)
+			for column in 16:
+				var top := skeleton.get_bone_global_pose(skeleton.find_bone("skirt_%02d_a" % column)).origin
+				drop = minf(drop, top.y - skeleton.get_bone_global_pose(skeleton.find_bone("skirt_%02d_b" % column)).origin.y)
+		check(drop > 0.02, activity + " lets the skirt hang from the belt rather than stand out")
+	person.job = {}
 
 	var camp: Node3D = small.create_camp()
 	root.add_child(camp)

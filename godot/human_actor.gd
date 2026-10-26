@@ -1,13 +1,11 @@
 extends Node3D
-## The farmer is a CC0 Quaternius model (assets/peasant/SOURCE.md); the tools,
-## sack and camp are original low-poly meshes, interpreted rather than reconstructed.
-## Geometry is in metres; only this root and the separate camp convert units.
+## The farmer is a Tripo body rigged to the peasant skeleton and dressed in a linen shirt,
+## trousers and opinci built around it (assets/peasant/SOURCE.md); the tools, sack and camp are original low-poly meshes,
+## interpreted rather than reconstructed. Geometry is in metres; only this root and the
+## separate camp convert units.
 
-## Looks the creation screen offers; the farmer starts with the first of each.
+## Skin tones the creation screen offers; the farmer starts with the first.
 const SKINS := {"Tanned": Color("b6805c"), "Fair": Color("e0b89a"), "Rosy": Color("d39a7e"), "Olive": Color("9d7651"), "Brown": Color("7a523a")}
-const HAIRS := {"Dark brown": Color("382a23"), "Black": Color("1c1917"), "Chestnut": Color("6b3f26"), "Fair": Color("b08d58"), "Red": Color("8a3a1e"), "Grey": Color("8d877d")}
-const BEARDS := ["None", "Moustache", "Beard"]
-const CLOTHES := {"Undyed linen": Color("c4b393"), "Bleached linen": Color("e4ddc9"), "Grey wool": Color("8b877b"), "Brown wool": Color("6d5844"), "Madder red": Color("8f3d2f"), "Woad blue": Color("4d6275")}
 
 ## Which clip, and which seconds of it, each pose plays: loops repeat the span,
 ## holds sway through it and back every four seconds, and once plays and stays.
@@ -23,8 +21,9 @@ const POSES := {
 	"Dead": ["Death01", 0.0, 2.375, "once"],
 }
 const MODEL := preload("res://assets/peasant/peasant.glb")
-## Soles to hair, the imported model stands this tall; it is shrunk to the default peasant.
-const MODEL_HEIGHT := 1.8477
+## Soles to crown, the imported model stands this tall; it is shrunk to the default peasant.
+## build_peasant.py scales the body to fit the rig's joints, which were made for this taller figure.
+const MODEL_HEIGHT := 1.833
 
 var _metres_to_units: float
 var _time := 0.0
@@ -35,8 +34,6 @@ var _skeleton: Skeleton3D
 var _player: AnimationPlayer
 ## Turns and shifts the lying clip onto the bedroll's length, along +z from the feet.
 var _lying: Transform3D
-var _moustache: MeshInstance3D
-var _beard: MeshInstance3D
 var _sack: Node3D
 var _hoe: Node3D
 var _sickle: Node3D
@@ -47,10 +44,7 @@ var _leather := _material(Color("493427"))
 var _wood := _material(Color("775336"))
 var _iron := _material(Color("606665"))
 var _burlap := _material(Color("a78c60"))
-var _skin: StandardMaterial3D
-var _hands: StandardMaterial3D
-var _hair: Array[StandardMaterial3D] = []
-var _clothes: Array[StandardMaterial3D] = []
+var _skin: Array[StandardMaterial3D] = []
 
 func _init(metres_to_units: float) -> void:
 	_metres_to_units = metres_to_units
@@ -63,16 +57,8 @@ func _init(metres_to_units: float) -> void:
 	_player = _model.find_children("*", "AnimationPlayer")[0]
 	# Posed only by show_person, so a paused game holds still.
 	_player.callback_mode_process = AnimationMixer.ANIMATION_CALLBACK_MODE_PROCESS_MANUAL
-	_skin = _recolour("Skin", 0)
-	_hands = _recolour("Male_Peasant_Arms", 1)
-	_hands.albedo_texture = null
-	for part in ["Hair", "Eyebrows", "Beard", "Moustache"]:
-		_hair.append(_recolour(part, 0))
-	_clothes = [_recolour("Male_Peasant_Body", 0), _recolour("Male_Peasant_Arms", 0)]
-	_moustache = _skeleton.get_node("Moustache")
-	_beard = _skeleton.get_node("Beard")
-	_moustache.visible = false
-	_beard.visible = false
+	for surface in _skeleton.get_node("Skin").mesh.get_surface_count():
+		_skin.append(_recolour("Skin", surface))
 	_player.play("LayToIdle")
 	_player.seek(0.0, true)
 	var feet := (_bone("foot_l") + _bone("foot_r")) / 2
@@ -108,19 +94,13 @@ func _init(metres_to_units: float) -> void:
 	_label.modulate = Color("f3e4bc")
 	_label.outline_modulate = Color("2c281f")
 	add_child(_label)
-	dress({"skin": SKINS.keys()[0], "hair": HAIRS.keys()[0], "beard": BEARDS[0], "clothes": CLOTHES.keys()[0]})
+	dress({"skin": SKINS.keys()[0]})
 
-## Colours the farmer and grows the beard chosen on the creation screen.
+## Colours the farmer's skin. Hair and facial hair wait for their models.
 func dress(peasant: Dictionary) -> void:
-	# The textures are fair skin, grey hair and undyed linen; the choice tints them.
-	_skin.albedo_color = _ratio(SKINS[peasant.skin], SKINS.Fair)
-	_hands.albedo_color = SKINS[peasant.skin]
-	for material in _hair:
-		material.albedo_color = HAIRS[peasant.hair] * 1.6
-	for material in _clothes:
-		material.albedo_color = _ratio(CLOTHES[peasant.clothes], CLOTHES["Undyed linen"])
-	_moustache.visible = peasant.beard != "None"
-	_beard.visible = peasant.beard == "Beard"
+	# The texture is light skin; the choice tints it.
+	for material in _skin:
+		material.albedo_color = _ratio(SKINS[peasant.skin], SKINS.Fair)
 
 func show_person(person, seconds: float) -> void:
 	seconds = maxf(seconds, 0.0)

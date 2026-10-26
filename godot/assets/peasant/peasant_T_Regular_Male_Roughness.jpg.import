@@ -3,9 +3,10 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://drxyq06foyti6"
-path="res://.godot/imported/peasant_T_Regular_Male_Roughness.jpg-93f99c1ab8c59255dda84aeb42e00952.ctex"
+path.s3tc="res://.godot/imported/peasant_T_Regular_Male_Roughness.jpg-93f99c1ab8c59255dda84aeb42e00952.s3tc.ctex"
 metadata={
-"vram_texture": false
+"imported_formats": ["s3tc_bptc"],
+"vram_texture": true
 }
 generator_parameters={
 "md5": "5db9fa5162a91cdbeed4105f9eeb235f"
@@ -14,11 +15,11 @@ generator_parameters={
 [deps]
 
 source_file="res://assets/peasant/peasant_T_Regular_Male_Roughness.jpg"
-dest_files=["res://.godot/imported/peasant_T_Regular_Male_Roughness.jpg-93f99c1ab8c59255dda84aeb42e00952.ctex"]
+dest_files=["res://.godot/imported/peasant_T_Regular_Male_Roughness.jpg-93f99c1ab8c59255dda84aeb42e00952.s3tc.ctex"]
 
 [params]
 
-compress/mode=0
+compress/mode=2
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0
@@ -40,4 +41,4 @@ process/normal_map_invert_y=false
 process/hdr_as_srgb=false
 process/hdr_clamp_exposure=false
 process/size_limit=0
-detect_3d/compress_to=1
+detect_3d/compress_to=0

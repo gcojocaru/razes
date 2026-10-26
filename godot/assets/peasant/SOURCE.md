@@ -1,25 +1,52 @@
 # Farmer model
 
-`peasant.glb` is assembled by `build_peasant.py` (Blender 5.2) from four packs by
-[Quaternius](https://quaternius.com), all released under **CC0 1.0** (public
-domain dedication); no attribution is required, but it is recorded here.
-Standard (free) versions, retrieved from itch.io on 25 October 2026.
+`peasant.glb` is assembled by `build_peasant.py` (Blender 5.2). It has two sources:
 
-| Part | Pack |
-| --- | --- |
-| Tunic, sleeves, hands, trousers and boots (`Male_Peasant`) | [Modular Character Outfits – Fantasy](https://quaternius.itch.io/modular-character-outfits-fantasy) |
-| Head, eyes, eyebrows, `Hair_SimpleParted`, `Hair_Beard` | [Universal Base Characters](https://quaternius.itch.io/universal-base-characters) |
-| `Idle`, `Walk`, `Fixing_Kneeling`, `Death01` | [Universal Animation Library](https://quaternius.itch.io/universal-animation-library) |
-| `Farm_PlantSeed`, `Farm_Harvest`, `TreeChopping`, `LayToIdle` | [Universal Animation Library 2](https://quaternius.itch.io/universal-animation-library-2) |
+| Part | Source | Licence |
+| --- | --- | --- |
+| Bald, bare, barefoot body (`Skin`) with its normal map | A figure generated from a prompt with [Tripo](https://www.tripo3d.ai), on a paid plan, which grants commercial rights to the outputs | Tripo paid-plan terms; the file is kept outside the repo |
+| Skeleton (`Peasant`) and the eight clips `Idle_Loop`, `Walk_Loop`, `Fixing_Kneeling`, `Death01`, `Farm_PlantSeed`, `Farm_Harvest`, `TreeChopping_Loop`, `LayToIdle` | [Quaternius](https://quaternius.com) Universal Base Characters and Universal Animation Library packs, kept from the previous `peasant.glb` | CC0 1.0 |
 
-The script keeps only the head and neck of the base body, which the outfit's
-collar covers, swaps its skin to the light texture so the game can tint it,
-splits the upper lip off the beard as a separate moustache, keeps the eight
-clips above, and shrinks the textures to 1024 px. To rebuild, unzip the four
-packs into one folder and run:
+The script fits the figure to the Quaternius skeleton rather than the other way
+round, so the animations play unchanged:
 
-    blender -b -P build_peasant.py -- <that folder>
+- **Scale:** the skeleton was made for a 1.85 m model, so the body is scaled until
+  the joints of its own (Tripo, Mixamo-named) skeleton match the heights of the
+  Quaternius joints. It comes out 1.833 m tall, which `human_actor.gd` records as
+  `MODEL_HEIGHT` and shrinks to the peasant's height in the game.
+- **Weights:** Blender's automatic (heat) weights, computed on a copy of the mesh
+  welded along its UV seams and copied back to every vertex. The Tripo export
+  weights almost every vertex to the hips, so its weights are not used.
+- **Skin:** the generated texture is grey clay; it is tinted to the `Fair` skin
+  tone of `human_actor.gd`, keeping 40% of its light and dark variation. The
+  normal map is kept, at 2048 px like the colour.
 
-The `peasant_T_*.jpg` files are the textures Godot extracts from the GLB on
-import. The outfit is a generic fantasy peasant, not a reconstruction of
-fifteenth-century Moldavian dress.
+The clothes are made by the script itself, so they are original work under the
+project's own terms. They follow Moldovan peasant dress:
+
+- **Shirt (`Shirt`, `Skirt`):** a long linen shirt (cămașă) hanging over the
+  trousers to mid-thigh. The top is the skin of the torso and arms, copied, smoothed
+  and lifted off the body, so it keeps the skin's weights. The skirt is a generated
+  ring that flares out below the belt. It hangs from 16 chains of two bones
+  (`skirt_00_a`/`_b` to `skirt_15_a`/`_b`), added to the skeleton and keyed into
+  every clip. For each frame, each bone is turned as low as it can go, somewhere
+  between moving with the hips and moving with its thigh, while staying clear of
+  the legs and the ground. So when kneeling, the back hangs from the hips and the
+  front lies on the thighs; when bending over, the cloth folds over the buttocks
+  and hangs along the thighs.
+- **Embroidery (`Collar`, `Cuff`, the skirt's hem):** strips along the shirt's edges
+  with a generated red-and-black diamond border (`Embroidery` texture).
+- **Belt (`Belt`):** a red woven brâu (`BeltWeave` texture).
+- **Trousers (`Trousers`):** linen ițari, made from the leg skin like the shirt.
+- **Opinci (`Opinci`, `Laces`):** leather sandals over the sole, sides and toes, with
+  nojițe laces wound three times around each lower leg.
+
+The skin under the shirt and trousers is removed, apart from two rings of faces
+under the garment edges.
+
+To rebuild, keep a copy of `peasant.glb` (the script reads the skeleton and clips
+from it and overwrites it), then run:
+
+    blender -b -P build_peasant.py -- <path to the figure GLB>
+
+The model has no hair or facial hair yet.

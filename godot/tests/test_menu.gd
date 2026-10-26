@@ -95,7 +95,7 @@ func run() -> void:
 				await process_frame
 				await process_frame
 				var card: Rect2 = creation.get_global_rect()
-				check(menu.get_viewport_rect().encloses(card) and not card.intersects(menu.get_node("SoundControl").button.get_global_rect()), "Peasant creation fits beside the Sound button at %s" % dimensions)
+				check(card.size.is_equal_approx(menu.get_viewport_rect().size) and card.position == Vector2.ZERO, "Peasant creation fills the screen at %s" % dimensions)
 			check(creation.peasant.name == "Ion" and creation._values.Height.text == "1.72 m" and creation._values.Weight.text == "65 kg" and creation._values["Body fat"].text == "15%" and creation._info.text.begins_with("BMI 22.0"), "Creation starts from the default 65 kg peasant with 15% body fat")
 			type("Toader")
 			# LineEdit reports text changes deferred, after the frame that inserts them.
@@ -131,14 +131,18 @@ func run() -> void:
 			# Typed with the Enter below in one frame, before LineEdit reports the change, so Begin must read the field itself.
 			type("Toader")
 		elif activation == "Space":
-			creation.begin.grab_focus()
+			creation.next.grab_focus()
 		else:
-			await activate(activation, creation.looks.hair.Red)
-			for look in [["skin", "Olive"], ["beard", "Beard"], ["clothes", "Woad blue"]]:
-				creation.looks[look[0]][look[1]].button_pressed = true
-			check(creation.peasant.hair == "Red" and creation.peasant.beard == "Beard" and creation._values.Hair.text == "Red", "Clicking a swatch chooses its look")
+			await activate(activation, creation.looks.skin.Olive)
+			check(creation.peasant.skin == "Olive" and creation._values.Skin.text == "Olive", "Clicking a swatch chooses its skin")
+			await activate(activation, creation.next)
+			check(creation._land_page.visible and not creation._character.visible, "Next moves from the character to the land")
 			await activate(activation, creation.lands.Lakeland)
 			check(creation.land == creation.Terrain.PRESETS.Lakeland and creation._values.Ponds.text == "4", "Clicking a land preset chooses it")
+		if activation != "Mouse":
+			await activate(activation, creation.next)
+			# Next hides itself, so the keys need Begin focused on the land page.
+			creation.begin.grab_focus()
 		await activate(activation, creation.begin)
 		check(current_scene.scene_file_path == "res://game.tscn", "Begin opens game via " + activation)
 		check(not is_instance_valid(music), "Leaving the menu frees its music player")
@@ -153,13 +157,13 @@ func run() -> void:
 			check(farmer.name == "Ion" and is_equal_approx(farmer.mass(), 65.0) and current_scene.terrain.hills == 18.0 and current_scene.terrain.ponds.size() == 2, "A new creation screen offers the default peasant and land again")
 		else:
 			var actor: Node3D = current_scene._human_actor
-			check(actor._hair[0].albedo_color == actor.HAIRS.Red * 1.6 and actor._hands.albedo_color == actor.SKINS.Olive and actor._clothes[0].albedo_color == actor._ratio(actor.CLOTHES["Woad blue"], actor.CLOTHES["Undyed linen"]) and actor._beard.visible, "The farmer wears the chosen looks")
+			check(actor._skin[0].albedo_color == actor._ratio(actor.SKINS.Olive, actor.SKINS.Fair), "The farmer wears the chosen skin")
 			check(current_scene.terrain.hills == 11.0 and current_scene.terrain.ponds.size() == 4, "The field is made from the chosen preset")
 			var first_seed: int = current_scene.terrain.seed
 			reload_current_scene()
 			await process_frame
 			await process_frame
-			check(current_scene.human.name == "Ion" and current_scene._human_actor._beard.visible and is_equal_approx(current_scene.human.mass(), 65.0), "Restart begins again with the same peasant")
+			check(current_scene.human.name == "Ion" and is_equal_approx(current_scene.human.mass(), 65.0), "Restart begins again with the same peasant")
 			check(current_scene.terrain.hills == 11.0 and current_scene.terrain.ponds.size() == 4 and current_scene.terrain.seed != first_seed, "Restart keeps the land with a fresh field")
 		check(current_scene.placing_camp and current_scene.speed == 0, "A new game first pauses to choose the camp's place")
 		for cell in 256:
