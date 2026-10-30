@@ -31,6 +31,12 @@ func capture() -> void:
 	root.size = Vector2i(1000, 700)
 	game._camp_menu.open_at(root.get_visible_rect().size - Vector2.ONE * 8)
 	await save("camp-wheel-minimum")
+	# Lying snow adds Melt snow beside Fetch water.
+	game.farm.snow_cover = 1.0
+	game._show_person()
+	game._camp_menu.open_at(root.get_visible_rect().size - Vector2.ONE * 8)
+	await save("camp-wheel-snow-minimum")
+	game.farm.snow_cover = 0.0
 	root.size = Vector2i(1280, 800)
 	game._open_food()
 	game._food_window._choose_grain("Oats")

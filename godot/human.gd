@@ -7,10 +7,12 @@ const Exposure := preload("res://exposure.gd")
 ## any surplus and pay any deficit. Health follows body mass; tiredness slows work.
 
 const WALK_SPEED := 4500.0
-const WORK_HOURS := {"Plow": Farm.PLOW_HOURS, "Sow": 0.5, "Harvest": 2.0, "Chop": Farm.CHOP_HOURS, "Haul wood": 0.01}
+const WORK_HOURS := {"Plow": Farm.PLOW_HOURS, "Sow": 0.5, "Harvest": 2.0, "Chop": Farm.CHOP_HOURS, "Haul wood": 0.01, "Fetch water": 0.25, "Melt snow": 2.0}
 const BAG_CAPACITY := 15000
 const MEAL_GRAMS := 300
 const MEAL_HOURS := 0.5
+## Porridge cooks in 4 ml of water per gram of grain; eating it hydrates the farmer.
+const PORRIDGE_WATER := 4
 const BUILD_HOURS := 8.0
 const MAX_SLEEP_HOURS := 24.0
 const EPSILON := 0.00000001
@@ -22,7 +24,7 @@ const START_FAT := 9.75
 const START_LEAN := 55.25
 ## Energy use as multiples of basal metabolism: FAO 2004 physical activity ratios,
 ## and about 5 METs for hoeing (Compendium of Physical Activities).
-const EFFORT := {"Sleeping": 1.0, "Idle": 1.4, "Cooking": 2.1, "Walking": 3.2, "Sow": 4.1, "Harvest": 4.1, "Plow": 5.0, "Chop": 5.5, "Haul wood": 2.1, "Build": 4.1, "Recovering": 1.4}
+const EFFORT := {"Sleeping": 1.0, "Idle": 1.4, "Cooking": 2.1, "Walking": 3.2, "Sow": 4.1, "Harvest": 4.1, "Plow": 5.0, "Chop": 5.5, "Haul wood": 2.1, "Build": 4.1, "Recovering": 1.4, "Fetch water": 2.1, "Melt snow": 2.1}
 ## kcal in a kilogram of fat and of lean tissue, which is mostly water. By Forbes' rule
 ## each kilogram of fat lost takes FORBES / fat kilograms of lean with it (Hall 2008).
 const FAT_KCAL := 9400.0
@@ -49,10 +51,26 @@ const SLEEP_HOURS := 8.0
 const AWAKE_TIRING := 70.0 / 16.0
 const EFFORT_TIRING := 30.0 / (9.0 * 3.6)
 const TIRED_PACE := {70.0: 0.8, 90.0: 0.6}
+## Water, in litres of body water lost and ml carried. A resting 65 kg adult loses about
+## 2.4 litres a day (EFSA 2010 advises 2.5 a day for men); sweat adds up to about a
+## litre an hour of hot, hard work (Sawka et al. 2007). Thirst shows from a loss of 2%
+## of body mass; health falls from 4% and is gone at 10%, about three days at rest.
+const WATER_LOSS := 0.1
+const THIRSTY := 0.02
+const DRY := 0.04
+const DEATH_DRY := 0.10
+## The farmer sips from a skin while away once this many litres are missing.
+const SIP := 0.25
+const SKIN := 2000
+## Melting snow over the fire turns this many ml into water per job.
+const MELT_ML := 10000
+const ICE_HOURS := 0.5
 
 ## The peasant made on the creation screen, if any. Each new game's farmer is made
 ## from them, so Restart keeps them.
 static var peasant := {}
+## Everything a save needs to resume this farmer exactly; exposure is saved apart.
+const SAVED := ["name", "height", "start_fat", "start_lean", "home", "position", "facing", "activity", "job", "queue", "carried_crop", "carried", "fat", "lean", "glycogen", "stomach", "stomach_kcal", "fatigue", "message", "sleep_remaining", "eating_requested", "meal_crop", "meal_grams", "build_remaining", "build_reserved", "meal_fuel", "recovering", "_absolute_hour", "_thermal_key", "_thermal_rate", "_carrying_seed", "_returning_home", "_cooking_remaining", "_route", "_route_destination", "dehydration", "skin", "meal_water"]
 
 var name := "Ion"
 var height := HEIGHT
@@ -78,7 +96,10 @@ var fatigue := 0.0
 ## 100 down to 0 as the body falls from a BMI of 18.5 to 12.5.
 var health: float:
 	get:
-		return 0.0 if activity == "Dead" else minf(exposure.health, clampf(inverse_lerp(DEATH_BMI, HEALTHY_BMI, bmi()), 0.0, 1.0) * 100.0)
+		return 0.0 if activity == "Dead" else minf(minf(exposure.health, water_health()), clampf(inverse_lerp(DEATH_BMI, HEALTHY_BMI, bmi()), 0.0, 1.0) * 100.0)
+## Litres of body water missing, and ml in the water skin.
+var dehydration := 0.0
+var skin := SKIN
 var message := "Ready for work"
 var sleep_remaining := 0.0
 var eating_requested := false
@@ -88,6 +109,7 @@ var advanced_hours := 0.0
 var build_remaining := 0.0
 var build_reserved := 0
 var meal_fuel := 0
+var meal_water := 0
 var _farm: Farm
 var weather: Weather
 var exposure = Exposure.new()
@@ -150,6 +172,46 @@ func order(farm: Farm, cells: Array, day: int, action := "", crop := "") -> int:
 ## Where the farmer stands to work a plot, in metres.
 static func plot_centre(cell: Vector2i) -> Vector2:
 	return (Vector2(cell) - Vector2.ONE * 7.5) * 10.0
+
+## Queues trips to the nearest pond bank until the camp's water store would be full.
+func fetch_water(farm: Farm) -> int:
+	var bank: Vector2 = terrain.bank / terrain_scale if terrain != null else Vector2.INF
+	if bank == Vector2.INF or not _reachable(home, bank):
+		message = "No dry route to water"
+		return 0
+	return _queue_water(farm, {"action": "Fetch water", "point": bank, "remaining": WORK_HOURS["Fetch water"]}, BAG_CAPACITY)
+
+## Queues melting lying snow over the camp fire until the store would be full.
+func melt_snow(farm: Farm) -> int:
+	if farm.snow_cover < Farm.MELTABLE_SNOW:
+		message = "Not enough lying snow to melt"
+		return 0
+	return _queue_water(farm, {"action": "Melt snow", "point": home, "remaining": WORK_HOURS["Melt snow"]}, MELT_ML)
+
+func _queue_water(farm: Farm, template: Dictionary, ml: int) -> int:
+	if activity == "Dead":
+		return 0
+	var pending := 0
+	for waiting in queue.duplicate() + [job]:
+		pending += {"Fetch water": BAG_CAPACITY, "Melt snow": MELT_ML}.get(waiting.get("action", ""), 0)
+	var room := farm.water_capacity() - farm.water - pending
+	if room <= 0:
+		message = "The water store will be full"
+		return 0
+	var added := mini(ceili(float(room) / ml), 256 - queue.size() - int(not job.is_empty()))
+	# Water comes before queued field work: the farmer cannot last long without it.
+	for trip in added:
+		queue.insert(0, template.merged({"cell": Vector2i(-1, -1), "crop": "", "seed": 0}))
+	message = "%d %s queued" % [added, template.action.to_lower() + (" trip" if template.action == "Fetch water" else " job") + ("" if added == 1 else "s")]
+	return added
+
+## 100 until the body has lost DRY of its mass in water, 0 at DEATH_DRY.
+func water_health() -> float:
+	return clampf(inverse_lerp(DEATH_DRY, DRY, dehydration / mass()), 0.0, 1.0) * 100.0
+
+## Litres an hour the body loses now: a base share of its mass, plus the current sweat.
+func water_loss() -> float:
+	return WATER_LOSS * mass() / 65.0 + (_thermal_rate.get("sweat", 0.0) if weather != null else 0.0)
 
 func reserved_seed() -> int:
 	var total: int = job.get("seed", 0)
@@ -241,7 +303,9 @@ func cancel_meal(farm: Farm) -> void:
 	if not eating_requested: return
 	farm.stock[meal_crop] += meal_grams
 	farm.wood += meal_fuel
+	farm.water += meal_water
 	meal_fuel = 0
+	meal_water = 0
 	meal_crop = ""
 	meal_grams = 0
 	_cooking_remaining = 0.0
@@ -285,7 +349,7 @@ func wake_up() -> void:
 
 func sleep_prediction(hours: Variant, context: Farm = null, day := 0, hour := 0.0) -> Dictionary:
 	var forecast := Human.new()
-	for property in ["position", "home", "carried", "carried_crop", "height", "fat", "lean", "glycogen", "stomach", "stomach_kcal", "fatigue", "terrain", "terrain_scale", "weather", "activity", "eating_requested", "sleep_remaining", "build_remaining", "build_reserved", "recovering", "_carrying_seed", "_returning_home", "_absolute_hour"]:
+	for property in ["position", "home", "carried", "carried_crop", "height", "fat", "lean", "glycogen", "stomach", "stomach_kcal", "fatigue", "terrain", "terrain_scale", "weather", "activity", "eating_requested", "sleep_remaining", "build_remaining", "build_reserved", "recovering", "_carrying_seed", "_returning_home", "_absolute_hour", "dehydration", "skin"]:
 		forecast.set(property, get(property))
 	forecast.exposure = exposure.copy_state()
 	forecast.job = job.duplicate(true)
@@ -308,10 +372,10 @@ func sleep_prediction(hours: Variant, context: Farm = null, day := 0, hour := 0.
 	return {"fatigue":forecast.fatigue, "glycogen":forecast.glycogen, "mass":forecast.mass(), "health":forecast.health, "hours":elapsed + forecast.advanced_hours, "core":forecast.exposure.core, "wetness":forecast.exposure.wetness, "exposure_health":forecast.exposure.health, "wood":farm.wood}
 
 static func porridge(crop: String, grams: int) -> Dictionary:
-	# shortcut: water and milling losses are abstracted; model them before adding thirst or processing.
+	# shortcut: milling losses are abstracted; model them before adding grain processing.
 	if crop not in Farm.CROPS or grams <= 0:
 		return {}
-	return {"hours": MEAL_HOURS * grams / MEAL_GRAMS, "calories": grams * Farm.CROPS[crop].kcal_per_100g / 100.0}
+	return {"hours": MEAL_HOURS * grams / MEAL_GRAMS, "calories": grams * Farm.CROPS[crop].kcal_per_100g / 100.0, "water": grams * PORRIDGE_WATER}
 
 func eat(farm: Farm, crop: String, grams: Variant) -> bool:
 	_farm = farm
@@ -333,8 +397,13 @@ func eat(farm: Farm, crop: String, grams: Variant) -> bool:
 	if farm.wood < fuel:
 		message = "Not enough wood for cooking: needs %s kg" % Farm.kg(fuel)
 		return false
+	if farm.water < grams * PORRIDGE_WATER:
+		message = "Not enough water for porridge: needs %s L" % String.num(grams * PORRIDGE_WATER / 1000.0, 2)
+		return false
 	farm.stock[crop] -= grams
 	farm.wood -= fuel
+	farm.water -= grams * PORRIDGE_WATER
+	meal_water = grams * PORRIDGE_WATER
 	meal_fuel = fuel
 	meal_crop = crop
 	meal_grams = grams
@@ -373,6 +442,7 @@ func _step(farm: Farm, day: int, _hour: float, hours: float) -> float:
 		position = home
 		_deposit(farm)
 		_returning_home = false
+	_drink(farm)
 	var return_home := eating_requested or sleep_remaining > 0.0 or build_remaining > 0.0 or recovering or _returning_home or (carried > 0 and (not _carrying_seed or job.is_empty()))
 	if return_home and position != home:
 		return _walk(farm, home, hours)
@@ -385,6 +455,8 @@ func _step(farm: Farm, day: int, _hour: float, hours: float) -> float:
 			stomach_kcal += porridge(meal_crop, meal_grams).calories
 			farm.wood += meal_fuel
 			meal_fuel = 0
+			dehydration = maxf(0.0, dehydration - meal_water / 1000.0)
+			meal_water = 0
 			eating_requested = false
 			meal_crop = ""
 			meal_grams = 0
@@ -433,10 +505,14 @@ func _step(farm: Farm, day: int, _hour: float, hours: float) -> float:
 		carried_crop = job.crop
 		carried = job.seed
 		_carrying_seed = true
-	var destination := plot_centre(job.cell)
+	var destination: Vector2 = job.get("point", plot_centre(job.cell))
 	if position.distance_to(destination) > EPSILON:
 		return _walk(farm, destination, hours)
 	position = destination
+	if job.action == "Melt snow" and not (farm.heating_enabled and farm.wood > farm.fuel_remainder + EPSILON):
+		job = {}
+		message = "Melting snow needs the fire: turn heating on and supply wood"
+		return 0.0
 	activity = "Working"
 	var rate := pace()
 	var used := _spend(minf(hours, job.remaining / rate), job.action)
@@ -528,7 +604,13 @@ func _spend(hours: float, action: String) -> float:
 			var absolute_minute: float = key[0] / 60.0
 			var climate := weather.at(floori(absolute_minute / 24.0), fposmod(absolute_minute, 24.0))
 			_thermal_rate = exposure.rates(climate, EFFORT[action], mass(), basal(), at_home and _farm.shelter, fire)
+	# Water runs out before exposure advances, so neither body store overshoots death.
+	var losing := water_loss()
+	var parched := maxf(0.0, DEATH_DRY * mass() - dehydration) / losing
+	used = minf(used, parched)
+	if weather != null:
 		used = exposure.advance(used, _thermal_rate, at_home and action in ["Idle", "Sleeping", "Recovering"])
+	dehydration += losing * used
 	var absorbed := digesting * used
 	if absorbed > 0.0:
 		stomach -= stomach * absorbed / stomach_kcal
@@ -545,7 +627,7 @@ func _spend(hours: float, action: String) -> float:
 		if eating_requested: meal_fuel -= whole
 		else: _farm.wood -= whole
 		if whole > 0: _farm_changed = true
-	if used >= starved - EPSILON or exposure.health <= 0.0:
+	if used >= starved - EPSILON or used >= parched - EPSILON or exposure.health <= 0.0:
 		_die()
 	return used
 
@@ -571,6 +653,26 @@ func _reserve() -> float:
 	return maxf(0.0, mass() - DEATH_BMI * height * height) / (1.0 + lean_per_fat) * (FAT_KCAL + LEAN_KCAL * lean_per_fat)
 
 func _finish_job(farm: Farm, day: int) -> void:
+	if job.action == "Fetch water":
+		if farm.pond_frozen and not job.get("broke_ice", false):
+			job.broke_ice = true
+			job.remaining = ICE_HOURS
+			message = "Breaking the pond's ice"
+			return
+		# The farmer drinks their fill and refills the skin at the pond.
+		dehydration = 0.0
+		skin = SKIN
+		carried = BAG_CAPACITY
+		carried_crop = "Water"
+		job = {}
+		message = "Carrying water to camp"
+		return
+	if job.action == "Melt snow":
+		farm.water = mini(farm.water + MELT_ML, farm.water_capacity())
+		_farm_changed = true
+		job = {}
+		message = "Snow melted into water"
+		return
 	if job.action == "Haul wood":
 		var grams: int = mini(farm.wood_piles.get(job.cell, 0), BAG_CAPACITY)
 		if grams > 0:
@@ -625,6 +727,8 @@ func _deposit(farm: Farm) -> void:
 	if not _carrying_seed or job.is_empty():
 		if carried_crop == "Wood":
 			farm.wood += carried
+		elif carried_crop == "Water":
+			farm.water = mini(farm.water + carried, farm.water_capacity())
 		else:
 			farm.stock[carried_crop] += carried
 		_farm_changed = true
@@ -632,6 +736,21 @@ func _deposit(farm: Farm) -> void:
 	carried_crop = ""
 	_carrying_seed = false
 
+## Drinks from the camp store at home, refilling the skin; sips from the skin otherwise.
+func _drink(farm: Farm) -> void:
+	if position == home:
+		var ml := mini(farm.water, floori(dehydration * 1000.0 + EPSILON))
+		farm.water -= ml
+		dehydration -= ml / 1000.0
+		var refill := mini(farm.water, SKIN - skin)
+		farm.water -= refill
+		skin += refill
+	if dehydration >= SIP - EPSILON:
+		var sip := mini(skin, floori(dehydration * 1000.0 + EPSILON))
+		skin -= sip
+		dehydration -= sip / 1000.0
+	dehydration = maxf(0.0, dehydration)
+
 func _die() -> void:
 	activity = "Dead"
-	message = "Game Over. " + ("Exposure health reached zero." if exposure.health <= 0 else "Starvation health reached zero.")
+	message = "Game Over. " + ("Exposure health reached zero." if exposure.health <= 0 else ("Dehydration health reached zero." if water_health() <= 0 else "Starvation health reached zero."))

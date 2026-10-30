@@ -4,7 +4,7 @@ var output := "/private/tmp/razes-survival-captures"
 func _initialize() -> void: call_deferred("run")
 func shot(title: String) -> void:
 	await create_timer(0.3).timeout
-	game._woodland.show_conditions(game._human_actor.position,game._camera.position,Vector2(0.2,0.04),game.snow_cover)
+	game._woodland.show_conditions(game._human_actor.position,game._camera.position,Vector2(0.2,0.04),game.farm.snow_cover)
 	await RenderingServer.frame_post_draw
 	root.get_texture().get_image().save_png(output.path_join(title+".png"))
 	# Change scene transforms outside the renderer callback.
@@ -59,7 +59,7 @@ func run() -> void:
 	game.day=Calendar.DAYS_PER_SEASON*2+40;game._show_farm()
 	game._zoom=18;game._place_camera(Vector3.ZERO)
 	await shot("autumn")
-	game.day=Calendar.DAYS_PER_SEASON*3+10;game.snow_cover=1;game._start_day()
+	game.day=Calendar.DAYS_PER_SEASON*3+10;game.farm.snow_cover=1;game._start_day()
 	game._day_time=game.seconds_per_day*0.9;game._show_date();game._show_person()
 	await shot("winter-night")
 	root.size=Vector2i(1000,700);game._open_sleep()
