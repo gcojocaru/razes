@@ -53,6 +53,8 @@ const TIRED_PACE := {70.0: 0.8, 90.0: 0.6}
 ## The peasant made on the creation screen, if any. Each new game's farmer is made
 ## from them, so Restart keeps them.
 static var peasant := {}
+## Everything a save needs to resume this farmer exactly; exposure is saved apart.
+const SAVED := ["name", "height", "start_fat", "start_lean", "home", "position", "facing", "activity", "job", "queue", "carried_crop", "carried", "fat", "lean", "glycogen", "stomach", "stomach_kcal", "fatigue", "message", "sleep_remaining", "eating_requested", "meal_crop", "meal_grams", "build_remaining", "build_reserved", "meal_fuel", "recovering", "_absolute_hour", "_thermal_key", "_thermal_rate", "_carrying_seed", "_returning_home", "_cooking_remaining", "_route", "_route_destination"]
 
 var name := "Ion"
 var height := HEIGHT

@@ -113,22 +113,15 @@ func ground_wood() -> int:
 func can_camp(cell: Vector2i) -> bool:
 	return not woodland.has(cell) and not wood_piles.has(cell)
 
-## Preview/forecast copies own every mutable resource and plot collection.
+## Every mutable resource and plot collection: forecast copies own them and saves store them.
+const SAVED := ["stock", "plots", "years", "wood", "shelter", "heating_enabled", "fire_lit", "fuel_remainder", "woodland", "wood_piles", "regrowth", "plowing"]
+
 func copy_state() -> Farm:
 	var copy := Farm.new()
 	copy.terrain = terrain
-	copy.stock = stock.duplicate()
-	copy.plots = plots.duplicate(true)
-	copy.years = years.duplicate(true)
-	copy.wood = wood
-	copy.shelter = shelter
-	copy.heating_enabled = heating_enabled
-	copy.fire_lit = fire_lit
-	copy.fuel_remainder = fuel_remainder
-	copy.woodland = woodland.duplicate()
-	copy.wood_piles = wood_piles.duplicate()
-	copy.regrowth = regrowth.duplicate()
-	copy.plowing = plowing.duplicate()
+	for property in SAVED:
+		var value: Variant = get(property)
+		copy.set(property, value.duplicate(true) if value is Dictionary else value)
 	return copy
 
 ## Display kilograms without losing gram precision or adding trailing zeroes.

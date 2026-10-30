@@ -253,7 +253,17 @@ with the game.
 The field uses CC0 grass and ploughed-soil textures (see their
 [sources](godot/assets/textures/SOURCE.md)); crops are instanced stalks sized
 and coloured on the GPU from a per-plot data texture.
-Current version: **0.1.2**. No saves yet.
+Current version: **0.1.2**.
+
+The game autosaves each dawn and when the window closes to one slot,
+`user://save.dat`. **Continue** on the title screen (focused when a save exists)
+resumes it paused: the field, woodland, camp and hut, stores, the farmer's body,
+exposure and unfinished jobs, on the same land, terrain and weather. Saves are
+written beside the slot and renamed over it, so a failed write keeps the last
+good save; an unreadable save is set aside as `save.dat.bad` and the menu offers
+only Play. Death deletes the save. Restart and Play begin a fresh game, whose
+first dawn replaces the old save. Saves from an older version are rejected, not
+migrated, while the game is unreleased.
 
 The menu loops **Drumul Dracului – (Moldavian Medieval Song)** from the
 [user-selected recording](https://www.youtube.com/watch?v=HdnlsAkVnmk), at -14 dB.
@@ -307,6 +317,7 @@ script), then run the tests:
 ./godot/run.sh --headless --script tests/test_shelter.gd
 ./godot/run.sh --headless --script tests/test_exposure.gd
 ./godot/run.sh --headless --script tests/test_woodland_scene.gd
+./godot/run.sh --headless --script tests/test_save.gd
 ```
 
 The menu test checks title spelling/font coverage, version, initial keyboard focus,
@@ -353,6 +364,11 @@ route cancellation and sleep forecasts while already returning home. The scene
 test checks hill/water picking, grounded people and camera clearance; run it
 without `--headless` to also inspect actual crop instance transforms, which the
 dummy renderer discards.
+The save test writes only under `/tmp/stefan-save` (test runs never touch the
+player's slot). It saves a game mid-job, restores it into a fresh scene, checks
+every saved field and that both games stay identical for 48 game hours, and
+checks the dawn autosave, eight kinds of corrupt save, the menu's Continue and
+deletion at death.
 To capture actual GPU-rendered screens:
 
 ```sh

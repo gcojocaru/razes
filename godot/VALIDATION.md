@@ -720,3 +720,20 @@ storage limits: bags are a display, so the store holds any amount.
   and 1000×700 cover empty selection, all actions together and seed shortage;
   the panel fits both sizes. Godot still reports shader/resource cleanup
   warnings at process exit. VoiceOver has not been checked.
+
+## Save and Continue — 30 October 2026
+
+- One autosave slot (`user://save.dat`), written at each dawn and on window
+  close via a temporary file renamed over the slot. Terrain and weather rebuild
+  from saved seeds; the farm, farmer, exposure, land, peasant and camp are
+  plain fields. `Farm.SAVED` now also drives `copy_state()`.
+- `tests/test_save.gd` restores a game saved mid-plowing/chopping with a meal
+  pending, matches every saved field, then advances both games 48 game hours
+  and finds them identical. It rejects garbage, truncated, wrong-version,
+  wrong-type, out-of-range cell, unknown skin, too many ponds and out-of-day
+  saves, setting each aside as `.bad`. It also checks that Continue sits above
+  Play with focus, opens the saved day paused, and that death deletes the save.
+- Test runs detect their own SceneTree script and leave the save path empty,
+  so suites cannot overwrite a player's slot.
+- Not checked: the Continue button in a GPU capture, saving on window close in
+  the running app, and save-write failures surfacing anywhere but the log.
