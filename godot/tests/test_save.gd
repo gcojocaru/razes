@@ -28,7 +28,7 @@ func differences(a: Node, b: Node) -> Array:
 		if var_to_str(a.farm.get(property)) != var_to_str(b.farm.get(property)): different.append("farm." + property)
 	for property in Human.SAVED:
 		if var_to_str(a.human.get(property)) != var_to_str(b.human.get(property)): different.append("human." + property)
-	for property in SaveGame.EXPOSURE + ["day", "_day_time", "snow_cover", "weather_seed", "terrain_seed"]:
+	for property in SaveGame.EXPOSURE + ["day", "_day_time", "weather_seed", "terrain_seed"]:
 		var owner: Object = a.human.exposure if property in SaveGame.EXPOSURE else a
 		var other: Object = b.human.exposure if property in SaveGame.EXPOSURE else b
 		if var_to_str(owner.get(property)) != var_to_str(other.get(property)): different.append(property)

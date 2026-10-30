@@ -737,3 +737,26 @@ storage limits: bags are a display, so the store holds any amount.
   so suites cannot overwrite a player's slot.
 - Not checked: the Continue button in a GPU capture, saving on window close in
   the running app, and save-write failures surfacing anywhere but the log.
+
+## Water and thirst — 30 October 2026
+
+- The body loses 0.1 L an hour per 65 kg plus sweat from `Exposure.rates()`;
+  health falls from a 4% body-mass loss and is gone at 10%. The farmer drinks
+  from the camp store at home, refills a 2 L skin and sips from it away. Fetch
+  water and Melt snow are camp-wheel jobs queued ahead of field work. Pond ice,
+  snow and the hut's rain barrel update with each day's `Farm.grow()`. Porridge
+  reserves 4 ml of water per gram and hydrates when eaten. Custom land keeps at
+  least one pond.
+- `tests/test_water.gd` covers death at rest in 60–70 h, drinking, skin sips,
+  sweat, the reachable bank, trip order and cap, ice timing, melting with and
+  without the fire, the barrel, freezing and thawing, sleep forecasts and
+  porridge water. The starvation check now gives the farmer ample water; the
+  camp-food check lists Fetch water.
+- The scripted survival player (`sim_first_year.gd`) now orders water when the
+  store drops below 20 L. Steppe, Hills and Lakeland, 3 seeds each, survive 2
+  years with harvests within a kilogram of the code without water.
+- GPU captures (Apple M4/OpenGL) checked the camp wheel with Fetch water and,
+  with snow lying, Melt snow at the 1000×700 minimum, the farmer panel, the Body
+  window's Water section and the porridge water line.
+- Not checked: playtesting whether trips feel tedious, and water quality or
+  illness.

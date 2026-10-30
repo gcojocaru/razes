@@ -44,7 +44,9 @@ func rates(climate: Dictionary, effort: float, mass: float, basal: float, shelte
 	hot += (0.0 if sheltered else solar * 0.6) + maxf(0.0, air - 20.0) * maxf(0.0, effort - 1.4) * 0.025
 	var wet_cooling := wetness * (maxf(0.0, 12.0 - air) * 0.07 + maxf(0.0, air - 22.0) * 0.025)
 	var target := 37.0 - cold + work_warmth + shiver_warmth + hot - wet_cooling
-	return {"wet":wetting * (1.0 - wetness) - drying * wetness, "temperature":(target - core) / clampf(1.2 * mass / 65.0, 0.8, 1.8)}
+	# Litres of sweat an hour: effort above idle, and far more in heat (Sawka et al. 2007).
+	var sweat := 0.08 * maxf(0.0, effort - 1.4) + maxf(0.0, air - 18.0) * 0.015 * (0.5 + maxf(0.0, effort - 1.4))
+	return {"wet":wetting * (1.0 - wetness) - drying * wetness, "temperature":(target - core) / clampf(1.2 * mass / 65.0, 0.8, 1.8), "sweat":sweat * (0.6 if sheltered else 1.0)}
 
 func _health_delta(hours: float, temperature_rate: float, resting: bool) -> float:
 	var end := core + temperature_rate * hours

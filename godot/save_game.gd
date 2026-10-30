@@ -7,7 +7,7 @@ const VERSION := 1
 const Terrain := preload("res://terrain.gd")
 const Exposure := preload("res://exposure.gd")
 const Actor := preload("res://human_actor.gd")
-const GAME := {"day": TYPE_INT, "_day_time": TYPE_FLOAT, "seconds_per_day": TYPE_FLOAT, "snow_cover": TYPE_FLOAT, "terrain_seed": TYPE_INT, "weather_seed": TYPE_INT, "_seed_choice": TYPE_STRING}
+const GAME := {"day": TYPE_INT, "_day_time": TYPE_FLOAT, "seconds_per_day": TYPE_FLOAT, "terrain_seed": TYPE_INT, "weather_seed": TYPE_INT, "_seed_choice": TYPE_STRING}
 const EXPOSURE := ["wetness", "core", "health"]
 const CELLS := ["plots", "woodland", "wood_piles", "regrowth", "plowing"]
 
@@ -69,7 +69,7 @@ static func _valid(data: Dictionary) -> bool:
 	if data.get("version") != VERSION or not _shaped(data, {"land": TYPE_DICTIONARY, "peasant": TYPE_DICTIONARY, "camp": TYPE_VECTOR2, "game": TYPE_DICTIONARY, "farm": TYPE_DICTIONARY, "human": TYPE_DICTIONARY, "exposure": TYPE_DICTIONARY}):
 		return false
 	var land: Dictionary = data.land
-	if not _shaped(land, {"hills": TYPE_FLOAT, "ponds": TYPE_INT}) or land.hills < 0.0 or land.hills > Terrain.MAX_HILLS or land.ponds < 0 or land.ponds > 4:
+	if not _shaped(land, {"hills": TYPE_FLOAT, "ponds": TYPE_INT}) or land.hills < 0.0 or land.hills > Terrain.MAX_HILLS or land.ponds < 1 or land.ponds > 4:
 		return false
 	var peasant: Dictionary = data.peasant
 	if not peasant.is_empty():
@@ -93,7 +93,7 @@ static func _valid(data: Dictionary) -> bool:
 		for cell: Variant in data.farm[collection]:
 			if not cell is Vector2i or cell.x < 0 or cell.y < 0 or cell.x >= 16 or cell.y >= 16:
 				return false
-	for grams: Variant in data.farm.stock.values() + data.farm.wood_piles.values() + [data.farm.wood, data.human.carried, data.human.meal_grams, data.human.build_reserved, data.human.meal_fuel]:
+	for grams: Variant in data.farm.stock.values() + data.farm.wood_piles.values() + [data.farm.wood, data.farm.water, data.human.skin, data.human.carried, data.human.meal_grams, data.human.build_reserved, data.human.meal_fuel, data.human.meal_water]:
 		if not grams is int or grams < 0:
 			return false
 	return true

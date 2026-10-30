@@ -133,6 +133,8 @@ func test_created_body() -> void:
 func test_starvation() -> void:
 	var person = Model.new()
 	var farm := _old_farm()
+	# Hunger strikers drink: plenty of water isolates starvation from thirst.
+	farm.water = 1000000000
 	var hurt := -1
 	var days := 0
 	while person.activity != "Dead" and days < 120:

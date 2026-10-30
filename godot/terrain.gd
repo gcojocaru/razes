@@ -28,6 +28,8 @@ var hills: float
 var ponds: Array[Dictionary] = []
 ## Where the camp stands, in world units; see set_camp().
 var camp := CAMP
+## The reachable lattice point beside water nearest the camp, or INF without water.
+var bank := Vector2.INF
 var _noise := FastNoiseLite.new()
 var _heights := PackedFloat32Array()
 var _navigation := AStar2D.new()
@@ -85,6 +87,13 @@ func set_camp(point: Vector2) -> bool:
 		for z in 16:
 			var cell := Vector2i(x, z)
 			_reasons[cell] = _cell_reason(cell)
+	bank = Vector2.INF
+	for shore_point: Vector2i in _reachable:
+		var shore := false
+		for direction in 8:
+			shore = shore or height_at(Vector2(shore_point) + Vector2.from_angle(direction * TAU / 8.0)) <= WATER_LEVEL
+		if shore and Vector2(shore_point).distance_to(camp) < bank.distance_to(camp):
+			bank = Vector2(shore_point)
 	# The plot the camp stands on is not farmed; off-field camps block nothing.
 	var camp_cell := Vector2i(((camp + Vector2.ONE * 16.0) / 2.0).floor())
 	if _reasons.has(camp_cell):

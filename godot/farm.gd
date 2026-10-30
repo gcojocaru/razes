@@ -66,6 +66,16 @@ var heating_enabled := true
 var fire_lit := false
 ## Fractional grams accrued since the last whole gram was burned.
 var fuel_remainder := 0.0
+## Camp water in ml (grams): jars hold 40 litres; the hut adds a 100-litre rain barrel
+## filled from its roof (about 10 m², so 1 mm of rain gives 10 litres).
+const WATER_JARS := 40000
+const RAIN_BARREL := 100000
+const ROOF_CATCH := {"Rain": 40000, "Storm": 80000}
+const MELTABLE_SNOW := 0.3
+var water := 20000
+## Ponds freeze after a hard frost and thaw above freezing; snow lies 0–1 deep.
+var pond_frozen := false
+var snow_cover := 0.0
 
 ## Cell -> chopping hours left, ground grams, and day cleared/last cultivated.
 var woodland := {}
@@ -85,6 +95,9 @@ var plots := {}
 var years := {}
 ## Optional shared playable terrain; standalone crop simulations stay flat.
 var terrain: RefCounted
+
+func water_capacity() -> int:
+	return WATER_JARS + (RAIN_BARREL if shelter else 0)
 
 func fuel_hours() -> float:
 	return maxf(0.0, wood - fuel_remainder) / FUEL_PER_HOUR
@@ -114,7 +127,7 @@ func can_camp(cell: Vector2i) -> bool:
 	return not woodland.has(cell) and not wood_piles.has(cell)
 
 ## Every mutable resource and plot collection: forecast copies own them and saves store them.
-const SAVED := ["stock", "plots", "years", "wood", "shelter", "heating_enabled", "fire_lit", "fuel_remainder", "woodland", "wood_piles", "regrowth", "plowing"]
+const SAVED := ["stock", "plots", "years", "wood", "shelter", "heating_enabled", "fire_lit", "fuel_remainder", "woodland", "wood_piles", "regrowth", "plowing", "water", "pond_frozen", "snow_cover"]
 
 func copy_state() -> Farm:
 	var copy := Farm.new()
@@ -294,6 +307,16 @@ static func daily_growth(name: String, weather: Dictionary) -> float:
 ## them, growing days count towards the harvest's size, warmth lets grass back
 ## onto stubble and dead crops, and land without a crop regains fertility.
 func grow(weather: Dictionary, day: int) -> void:
+	if weather.condition == "Snow":
+		snow_cover = 1.0
+	elif weather.temperature > 2:
+		snow_cover = maxf(snow_cover - 0.02 * weather.temperature, 0.0)
+	if weather.temperature <= -3:
+		pond_frozen = true
+	elif weather.temperature >= 2:
+		pond_frozen = false
+	if shelter:
+		water = mini(water + ROOF_CATCH.get(weather.condition, 0), water_capacity())
 	for cell in regrowth.keys():
 		if stage(cell) != "Grass" or (terrain != null and terrain.cell_reason(cell) == "Camp") or wood_piles.has(cell):
 			regrowth[cell] = day

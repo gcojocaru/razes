@@ -71,9 +71,11 @@ func show_person(person) -> void:
 		_activity.text += " · %s h left" % String.num(person.job.remaining, 1).trim_suffix(".0")
 	_activity.text += "\n%d job%s queued" % [waiting, "" if waiting == 1 else "s"]
 	_needs.text = "Energy: %d kcal  ·  Stomach: %d%%\nWeight: %.1f kg  ·  BMI %.1f\nFatigue: %d%%  ·  Health: %d%%" % [roundi(person.glycogen), roundi(person.stomach / Human.STOMACH_GRAMS * 100.0), person.mass(), person.bmi(), roundi(person.fatigue), roundi(person.health)]
-	_needs.tooltip_text = "Camp offers food, sleep, recovery, heating and shelter construction. Cold/wet and hot work can cause exposure injury. Meals fill the stomach and digest into ready energy. Without it the body burns fat and muscle: weight falls, and health drops below a BMI of 18.5 and is gone at 12.5. Sleep clears fatigue, which slows work and walking from 70%."
+	_needs.tooltip_text = "Camp offers food, sleep, recovery, heating and shelter construction. Cold/wet and hot work can cause exposure injury. Meals fill the stomach and digest into ready energy. Without it the body burns fat and muscle: weight falls, and health drops below a BMI of 18.5 and is gone at 12.5. Sleep clears fatigue, which slows work and walking from 70%. The farmer drinks from the camp's water at home and sips from a 2 L skin away; heat and hard work sweat out more. Losing 4% of body mass in water harms health and 10% kills."
 	_supplies.text = "Seed reserved: %s kg\nShelter reserved: %s kg" % [Farm.kg(person.reserved_seed()), Farm.kg(person.build_reserved)]
 	_needs.text += "\nCore: %.1f°C · Wet: %d%%\n%s" % [person.exposure.core, roundi(person.exposure.wetness * 100), person.exposure.warning()]
+	var dry: float = person.dehydration / person.mass()
+	_needs.text += "\nThirst: %.1f L · Skin: %.1f L\n%s" % [person.dehydration, person.skin / 1000.0, "Parched: fetch water now" if dry >= Human.DRY else ("Thirsty: fetch water" if dry >= Human.THIRSTY else "Watered")]
 	_wake_button.text = "Stop recovery" if person.recovering else "Wake up"
 	_wake_button.tooltip_text = "End recovery and resume work (R)" if person.recovering else "End the chosen sleep early (R)"
 	_wake_button.visible = person.sleep_remaining > 0 or person.recovering

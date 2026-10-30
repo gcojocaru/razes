@@ -29,7 +29,6 @@ var weather_seed := randi()
 var weather := Weather.new(weather_seed)
 var today := {}
 ## 0–1 snow lying on the field: snow days cover it, warm days melt it.
-var snow_cover := 0.0
 var _sun: DirectionalLight3D
 var _environment: Environment
 var _weather_effects: Node3D
@@ -242,6 +241,12 @@ func _ready() -> void:
 	_camp_menu.recover_selected.connect(func() -> void:
 		human.recover()
 		_show_person())
+	_camp_menu.water_selected.connect(func() -> void:
+		human.fetch_water(farm)
+		_show_farm())
+	_camp_menu.melt_selected.connect(func() -> void:
+		human.melt_snow(farm)
+		_show_farm())
 	_camp_menu.heat_selected.connect(func() -> void:
 		farm.heating_enabled = not farm.heating_enabled
 		_show_person())
@@ -276,7 +281,7 @@ func _resume(data: Dictionary) -> void:
 	_camp.position = _surface_point(terrain.camp)
 	today = weather.on(day)
 	for material in [_field, _stalks]:
-		material.set_shader_parameter("snow", snow_cover)
+		material.set_shader_parameter("snow", farm.snow_cover)
 	_weather_audio.show_weather(today.condition, true)
 	_weather_effects.show_weather(today.condition, true)
 	set_speed(0)
@@ -472,16 +477,12 @@ func _wake_up() -> void:
 ## Rolls the weather for the current day and applies it to the sky and field.
 func _start_day() -> void:
 	today = weather.on(day)
-	if today.condition == "Snow":
-		snow_cover = 1.0
-	elif today.temperature > 2:
-		snow_cover = maxf(snow_cover - 0.02 * today.temperature, 0.0)
+	farm.grow(today, day)
 	# The first day appears at once; later days blend in.
 	_weather_audio.show_weather(today.condition, _weather_effects.condition == "")
 	_weather_effects.show_weather(today.condition, _weather_effects.condition == "")
 	for material in [_field, _stalks]:
-		material.set_shader_parameter("snow", snow_cover)
-	farm.grow(today, day)
+		material.set_shader_parameter("snow", farm.snow_cover)
 	_show_farm()
 	_show_date()
 	if not placing_camp and human.activity != "Dead":
@@ -667,7 +668,7 @@ func _process(delta: float) -> void:
 	if is_instance_valid(_weather_audio):
 		_weather_effects.set_wind(_weather_audio.wind_direction, _weather_audio.wind_strength)
 		_stalks.set_shader_parameter("wind", _weather_audio.wind_direction * _weather_audio.wind_strength)
-		_woodland.show_conditions(_human_actor.position, _camera.position, _weather_audio.wind_direction * _weather_audio.wind_strength, snow_cover)
+		_woodland.show_conditions(_human_actor.position, _camera.position, _weather_audio.wind_direction * _weather_audio.wind_strength, farm.snow_cover)
 	if speed > 0:
 		advance_time(delta * speed)
 		# Real time, not game time: at 144x a game-time stride only flickers.
