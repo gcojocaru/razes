@@ -5,6 +5,7 @@ const GRID_SIZE := 16
 const CELL_SIZE := 2.0
 const Terrain := preload("res://terrain.gd")
 const TimeHud := preload("res://time_hud.gd")
+const SaveGame := preload("res://save_game.gd")
 const METRES_TO_UNITS := CELL_SIZE / 10.0
 const PAN_SPEED := 18.0
 const ZOOM_STEP := 2.0
@@ -24,7 +25,8 @@ var _time_hud: PanelContainer
 var _debug_panel: PanelContainer
 var _agri_debug: PanelContainer
 
-var weather := Weather.new(randi())
+var weather_seed := randi()
+var weather := Weather.new(weather_seed)
 var today := {}
 ## 0–1 snow lying on the field: snow days cover it, warm days melt it.
 var snow_cover := 0.0
@@ -61,6 +63,8 @@ var _camp_press := Vector2.INF
 var _camp: Node3D
 ## Set by the creation screen so each new game starts by choosing the camp's place.
 static var choose_camp := false
+## A save read by the menu's Continue; the next game resumes it, then clears it.
+static var continue_save := {}
 ## While true, the next left click on the ground places the camp; _first_camp
 ## is true until the camp has been placed once this game.
 var placing_camp := false
@@ -90,6 +94,14 @@ var _woodland: Node3D
 var _zoom := 36.0
 
 func _ready() -> void:
+	var resumed := continue_save
+	continue_save = {}
+	if not resumed.is_empty():
+		terrain_seed = resumed.game.terrain_seed
+		weather_seed = resumed.game.weather_seed
+		weather = Weather.new(weather_seed)
+		Terrain.land = resumed.land
+		Human.peasant = resumed.peasant
 	terrain = Terrain.new(terrain_seed, Terrain.land)
 	farm.terrain = terrain
 	farm.generate_woodland(terrain_seed)
@@ -247,10 +259,34 @@ func _ready() -> void:
 	hud.add_child(_camp_hint)
 	_game_over = _make_game_over()
 	hud.add_child(_game_over)
+	if not resumed.is_empty():
+		_resume(resumed)
+		return
 	_start_day()
 	if choose_camp:
 		_first_camp = true
 		_start_camp_placement()
+
+## Restores a saved game into the freshly built scene, paused to get one's bearings.
+func _resume(data: Dictionary) -> void:
+	SaveGame.apply(data, self)
+	if not terrain.set_camp(data.camp):
+		push_warning("The saved camp is no longer valid; choose a new one")
+		human.home = terrain.camp / METRES_TO_UNITS
+	_camp.position = _surface_point(terrain.camp)
+	today = weather.on(day)
+	for material in [_field, _stalks]:
+		material.set_shader_parameter("snow", snow_cover)
+	_weather_audio.show_weather(today.condition, true)
+	_weather_effects.show_weather(today.condition, true)
+	set_speed(0)
+	_show_farm()
+	_show_date()
+	_focus_person()
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_WM_CLOSE_REQUEST and not placing_camp and human.activity != "Dead":
+		SaveGame.save(self)
 
 ## Pauses and waits for a left click on dry, walkable ground for the camp.
 func _start_camp_placement() -> void:
@@ -352,6 +388,7 @@ func _end_game() -> void:
 		if is_instance_valid(window):
 			window.hide()
 	get_viewport().gui_release_focus()
+	SaveGame.delete()
 	_game_over.show()
 	_show_date()
 
@@ -447,6 +484,8 @@ func _start_day() -> void:
 	farm.grow(today, day)
 	_show_farm()
 	_show_date()
+	if not placing_camp and human.activity != "Dead":
+		SaveGame.save(self)
 
 ## Orders `action` (every ready action when empty) on the selected plots.
 func work(action := "") -> void:
