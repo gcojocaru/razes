@@ -144,3 +144,23 @@ The game now tracks core temperature, wetness and exposure health alongside the 
 `exposure.gd` documents game coefficients: precipitation/sweat increase wetness, drying is faster with wind/warmth/fire, and body temperature approaches an environment/activity target with a mass-scaled 1.2-hour response. Shivering adds up to twice basal energy use, scaled at 0.6 basal per degree below 36.5°C. Exposure health loses four points per degree-hour below 35°C or above 39°C and recovers two points/hour during comfortable camp rest. Warning bands are 36–38°C. Rates are frozen per calendar minute and clipped at thermal/wetness/fuel/death boundaries for deterministic time subdivision. These are gameplay approximations, not a medical heat-balance solver.
 
 All outfits use one fixed insulation assumption. Drinking water, dehydration, illnesses, frostbite, heat acclimation and detailed material insulation are omitted. Roof protection and a vented wood hearth are simplified thermal effects, not a historical reconstruction. Wood yield (240 kg/plot), work (6h clearing, 8h building), hut cost (300 kg), fuel (0.5 kg/h), and two-year regrowth are initial tuning choices.
+
+## Water — 30 October 2026
+
+- Baseline loss: EFSA's 2010 dietary reference values give an adequate total water
+  intake of 2.5 litres a day for adult men, about 2.0 for women. The game uses a
+  base 0.1 litre an hour (2.4 a day) for a 65 kg body, scaled by mass.
+- Sweat: the American College of Sports Medicine position stand on exercise and
+  fluid replacement (Sawka et al. 2007) reports sweat rates of roughly 0.3–2.4
+  litres an hour depending on intensity and heat. The game's formula gives about
+  0.3 litre an hour hoeing in cool weather and about 1 litre an hour in 30°C sun.
+- Limits: performance falls from about 2% body-mass water loss (same stand);
+  losses of 10% or more are commonly cited as life-threatening. The rule of thumb
+  of about three days without water at rest sets the 10% death limit.
+- Rain barrel: a hut roof of about 10 m² catches 10 litres per millimetre of rain.
+  Daily Rain (about 4 mm) and Storm (8 mm) amounts are game tuning, not Chișinău
+  normals. Ice and snow-melting rates are game tuning too.
+- Not modelled: water quality and water-borne illness, electrolytes, alcohol, milk
+  and other drinks, and individual variation. These are game interpretations, not
+  medical predictions.
+

@@ -143,7 +143,7 @@ func _init() -> void:
 		lands[option] = button
 	lands.Hills.set_pressed_no_signal(true)
 	_slider(section, "Hills", 0.0, Terrain.MAX_HILLS, 1.0, 18.0, "How many metres the field's hills rise; Custom sets it")
-	_slider(section, "Ponds", 0.0, 4.0, 1.0, 2.0, "How many ponds lie in the field; Custom sets it")
+	_slider(section, "Ponds", 1.0, 4.0, 1.0, 2.0, "How many ponds lie in the field, at least one for water; Custom sets it")
 	_land_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	section.add_child(_land_note)
 	_footer()

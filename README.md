@@ -22,7 +22,7 @@ nights.
 Each new game generates playable hills and ponds inside the field from the land
 chosen before it starts: **Steppe** (hills up to 7 m, one pond: the most
 farmland), **Hills** (18 m, two ponds; the default), **Lakeland** (11 m, four
-ponds: the least farmland) or **Custom** (0–24 m and 0–4 ponds). Farm dry,
+ponds: the least farmland) or **Custom** (0–24 m and 1–4 ponds; every land keeps a pond for water). Farm dry,
 gentle slopes as usual; water, wet banks and steep plots show why they cannot
 be worked. The farmer follows dry routes around ponds for jobs, hauling, meals
 and sleep. A new game first pauses for you to click dry, gentle ground for the camp;
@@ -77,8 +77,27 @@ is at most 10% and temperature is 36.5–37.5°C. It provides no sleep bonus; **
 Stop recovery ends it early. Recovery may need a roof, wood, or heating switched
 off. Warnings never automatically abandon work. Sleep previews now replay the
 actual walk, future weather, shelter and fuel exhaustion and show temperature,
-wetness and remaining wood. Clothing choices remain cosmetic; water, diet quality,
+wetness and remaining wood. Clothing choices remain cosmetic; water quality, diet quality,
 illnesses and individual cold injuries are still abstracted.
+
+The farmer needs water. The body loses about **2.4 litres a day** at rest, and
+sweat adds up to about a litre an hour of hard work in summer heat (less under
+the roof, none idling in the cold). Thirst shows from a loss of 2% of body mass;
+health falls from **4%** and is gone at **10%**, under three days without any
+water at rest. At camp the farmer drinks from the **camp's water** by themself and
+refills a **2-litre skin**, sipping from it away from camp once a quarter litre
+is missing. Keeping the camp supplied is your job: **Fetch water** in the camp
+wheel queues 15-litre trips to the pond bank nearest the camp, ahead of queued
+field work, until the **40-litre jars** would be full; at the pond the farmer
+also drinks their fill. After a hard frost (−3°C) the pond freezes until a thaw
+(2°C), and each trip takes **half an hour** more to break the ice. With snow lying,
+**Melt snow** turns snow into 10 litres in 2 hours on the heating fire (heating on,
+wood needed). The completed hut adds a **100-litre rain barrel** fed by its roof:
+a rainy day adds 40 litres and a storm 80. Porridge cooks in **4 ml of water per
+gram** of grain, reserved with its grain and fuel, and eating it quenches thirst.
+The panel and **Body** show thirst, the skin and the litres lost an hour; the camp
+wheel shows the store. These rates are game tuning built on the
+[water notes](docs/historical-research.md#water--30-october-2026).
 
 Farming is the farming loop. Click a plot or drag over a rectangle of
 plots; hold **Shift** to add to the selection. Without a mouse, move the view
@@ -182,7 +201,7 @@ Sixteen idle hours awake build 70% fatigue and a day with nine hours of hoeing
 at 80% pace, from 90% at 60%. At zero health a centred **Game Over** message
 appears and gameplay, time and debug skips stop. Restart or Enter begins a fresh
 farm. F4 skips otherwise advance the farmer as well as the crops. Pause stops
-both; weather audio continues. Water, hulls and milling losses,
+both; weather audio continues. Hulls and milling losses,
 diet quality and illnesses are still abstracted, and the fatigue and pace
 figures are game tuning. See the
 [body sources](docs/historical-research.md#body-and-needs-model--25-october-2026).
@@ -253,7 +272,17 @@ with the game.
 The field uses CC0 grass and ploughed-soil textures (see their
 [sources](godot/assets/textures/SOURCE.md)); crops are instanced stalks sized
 and coloured on the GPU from a per-plot data texture.
-Current version: **0.1.2**. No saves yet.
+Current version: **0.1.2**.
+
+The game autosaves each dawn and when the window closes to one slot,
+`user://save.dat`. **Continue** on the title screen (focused when a save exists)
+resumes it paused: the field, woodland, camp and hut, stores, the farmer's body,
+exposure and unfinished jobs, on the same land, terrain and weather. Saves are
+written beside the slot and renamed over it, so a failed write keeps the last
+good save; an unreadable save is set aside as `save.dat.bad` and the menu offers
+only Play. Death deletes the save. Restart and Play begin a fresh game, whose
+first dawn replaces the old save. Saves from an older version are rejected, not
+migrated, while the game is unreleased.
 
 The menu loops **Drumul Dracului – (Moldavian Medieval Song)** from the
 [user-selected recording](https://www.youtube.com/watch?v=HdnlsAkVnmk), at -14 dB.
@@ -307,6 +336,8 @@ script), then run the tests:
 ./godot/run.sh --headless --script tests/test_shelter.gd
 ./godot/run.sh --headless --script tests/test_exposure.gd
 ./godot/run.sh --headless --script tests/test_woodland_scene.gd
+./godot/run.sh --headless --script tests/test_save.gd
+./godot/run.sh --headless --script tests/test_water.gd
 ```
 
 The menu test checks title spelling/font coverage, version, initial keyboard focus,
@@ -353,6 +384,15 @@ route cancellation and sleep forecasts while already returning home. The scene
 test checks hill/water picking, grounded people and camera clearance; run it
 without `--headless` to also inspect actual crop instance transforms, which the
 dummy renderer discards.
+The save test writes only under `/tmp/stefan-save` (test runs never touch the
+player's slot). It saves a game mid-job, restores it into a fresh scene, checks
+every saved field and that both games stay identical for 48 game hours, and
+checks the dawn autosave, eight kinds of corrupt save, the menu's Continue and
+deletion at death.
+The water test checks thirst damage and death at rest, drinking at home and from
+the skin, sweat in heat and cold, the camp's pond bank, fetch trips ahead of field
+work and their cap, pond ice, melting snow with and without the fire, the rain
+barrel, freezing and thawing, sleep forecasts with thirst and porridge water.
 To capture actual GPU-rendered screens:
 
 ```sh

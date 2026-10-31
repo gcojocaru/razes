@@ -181,6 +181,10 @@ func kept(farm: Farm, person: Human, policy: String, crop: String, day: int) -> 
 func survival(farm: Farm, person: Human, cells: Array, weather: Weather, day: int, hour: float) -> void:
 	var climate := weather.at(day, hour)
 	farm.heating_enabled = climate.temperature < 15.0 or person.exposure.core < 36.5
+	var watering: bool = person.queue.any(func(job: Dictionary) -> bool: return job.action in ["Fetch water", "Melt snow"]) or person.job.get("action", "") in ["Fetch water", "Melt snow"]
+	if farm.water < 20000 and not watering:
+		if farm.snow_cover >= Farm.MELTABLE_SNOW and farm.heating_enabled and farm.wood > 5000: person.melt_snow(farm)
+		else: person.fetch_water(farm)
 	if not farm.shelter and person.build_reserved == 0 and farm.wood >= Farm.SHELTER_WOOD:
 		person.build_shelter(farm)
 	if not person.eating_requested and person.sleep_remaining == 0:

@@ -6,6 +6,8 @@ signal move_selected
 signal build_selected
 signal heat_selected
 signal recover_selected
+signal water_selected
+signal melt_selected
 var _camp_farm: Farm
 var _person: Human
 
@@ -20,13 +22,14 @@ func _init() -> void:
 func show_camp(farm: Farm, person: Human) -> void:
 	_camp_farm = farm
 	_person = person
-	var next: Array[Dictionary] = [{"action":"Eat", "crop":""}, {"action":"Sleep", "crop":""}, {"action":"Move", "crop":""}, {"action":"Heat", "crop":""}, {"action":"Recover", "crop":""}]
+	var next: Array[Dictionary] = [{"action":"Eat", "crop":""}, {"action":"Sleep", "crop":""}, {"action":"Fetch water", "crop":""}, {"action":"Move", "crop":""}, {"action":"Heat", "crop":""}, {"action":"Recover", "crop":""}]
+	if farm.snow_cover >= Farm.MELTABLE_SNOW: next.insert(3, {"action":"Melt snow", "crop":""})
 	if not farm.shelter: next.append({"action":"Build", "crop":""})
 	if entries != next:
 		entries = next
 		if visible: _build_buttons()
 	_title = "Timber shelter" if farm.shelter else "Camp"
-	_detail = "%s kg wood · %s h fuel" % [Farm.kg(farm.wood), String.num(farm.fuel_hours(), 1)]
+	_detail = "%s kg wood · %s h fuel · %s L water" % [Farm.kg(farm.wood), String.num(farm.fuel_hours(), 1), _litres(farm.water)]
 	if visible:
 		_place_labels()
 		for index in mini(_buttons.size(), entries.size()):
@@ -38,8 +41,11 @@ func show_camp(farm: Farm, person: Human) -> void:
 func _show_hub() -> void:
 	super._show_hub()
 	if _camp_farm != null:
-		hub_detail.text = "%s kg wood\n%s h fuel" % [Farm.kg(_camp_farm.wood), String.num(_camp_farm.fuel_hours(), 1)]
+		hub_detail.text = "%s kg wood\n%s h fuel\n%s / %s L water" % [Farm.kg(_camp_farm.wood), String.num(_camp_farm.fuel_hours(), 1), _litres(_camp_farm.water), _litres(_camp_farm.water_capacity())]
 		hub_detail.tooltip_text = _detail + "\n" + ("Heating enabled" if _camp_farm.heating_enabled else "Heating off")
+
+static func _litres(ml: int) -> String:
+	return String.num(ml / 1000.0, 1).trim_suffix(".0")
 
 func open_at(at: Vector2) -> void:
 	_focused = 0
@@ -58,6 +64,8 @@ func _effect(entry: Dictionary) -> String:
 		"Build": return "300 kg wood · 8 h\nRoof and better sleep"
 		"Heat": return "0.5 kg/h at camp\nToggle heating"
 		"Recover": return "Return to camp\nDry, warm or cool down"
+		"Fetch water": return "15 L a trip from the pond\n" + ("Break the ice first" if _camp_farm != null and _camp_farm.pond_frozen else "Until the store is full")
+		"Melt snow": return "10 L in 2 h\nOn the heating fire"
 	return "Shelter cannot move" if _camp_farm != null and _camp_farm.shelter else "Pick a new place\non the field"
 
 func _tooltip(entry: Dictionary) -> String:
@@ -70,6 +78,8 @@ func _summary(entry: Dictionary) -> String:
 		"Build": return "300 kg · 8 h"
 		"Heat": return "0.5 kg/h at home"
 		"Recover": return "Dry and rest"
+		"Fetch water": return "Fill the store"
+		"Melt snow": return "Water from snow"
 	return "Fixed in place" if _camp_farm != null and _camp_farm.shelter else "Move camp"
 
 func _activate(index: int) -> void:
@@ -87,3 +97,5 @@ func _activate(index: int) -> void:
 		"Build": build_selected.emit()
 		"Heat": heat_selected.emit()
 		"Recover": recover_selected.emit()
+		"Fetch water": water_selected.emit()
+		"Melt snow": melt_selected.emit()

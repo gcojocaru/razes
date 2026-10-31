@@ -129,13 +129,15 @@ func _refresh_recipe() -> void:
 		_reason.text = "Choose an amount from the available grain."
 	elif valid_amount and _farm.wood < ceili(Human.porridge(selected_crop, int(quantity.value)).hours * Farm.FUEL_PER_HOUR + _farm.fuel_remainder - Human.EPSILON):
 		_reason.text = "Not enough wood for the cooking fire."
+	elif valid_amount and _farm.water < int(quantity.value) * Human.PORRIDGE_WATER:
+		_reason.text = "Not enough water at camp to cook it."
 	elif quantity.value > room:
 		_reason.text = "Too full: the stomach has room for %d g." % room
 	prepare.disabled = _reason.text != ""
 	var now := "Energy now: %d kcal · Stomach room: %d g" % [roundi(_person.glycogen), room]
 	if valid_amount:
 		var recipe: Dictionary = Human.porridge(selected_crop, int(quantity.value))
-		_preview.text = "%d kcal / 100 g dry grain\nMeal: %s kcal · %s min preparation\nCooking fuel: %s kg · deposited wood: %s kg\n%s" % [Farm.CROPS[selected_crop].kcal_per_100g, String.num(recipe.calories, 2).trim_suffix(".0"), String.num(recipe.hours * 60, 1).trim_suffix(".0"), Farm.kg(ceili(recipe.hours * Farm.FUEL_PER_HOUR + _farm.fuel_remainder - Human.EPSILON)), Farm.kg(_farm.wood), now]
+		_preview.text = "%d kcal / 100 g dry grain\nMeal: %s kcal · %s min preparation\nCooking fuel: %s kg · deposited wood: %s kg\nWater: %s L · at camp: %s L\n%s" % [Farm.CROPS[selected_crop].kcal_per_100g, String.num(recipe.calories, 2).trim_suffix(".0"), String.num(recipe.hours * 60, 1).trim_suffix(".0"), Farm.kg(ceili(recipe.hours * Farm.FUEL_PER_HOUR + _farm.fuel_remainder - Human.EPSILON)), Farm.kg(_farm.wood), String.num(recipe.water / 1000.0, 2), String.num(_farm.water / 1000.0, 1), now]
 	else:
 		_preview.text = now
 	if _person.exposure.core < 36 or _person.exposure.core > 38:
